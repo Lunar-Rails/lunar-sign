@@ -1,11 +1,24 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Document } from '@/lib/types'
+import { Company, Document } from '@/lib/types'
 import Link from 'next/link'
 
+interface DashboardDocument extends Document {
+  companies: Pick<Company, 'id' | 'name' | 'slug'>[]
+}
+
 interface DashboardSearchProps {
-  documents: Document[]
+  documents: DashboardDocument[]
+}
+
+/** Fixed locale + options so SSR (Node) and the browser produce the same string — avoids hydration mismatch. */
+function formatCreatedAt(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
 }
 
 function getStatusBadgeStyles(status: string) {
@@ -77,6 +90,9 @@ export default function DashboardSearch({
                 Created
               </th>
               <th className="py-3 text-left text-xs font-medium text-gray-500">
+                Companies
+              </th>
+              <th className="py-3 text-left text-xs font-medium text-gray-500">
                 Actions
               </th>
             </tr>
@@ -91,7 +107,23 @@ export default function DashboardSearch({
                   </span>
                 </td>
                 <td className="py-4 text-sm text-gray-600">
-                  {new Date(doc.created_at).toLocaleDateString()}
+                  {formatCreatedAt(doc.created_at)}
+                </td>
+                <td className="py-4 text-sm text-gray-600">
+                  {doc.companies.length === 0 ? (
+                    <span className="text-xs text-gray-500">Unassigned</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {doc.companies.map((company) => (
+                        <span
+                          key={company.id}
+                          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                        >
+                          {company.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="py-4 text-sm">
                   <Link

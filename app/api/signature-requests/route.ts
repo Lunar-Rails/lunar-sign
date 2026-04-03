@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { AddSignerSchema } from '@/lib/schemas'
 import { logAudit } from '@/lib/audit'
+import { canAccessDocument } from '@/lib/authorization'
 import { randomUUID } from 'crypto'
 
 export async function POST(request: NextRequest) {
@@ -35,13 +36,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check document exists and belongs to user
+    // Check document exists
     const { data: document } = await supabase
       .from('documents')
       .select('*')
       .eq('id', document_id)
-      .eq('uploaded_by', user.id)
-      .single()
+      .maybeSingle()
 
     if (!document) {
       return NextResponse.json(
@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    const hasDocumentAccess = await canAccessDocument({
+      supabase,
+      userId: user.id,
+      documentId: document_id,
+    })
+    if (!hasDocumentAccess)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     // Check document is still in draft status
     if (document.status !== 'draft') {
@@ -83,10 +91,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log audit
-    await logAudit(user.id, 'signer_added', 'signature_request', signatureRequest.id, {
+    // Log audit (entity_id = document so owners see it on document activity)
+    await logAudit(user.id, 'signer_added', 'document', document_id, {
       signer_email,
-      document_id,
+      signature_request_id: signatureRequest.id,
     })
 
     return NextResponse.json(
@@ -124,7 +132,7 @@ export async function DELETE(request: NextRequest) {
     // Get signature request
     const { data: sigRequest } = await supabase
       .from('signature_requests')
-      .select('document_id')
+      .select('document_id, signer_email')
       .eq('id', request_id)
       .single()
 
@@ -135,15 +143,26 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check document belongs to user and is draft
+    // Check document is accessible and draft
     const { data: document } = await supabase
       .from('documents')
       .select('*')
       .eq('id', sigRequest.document_id)
-      .eq('uploaded_by', user.id)
-      .single()
+      .maybeSingle()
 
-    if (!document || document.status !== 'draft') {
+    if (!document)
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
+      )
+
+    const hasDocumentAccess = await canAccessDocument({
+      supabase,
+      userId: user.id,
+      documentId: sigRequest.document_id,
+    })
+
+    if (!hasDocumentAccess || document.status !== 'draft') {
       return NextResponse.json(
         { error: 'Cannot remove signer from this document' },
         { status: 400 }
@@ -164,9 +183,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Log audit
-    await logAudit(user.id, 'signer_removed', 'signature_request', request_id, {
-      document_id: sigRequest.document_id,
+    // Log audit (entity_id = document so owners see it on document activity)
+    await logAudit(user.id, 'signer_removed', 'document', sigRequest.document_id, {
+      signature_request_id: request_id,
+      signer_email: sigRequest.signer_email,
     })
 
     return NextResponse.json({ success: true })

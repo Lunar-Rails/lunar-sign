@@ -1,0 +1,35 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import CompanyManagementTable from '@/components/CompanyManagementTable'
+import { Company } from '@/lib/types'
+
+export const dynamic = 'force-dynamic'
+
+export default async function CompanySettingsPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const [{ data: profile }, { data: companies }] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
+    supabase.from('companies').select('*').order('name', { ascending: true }),
+  ])
+
+  if (profile?.role !== 'admin') redirect('/dashboard')
+
+  const rows: Company[] = companies || []
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <h1 className="mb-2 text-3xl font-bold text-gray-900">Companies</h1>
+      <p className="mb-8 text-gray-600">
+        Manage workspace-like company groups used to organize documents.
+      </p>
+
+      <CompanyManagementTable initialCompanies={rows} />
+    </div>
+  )
+}

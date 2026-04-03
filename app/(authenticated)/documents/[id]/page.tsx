@@ -2,15 +2,19 @@ import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
 
-import { Document, SignatureRequest, AuditLog } from '@/lib/types'
+import { Document, SignatureRequest, Company } from '@/lib/types'
+import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 
 import AddSignerForm from '@/components/AddSignerForm'
 
 import SignersSection from '@/components/SignersSection'
 
-import AuditTimeline from '@/components/AuditTimeline'
+import { AuditTimeline } from '@/components/AuditTimeline'
 
 import SendDocumentButton from '@/components/SendDocumentButton'
+import { CancelDocumentButton } from '@/components/CancelDocumentButton'
+import DocumentPdfPreview from '@/components/DocumentPdfPreview'
+import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +57,6 @@ export default async function DocumentDetailPage({
     .from('documents')
     .select('*')
     .eq('id', id)
-    .eq('uploaded_by', user.id)
     .single()
 
   if (!document) {
@@ -62,23 +65,55 @@ export default async function DocumentDetailPage({
 
   const doc: Document = document
 
-  // Fetch signature requests
-  const { data: signatureRequests } = await supabase
-    .from('signature_requests')
-    .select('*')
-    .eq('document_id', id)
-    .order('created_at', { ascending: true })
+  const [
+    { data: signatureRequests },
+    { data: auditLogs },
+    { data: companies },
+    { data: assignedCompanyRows },
+  ] = await Promise.all([
+    supabase
+      .from('signature_requests')
+      .select('*')
+      .eq('document_id', id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('audit_log')
+      .select(
+        `
+        id,
+        actor_id,
+        action,
+        entity_type,
+        entity_id,
+        metadata,
+        created_at,
+        profiles:actor_id(email, full_name)
+      `
+      )
+      .eq('entity_id', id)
+      .eq('entity_type', 'document')
+      .order('created_at', { ascending: false }),
+    supabase.from('companies').select('*').order('name', { ascending: true }),
+    supabase
+      .from('document_companies')
+      .select('company_id, companies(id, name, slug)')
+      .eq('document_id', id),
+  ])
 
+  const allCompanies: Company[] = companies || []
+  const assignedCompanies = (assignedCompanyRows || [])
+    .flatMap((row) => {
+      const value = row.companies as
+        | Pick<Company, 'id' | 'name' | 'slug'>
+        | Pick<Company, 'id' | 'name' | 'slug'>[]
+        | null
+      if (!value) return []
+      if (Array.isArray(value)) return value
+      return [value]
+    })
+  const assignedCompanyIds = assignedCompanies.map((company) => company.id)
   const signers: SignatureRequest[] = signatureRequests || []
-
-  // Fetch audit logs for this document
-  const { data: auditLogs } = await supabase
-    .from('audit_logs')
-    .select('*')
-    .eq('entity_id', id)
-    .order('created_at', { ascending: false })
-
-  const logs: AuditLog[] = auditLogs || []
+  const logs = mapSupabaseAuditRows(auditLogs)
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -95,6 +130,9 @@ export default async function DocumentDetailPage({
           {doc.status === 'draft' && signers.length > 0 && (
             <SendDocumentButton documentId={doc.id} />
           )}
+          {doc.status === 'pending' && (
+            <CancelDocumentButton documentId={doc.id} />
+          )}
           {doc.status === 'completed' && (
             <a
               href={`/api/documents/${doc.id}/download`}
@@ -110,6 +148,8 @@ export default async function DocumentDetailPage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Left Column - Document Info and Signers */}
         <div className="lg:col-span-2 space-y-6">
+          <DocumentPdfPreview documentId={doc.id} />
+
           {/* Document Metadata */}
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
@@ -126,6 +166,25 @@ export default async function DocumentDetailPage({
                   <span className={getStatusBadgeStyles(doc.status)}>
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                   </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Companies</dt>
+                <dd className="mt-1">
+                  {assignedCompanies.length === 0 ? (
+                    <span className="text-sm text-gray-500">Unassigned</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {assignedCompanies.map((company) => (
+                        <span
+                          key={company.id}
+                          className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+                        >
+                          {company.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </dd>
               </div>
               <div>
@@ -148,6 +207,12 @@ export default async function DocumentDetailPage({
               )}
             </dl>
           </div>
+
+          <DocumentCompaniesEditor
+            documentId={doc.id}
+            companies={allCompanies}
+            selectedCompanyIds={assignedCompanyIds}
+          />
 
           {/* Signers Section */}
           <SignersSection

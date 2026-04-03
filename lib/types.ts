@@ -1,6 +1,10 @@
 export type UserRole = 'admin' | 'member'
 export type DocumentStatus = 'draft' | 'pending' | 'completed' | 'cancelled'
-export type SignatureRequestStatus = 'pending' | 'signed' | 'declined'
+export type SignatureRequestStatus =
+  | 'pending'
+  | 'signed'
+  | 'declined'
+  | 'cancelled'
 
 export interface Profile {
   id: string
@@ -20,6 +24,26 @@ export interface Document {
   latest_signed_pdf_path: string | null
   created_at: string
   completed_at: string | null
+}
+
+export interface Company {
+  id: string
+  name: string
+  slug: string
+  created_by: string
+  created_at: string
+}
+
+export interface DocumentCompany {
+  document_id: string
+  company_id: string
+  created_at: string
+}
+
+export interface CompanyMember {
+  company_id: string
+  user_id: string
+  created_at: string
 }
 
 export interface SignatureRequest {
@@ -53,4 +77,14 @@ export interface AuditLog {
   entity_id: string | null
   metadata: Record<string, unknown>
   created_at: string
+}
+
+/** Joined profile preview from `profiles:actor_id(...)` Supabase select */
+export interface AuditLogActorPreview {
+  email: string
+  full_name: string
+}
+
+export interface AuditLogWithActor extends AuditLog {
+  actor?: AuditLogActorPreview | null
 }

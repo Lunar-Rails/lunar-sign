@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
+import { canAccessDocument } from '@/lib/authorization'
 import { getConfig } from '@/lib/config'
 import nodemailer from 'nodemailer'
 
@@ -21,20 +22,26 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check document exists and belongs to user
+    // Check document exists
     const { data: document } = await supabase
       .from('documents')
       .select('*')
       .eq('id', documentId)
-      .eq('uploaded_by', user.id)
-      .single()
+      .maybeSingle()
 
-    if (!document) {
+    if (!document)
       return NextResponse.json(
         { error: 'Document not found' },
         { status: 404 }
       )
-    }
+
+    const hasDocumentAccess = await canAccessDocument({
+      supabase,
+      userId: user.id,
+      documentId,
+    })
+    if (!hasDocumentAccess)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     // Check document is in draft status
     if (document.status !== 'draft') {

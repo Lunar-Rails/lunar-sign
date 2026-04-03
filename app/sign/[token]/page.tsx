@@ -4,7 +4,7 @@ import { getServiceClient } from '@/lib/supabase/service'
 
 import { logAudit } from '@/lib/audit'
 
-import SigningInterface from '@/components/SigningInterface'
+import SigningInterfaceClient from '@/components/SigningInterfaceClient'
 
 import type { SignatureRequest, Document } from '@/lib/types'
 
@@ -33,11 +33,6 @@ export default async function SigningPage({ params }: SigningPageProps) {
       redirect(`/sign/${token}/not-found`)
     }
 
-    // Check if already signed
-    if (signatureRequest.status !== 'pending') {
-      redirect(`/sign/${token}/already-signed`)
-    }
-
     // Fetch document
     const { data: documentRaw } = await supabase
       .from('documents')
@@ -49,6 +44,36 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
     if (!document) {
       redirect(`/sign/${token}/not-found`)
+    }
+
+    const isRevoked =
+      document.status === 'cancelled' ||
+      signatureRequest.status === 'cancelled'
+
+    if (isRevoked) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
+          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-xl font-semibold text-gray-900">
+              Signing request cancelled
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              <span className="font-medium text-gray-800">
+                {document.title}
+              </span>
+            </p>
+            <p className="mt-4 text-sm text-gray-600">
+              This signing request has been cancelled by the document owner. You
+              can close this page.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    // Check if already signed or otherwise not actionable
+    if (signatureRequest.status !== 'pending') {
+      redirect(`/sign/${token}/already-signed`)
     }
 
     // Determine which PDF to load
@@ -83,7 +108,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
     })
 
     return (
-      <SigningInterface
+      <SigningInterfaceClient
         token={token}
         signerName={signatureRequest.signer_name}
         signerEmail={signatureRequest.signer_email}

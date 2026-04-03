@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Profile } from '@/lib/types'
 import UserDropdown from '@/components/UserDropdown'
+import CompanySidebar from '@/components/CompanySidebar'
 
 export default async function AuthenticatedLayout({
   children,
@@ -70,8 +71,12 @@ export default async function AuthenticatedLayout({
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 bg-gray-50 px-6 py-8">{children}</main>
+      <div className="flex flex-1 bg-gray-50">
+        <CompanySidebar />
+
+        {/* Main Content */}
+        <main className="flex-1 px-6 py-8">{children}</main>
+      </div>
     </div>
   )
 }

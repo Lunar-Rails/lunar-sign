@@ -15,7 +15,13 @@ export default async function LoginPage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect('/dashboard')
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) redirect('/dashboard')
   }
 
   return (

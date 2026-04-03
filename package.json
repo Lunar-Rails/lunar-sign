@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "node --env-file=.env.local --import tsx scripts/migrate.ts",
+    "db:migrate:status": "node --env-file=.env.local --import tsx scripts/migrate.ts status"
   },
   "dependencies": {
     "@drvillo/react-browser-e-signing": "^0.3.0",
@@ -40,7 +42,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
+    "postgres": "^3.4.8",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

@@ -11,7 +11,7 @@ export async function logAudit(
     const supabase = getServiceClient()
 
     const { error } = await supabase
-      .from('audit_logs')
+      .from('audit_log')
       .insert(
         [
           {

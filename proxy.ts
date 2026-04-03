@@ -1,10 +1,21 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_ROUTES = ['/login', '/auth', '/sign']
+const PUBLIC_ROUTES = ['/login', '/auth', '/sign', '/api/signatures', '/api/download']
+
+function isPublicRoute(path: string) {
+  if (PUBLIC_ROUTES.some((route) => path.startsWith(route))) return true
+
+  // PDF preview is guarded in the route handler itself.
+  // Skipping proxy auth refresh here avoids client remount loops on /documents/[id].
+  return /^\/api\/documents\/[^/]+\/preview\/?$/.test(path)
+}
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const path = request.nextUrl.pathname
+
+  if (isPublicRoute(path)) return supabaseResponse
 
   // Only run Supabase session refresh if env vars are configured
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,13 +30,16 @@ export async function proxy(request: NextRequest) {
       getAll() {
         return request.cookies.getAll()
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
         )
         supabaseResponse = NextResponse.next({ request })
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
+        )
+        Object.entries(headers).forEach(([key, value]) =>
+          supabaseResponse.headers.set(key, value)
         )
       },
     },
@@ -34,11 +48,8 @@ export async function proxy(request: NextRequest) {
   // Refresh session
   const { data: { user } } = await supabase.auth.getUser()
 
-  const path = request.nextUrl.pathname
-  const isPublic = PUBLIC_ROUTES.some((route) => path.startsWith(route))
-
   // Redirect unauthenticated users to login for protected routes
-  if (!user && !isPublic) {
+  if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

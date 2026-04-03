@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import '@drvillo/react-browser-e-signing/styles.css'
 
 export const metadata: Metadata = {
   title: 'Lunar Sign - E-Signature Portal',

@@ -2,13 +2,19 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DocumentUploadSchema } from '@/lib/schemas'
+import { DocumentCompanyIdsSchema, DocumentUploadSchema } from '@/lib/schemas'
+import { Company } from '@/lib/types'
 
-export default function FileUploadForm() {
+interface FileUploadFormProps {
+  companies: Company[]
+}
+
+export default function FileUploadForm({ companies }: FileUploadFormProps) {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +57,14 @@ export default function FileUploadForm() {
     }
   }
 
+  function handleCompanyToggle(companyId: string) {
+    setSelectedCompanyIds((prev) => {
+      if (prev.includes(companyId))
+        return prev.filter((id) => id !== companyId)
+      return [...prev, companyId]
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
@@ -61,6 +75,14 @@ export default function FileUploadForm() {
       const firstError = validation.error.flatten().fieldErrors
       const errorMessage = Object.values(firstError)[0]?.[0] || 'Validation error'
       setError(errorMessage)
+      return
+    }
+
+    const companyValidation = DocumentCompanyIdsSchema.safeParse({
+      companyIds: selectedCompanyIds,
+    })
+    if (!companyValidation.success) {
+      setError('Invalid company selection')
       return
     }
 
@@ -81,6 +103,9 @@ export default function FileUploadForm() {
       formData.append('title', title)
       formData.append('description', description || '')
       formData.append('file', file)
+      selectedCompanyIds.forEach((companyId) =>
+        formData.append('companyIds', companyId)
+      )
 
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
@@ -139,6 +164,37 @@ export default function FileUploadForm() {
           placeholder="Add details about this document"
         />
       </div>
+
+      {/* Company Assignment */}
+      {companies.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Assign to Companies
+          </label>
+          <div className="mt-2 max-h-52 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
+            {companies.map((company) => {
+              const isChecked = selectedCompanyIds.includes(company.id)
+              return (
+                <label
+                  key={company.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleCompanyToggle(company.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  />
+                  <span>{company.name}</span>
+                </label>
+              )
+            })}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            A document can belong to multiple companies.
+          </p>
+        </div>
+      )}
 
       {/* File Drop Zone */}
       <div>

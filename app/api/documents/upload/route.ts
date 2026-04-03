@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { DocumentUploadSchema } from '@/lib/schemas'
+import { DocumentCompanyIdsSchema, DocumentUploadSchema } from '@/lib/schemas'
 import { logAudit } from '@/lib/audit'
+import { isMemberOfCompany } from '@/lib/authorization'
 import { randomUUID } from 'crypto'
 
 export async function POST(request: NextRequest) {
@@ -22,6 +23,9 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string
     const description = formData.get('description') as string
     const file = formData.get('file') as File
+    const companyIdsInput = formData
+      .getAll('companyIds')
+      .filter((value): value is string => typeof value === 'string')
 
     // Validate
     const validation = DocumentUploadSchema.safeParse({
@@ -34,6 +38,16 @@ export async function POST(request: NextRequest) {
       const errorMessage = Object.values(firstError)[0]?.[0] || 'Validation error'
       return NextResponse.json(
         { error: errorMessage },
+        { status: 400 }
+      )
+    }
+
+    const companyValidation = DocumentCompanyIdsSchema.safeParse({
+      companyIds: companyIdsInput,
+    })
+    if (!companyValidation.success) {
+      return NextResponse.json(
+        { error: 'Invalid company selection' },
         { status: 400 }
       )
     }
@@ -61,6 +75,45 @@ export async function POST(request: NextRequest) {
 
     // Generate document ID
     const documentId = randomUUID()
+    const uniqueCompanyIds = [...new Set(companyValidation.data.companyIds)]
+
+    if (uniqueCompanyIds.length > 0) {
+      const { data: matchedCompanies, error: companyLookupError } = await supabase
+        .from('companies')
+        .select('id')
+        .in('id', uniqueCompanyIds)
+
+      if (companyLookupError) {
+        console.error('Company lookup error:', companyLookupError)
+        return NextResponse.json(
+          { error: 'Failed to validate company selection' },
+          { status: 500 }
+        )
+      }
+
+      if ((matchedCompanies || []).length !== uniqueCompanyIds.length) {
+        return NextResponse.json(
+          { error: 'Some selected companies do not exist' },
+          { status: 400 }
+        )
+      }
+
+      const membershipChecks = await Promise.all(
+        uniqueCompanyIds.map((companyId) =>
+          isMemberOfCompany({ supabase, userId: user.id, companyId })
+        )
+      )
+
+      const hasUnauthorizedCompany = membershipChecks.some(
+        (hasAccess) => !hasAccess
+      )
+      if (hasUnauthorizedCompany) {
+        return NextResponse.json(
+          { error: 'You do not have access to one or more selected companies' },
+          { status: 403 }
+        )
+      }
+    }
 
     // Upload to storage
     const fileBuffer = await file.arrayBuffer()
@@ -102,10 +155,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (uniqueCompanyIds.length > 0) {
+      const companyLinks = uniqueCompanyIds.map((companyId) => ({
+        document_id: documentId,
+        company_id: companyId,
+      }))
+
+      const { error: documentCompaniesError } = await supabase
+        .from('document_companies')
+        .insert(companyLinks)
+
+      if (documentCompaniesError) {
+        console.error('Document companies insert error:', documentCompaniesError)
+        return NextResponse.json(
+          { error: 'Document created but failed to assign companies' },
+          { status: 500 }
+        )
+      }
+    }
+
     // Log audit
     await logAudit(user.id, 'document_uploaded', 'document', documentId, {
       title,
       fileName: file.name,
+      company_ids: uniqueCompanyIds,
     })
 
     return NextResponse.json(

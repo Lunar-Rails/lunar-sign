@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
-import { PDFDocument, rgb } from 'pdf-lib'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import nodemailer from 'nodemailer'
@@ -10,7 +9,20 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getServiceClient()
     const body = await request.json()
-    const { token, signature_data, signer_name } = body
+    const {
+      token,
+      signature_data,
+      signer_name,
+      signed_pdf_base64,
+      document_hash,
+    } = body
+
+    if (!token || !signer_name || !signed_pdf_base64) {
+      return NextResponse.json(
+        { error: 'Missing required signing payload' },
+        { status: 400 }
+      )
+    }
 
     // Validate token and fetch signature request
     const { data: signatureRequest } = await supabase
@@ -41,115 +53,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine which PDF to download
-    const pdfPath = document.latest_signed_pdf_path || document.file_path
-    const bucket = document.latest_signed_pdf_path ? 'signed-documents' : 'documents'
-
-    // Download current PDF
-    const { data: pdfBlob, error: downloadError } = await supabase.storage
-      .from(bucket)
-      .download(pdfPath)
-
-    if (downloadError || !pdfBlob) {
-      console.error('PDF download error:', downloadError)
+    const signedPdfBytes = Buffer.from(signed_pdf_base64, 'base64')
+    if (!signedPdfBytes.length) {
       return NextResponse.json(
-        { error: 'Failed to download document' },
-        { status: 500 }
+        { error: 'Invalid signed PDF payload' },
+        { status: 400 }
       )
     }
 
-    // Convert blob to buffer
-    const pdfArrayBuffer = await pdfBlob.arrayBuffer()
-    const pdfBytes = Buffer.from(pdfArrayBuffer)
-
-    // Calculate hash of original PDF
-    const documentHash = crypto
-      .createHash('sha256')
-      .update(pdfBytes)
-      .digest('hex')
-
-    // Load PDF and embed signature
-    const pdfDoc = await PDFDocument.load(pdfBytes)
-    const pages = pdfDoc.getPages()
-    const lastPage = pages[pages.length - 1]
-    const { height } = lastPage.getSize()
-
-    // Process signature image data URL
-    let signatureImageBytes: Uint8Array
-
-    if (signature_data.startsWith('data:image/png;base64,')) {
-      const base64 = signature_data.substring('data:image/png;base64,'.length)
-      signatureImageBytes = Buffer.from(base64, 'base64')
-    } else if (signature_data.startsWith('data:image/jpeg;base64,')) {
-      const base64 = signature_data.substring('data:image/jpeg;base64,'.length)
-      signatureImageBytes = Buffer.from(base64, 'base64')
-    } else {
-      // Assume it's already base64
-      signatureImageBytes = Buffer.from(signature_data, 'base64')
-    }
-
-    // Embed image
-    let signatureImage
-    try {
-      signatureImage = await pdfDoc.embedPng(signatureImageBytes)
-    } catch {
-      try {
-        signatureImage = await pdfDoc.embedJpg(signatureImageBytes)
-      } catch {
-        return NextResponse.json(
-          { error: 'Invalid signature image format' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Draw signature box at bottom right
-    const signatureBoxWidth = 150
-    const signatureBoxHeight = 80
-    const margin = 20
-    const x = lastPage.getWidth() - signatureBoxWidth - margin
-    const y = margin
-
-    // Draw background
-    lastPage.drawRectangle({
-      x,
-      y,
-      width: signatureBoxWidth,
-      height: signatureBoxHeight,
-      borderColor: rgb(0.8, 0.8, 0.8),
-      borderWidth: 1,
-      color: rgb(1, 1, 1),
-    })
-
-    // Draw signature image (scaled to fit)
-    const imgScaledHeight = signatureBoxHeight * 0.7
-    const imgScaledWidth = (signatureImage.width / signatureImage.height) * imgScaledHeight
-    lastPage.drawImage(signatureImage, {
-      x: x + (signatureBoxWidth - imgScaledWidth) / 2,
-      y: y + 40,
-      height: imgScaledHeight,
-      width: imgScaledWidth,
-    })
-
-    // Draw signer name
-    lastPage.drawText(signer_name, {
-      x: x + 5,
-      y: y + 15,
-      size: 10,
-      color: rgb(0, 0, 0),
-    })
-
-    // Draw date
-    const date = new Date().toLocaleDateString()
-    lastPage.drawText(date, {
-      x: x + 5,
-      y: y + 5,
-      size: 8,
-      color: rgb(0.5, 0.5, 0.5),
-    })
-
-    // Save modified PDF
-    const signedPdfBytes = await pdfDoc.save()
+    const signedDocumentHash = document_hash ||
+      crypto.createHash('sha256').update(signedPdfBytes).digest('hex')
 
     // Upload signed PDF to storage
     const uploadPath = `${document.id}/${signatureRequest.id}_signed.pdf`
@@ -196,7 +109,7 @@ export async function POST(request: NextRequest) {
       .insert({
         request_id: signatureRequest.id,
         signature_data,
-        document_hash: documentHash,
+        document_hash: signedDocumentHash,
         signed_pdf_path: uploadPath,
         ip_address: ip,
         user_agent: userAgent,

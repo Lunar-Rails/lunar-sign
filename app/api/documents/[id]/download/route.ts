@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { canAccessDocument } from '@/lib/authorization'
 
 export async function GET(
   request: NextRequest,
@@ -32,17 +33,12 @@ export async function GET(
       )
     }
 
-    // Check if user is owner or admin
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const isOwner = document.uploaded_by === user.id
-    const isAdmin = userProfile?.role === 'admin'
-
-    if (!isOwner && !isAdmin) {
+    const hasDocumentAccess = await canAccessDocument({
+      supabase,
+      userId: user.id,
+      documentId,
+    })
+    if (!hasDocumentAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

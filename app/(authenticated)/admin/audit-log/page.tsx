@@ -1,25 +1,14 @@
 import { getServiceClient } from '@/lib/supabase/service'
 
-import { AuditLog } from '@/lib/types'
-
-import AuditLogSearch from '@/components/AuditLogSearch'
+import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 
 export const dynamic = 'force-dynamic'
-
-
-interface AuditLogWithActor extends AuditLog {
-  actor?: {
-    email: string
-    full_name: string
-  }
-}
 
 export default async function AdminAuditLogPage() {
   const supabase = getServiceClient()
 
-  // Fetch audit logs with actor profiles
   const { data: auditLogs } = await supabase
-    .from('audit_logs')
+    .from('audit_log')
     .select(
       `
       id,
@@ -35,10 +24,7 @@ export default async function AdminAuditLogPage() {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  const logs = (auditLogs as any[])?.map((log) => ({
-    ...log,
-    actor: log.profiles,
-  })) || []
+  const logs = mapSupabaseAuditRows(auditLogs)
 
   return (
     <div>
@@ -49,10 +35,6 @@ export default async function AdminAuditLogPage() {
         </p>
       </div>
 
-      {/* Search Component */}
-      <AuditLogSearch />
-
-      {/* Audit Log Table */}
       <div className="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
         <table className="w-full">
           <thead className="border-b border-gray-200 bg-gray-50">
@@ -79,7 +61,7 @@ export default async function AdminAuditLogPage() {
                 </td>
               </tr>
             ) : (
-              logs.map((log: AuditLogWithActor) => (
+              logs.map((log) => (
                 <tr
                   key={log.id}
                   className="border-b border-gray-200 hover:bg-gray-50"

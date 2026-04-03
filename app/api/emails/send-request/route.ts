@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/client'
 import { signatureRequestEmail } from '@/lib/email/templates'
 import { getConfig } from '@/lib/config'
+import { canAccessDocument } from '@/lib/authorization'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,8 +27,7 @@ export async function POST(request: NextRequest) {
       .from('documents')
       .select('*')
       .eq('id', document_id)
-      .eq('uploaded_by', user.id)
-      .single()
+      .maybeSingle()
 
     if (!document) {
       return NextResponse.json(
@@ -35,6 +35,14 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    const hasDocumentAccess = await canAccessDocument({
+      supabase,
+      userId: user.id,
+      documentId: document_id,
+    })
+    if (!hasDocumentAccess)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     // Fetch requester profile
     const { data: requesterProfile } = await supabase
