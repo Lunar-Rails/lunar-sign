@@ -61,15 +61,20 @@ All PDF rendering, field placement, signature capture, and PDF modification MUST
 ### Data flow between application and library
 
 ```
-1. Application fetches PDF from Supabase Storage → ArrayBuffer
+1. Application fetches the latest PDF from Supabase Storage → ArrayBuffer
+   - For the first signer: this is the original uploaded PDF
+   - For subsequent signers: this is the PDF already signed by previous signers (signatures accumulate)
 2. ArrayBuffer passed to usePdfDocument → pdfData, pageDimensions
 3. User places fields via FieldOverlay + useFieldPlacement → FieldPlacement[]
 4. User configures signature via SignaturePreview/SignaturePad → signatureDataUrl
 5. User confirms → application calls modifyPdf({ pdfBytes, fields, signer, signatureDataUrl, pageDimensions })
 6. modifyPdf returns signed PDF bytes + sha256 hash
-7. Application uploads signed PDF to Supabase Storage
+7. Application uploads signed PDF to Supabase Storage as the new "latest" version
 8. Application records signature metadata (hash, timestamp, IP, user agent) in database
+9. When all signers have signed, the final PDF contains all accumulated signatures
 ```
+
+**Multi-signer accumulation:** Each signer receives the PDF with all prior signatures already embedded. The application tracks the latest signed PDF path on the document record. When all signature requests are fulfilled, the last signed PDF becomes the final completed document and is emailed to all parties.
 
 ## Authentication & Authorization
 
@@ -78,7 +83,7 @@ All PDF rendering, field placement, signature capture, and PDF modification MUST
 | Only BCOMM employees can access the system | Google OAuth restricted to company domain |
 | Session management | Supabase Auth handles JWT + refresh tokens |
 | Role-based access | `role` column on `profiles` table, enforced via Supabase RLS |
-| Initial roles | `admin`, `manager`, `member` |
+| Initial roles | `admin`, `member` |
 | Role assignment | Admins assign roles via admin panel; first user bootstrapped as admin |
 
 ## Data Model
@@ -88,32 +93,34 @@ profiles
   id            uuid (FK to auth.users)
   email         text
   full_name     text
-  role          text ('admin' | 'manager' | 'member')
+  role          text ('admin' | 'member')
   created_at    timestamptz
 
 documents
   id            uuid
   title         text
+  description   text (optional)
   file_path     text (Supabase Storage path)
   uploaded_by   uuid (FK to profiles)
   status        text ('draft' | 'pending' | 'completed' | 'cancelled')
+  latest_signed_pdf_path text (tracks the most recent signed version for signature accumulation)
   created_at    timestamptz
   completed_at  timestamptz
 
 signature_requests
   id            uuid
   document_id   uuid (FK to documents)
-  signer_id     uuid (FK to profiles)
+  signer_name   text
+  signer_email  text
   requested_by  uuid (FK to profiles)
   status        text ('pending' | 'signed' | 'declined')
-  order         int (signing order, if sequential)
+  token         uuid (unique secure token for signing link)
   signed_at     timestamptz
   created_at    timestamptz
 
 signatures
   id            uuid
   request_id    uuid (FK to signature_requests)
-  signer_id     uuid (FK to profiles)
   signature_data text (base64 PNG or SVG path data)
   document_hash text (SHA-256 from library's sha256 utility)
   signed_pdf_path text (Supabase Storage path to modified PDF)
@@ -200,6 +207,10 @@ Per BCOMM vibe coding guidelines and approved tech stack:
 | Slack notifications | Email covers MVP notification needs |
 | Sequential signing workflows | MVP supports parallel signing; sequential adds ordering logic |
 | Document templates | MVP is upload-and-sign; templates are a workflow enhancement |
+| Manager role (intermediate permissions) | Two roles (`admin`, `member`) are sufficient for < 50 users |
 | Advanced RBAC (team-scoped permissions) | Role enum is sufficient for < 50 users |
 | Mobile-optimized signing (`pageMode: 'single'`) | Desktop-first for internal use; library supports this when needed |
 | Digital certificate-based signatures (eIDAS/PKI) | Visual e-signatures with SHA-256 integrity are sufficient for internal documents |
+| Reminder emails for unsigned documents | Email notification on send and completion covers MVP needs |
+| Signing link expiration | Links remain valid indefinitely in MVP; expiry adds complexity |
+| Document retraction / cancellation | MVP covers the core happy path; cancel workflow deferred |

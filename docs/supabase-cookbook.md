@@ -88,7 +88,7 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   full_name text not null default '',
-  role text not null default 'member' check (role in ('admin', 'manager', 'member')),
+  role text not null default 'member' check (role in ('admin', 'member')),
   created_at timestamptz not null default now()
 );
 
@@ -167,9 +167,11 @@ where email = 'your.email@company.com';
 create table public.documents (
   id uuid primary key default gen_random_uuid(),
   title text not null,
+  description text,
   file_path text not null,
   uploaded_by uuid not null references public.profiles(id),
   status text not null default 'draft' check (status in ('draft', 'pending', 'completed', 'cancelled')),
+  latest_signed_pdf_path text,
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
@@ -179,15 +181,6 @@ alter table public.documents enable row level security;
 create policy "Users can read documents they uploaded"
   on public.documents for select
   using (uploaded_by = auth.uid());
-
-create policy "Users can read documents where they are a signer"
-  on public.documents for select
-  using (
-    exists (
-      select 1 from public.signature_requests
-      where document_id = documents.id and signer_id = auth.uid()
-    )
-  );
 
 create policy "Admins can read all documents"
   on public.documents for select
@@ -213,20 +206,20 @@ create policy "Document owner can update their documents"
 create table public.signature_requests (
   id uuid primary key default gen_random_uuid(),
   document_id uuid not null references public.documents(id) on delete cascade,
-  signer_id uuid not null references public.profiles(id),
+  signer_name text not null,
+  signer_email text not null,
   requested_by uuid not null references public.profiles(id),
   status text not null default 'pending' check (status in ('pending', 'signed', 'declined')),
-  "order" int not null default 0,
+  token uuid not null default gen_random_uuid(),
   signed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
+create unique index signature_requests_token_idx on public.signature_requests(token);
+
 alter table public.signature_requests enable row level security;
 
-create policy "Signers can read their own requests"
-  on public.signature_requests for select
-  using (signer_id = auth.uid());
-
+-- Signers don't have accounts, so RLS is based on the document owner (requester)
 create policy "Requesters can read requests they created"
   on public.signature_requests for select
   using (requested_by = auth.uid());
@@ -244,9 +237,9 @@ create policy "Authenticated users can create signature requests"
   on public.signature_requests for insert
   with check (auth.uid() = requested_by);
 
-create policy "Signers can update their own request status"
+create policy "Requesters can update requests they created"
   on public.signature_requests for update
-  using (signer_id = auth.uid());
+  using (requested_by = auth.uid());
 ```
 
 ### 3.6 Signatures table
@@ -255,7 +248,6 @@ create policy "Signers can update their own request status"
 create table public.signatures (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null references public.signature_requests(id) on delete cascade,
-  signer_id uuid not null references public.profiles(id),
   signature_data text not null,
   document_hash text not null,
   signed_pdf_path text not null,
@@ -266,9 +258,15 @@ create table public.signatures (
 
 alter table public.signatures enable row level security;
 
-create policy "Signers can read their own signatures"
+-- Signatures are accessed via the document owner (requester) since signers don't have accounts
+create policy "Document owners can read signatures on their documents"
   on public.signatures for select
-  using (signer_id = auth.uid());
+  using (
+    exists (
+      select 1 from public.signature_requests sr
+      where sr.id = signatures.request_id and sr.requested_by = auth.uid()
+    )
+  );
 
 create policy "Admins can read all signatures"
   on public.signatures for select
@@ -279,9 +277,8 @@ create policy "Admins can read all signatures"
     )
   );
 
-create policy "Signers can insert their own signature"
-  on public.signatures for insert
-  with check (auth.uid() = signer_id);
+-- Signature insertion happens via API route (service role) since signers are unauthenticated
+-- No insert policy needed for authenticated users on this table
 ```
 
 ### 3.7 Audit log table
@@ -339,20 +336,14 @@ create policy "Authenticated users can upload documents"
   to authenticated
   with check (bucket_id = 'documents');
 
--- Documents bucket: read own uploads or assigned documents
+-- Documents bucket: read own uploads
+-- Note: signers are unauthenticated and access PDFs via API routes using service role
 create policy "Users can read their own documents"
   on storage.objects for select
   to authenticated
   using (
     bucket_id = 'documents'
-    and (
-      owner_id = auth.uid()
-      or exists (
-        select 1 from public.documents d
-        join public.signature_requests sr on sr.document_id = d.id
-        where d.file_path = name and sr.signer_id = auth.uid()
-      )
-    )
+    and owner_id = auth.uid()
   );
 
 -- Signed documents bucket: upload
@@ -361,26 +352,16 @@ create policy "Authenticated users can upload signed documents"
   to authenticated
   with check (bucket_id = 'signed-documents');
 
--- Signed documents bucket: read
-create policy "Users can read signed documents they are involved with"
+-- Signed documents bucket: read (document owners only; signers access via API routes with service role)
+create policy "Document owners can read signed documents"
   on storage.objects for select
   to authenticated
   using (
     bucket_id = 'signed-documents'
-    and (
-      owner_id = auth.uid()
-      or exists (
-        select 1 from public.signatures s
-        where s.signed_pdf_path = name
-        and (
-          s.signer_id = auth.uid()
-          or exists (
-            select 1 from public.signature_requests sr
-            join public.documents d on d.id = sr.document_id
-            where sr.id = s.request_id and d.uploaded_by = auth.uid()
-          )
-        )
-      )
+    and exists (
+      select 1 from public.documents d
+      where d.latest_signed_pdf_path = name
+      and d.uploaded_by = auth.uid()
     )
   );
 ```
