@@ -3,29 +3,81 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { Profile } from '@/lib/types'
 
 import RoleToggle from '@/components/RoleToggle'
+import { InviteUserForm } from '@/components/InviteUserForm'
+import {
+  InvitationsTable,
+  InvitationWithCompanies,
+} from '@/components/InvitationsTable'
 
 export const dynamic = 'force-dynamic'
+
+interface InvitationRow {
+  id: string
+  email: string
+  role: 'admin' | 'member'
+  invited_by: string
+  status: 'pending' | 'accepted' | 'revoked'
+  created_at: string
+  invitation_companies: {
+    company_id: string
+    companies:
+      | { id: string; name: string; slug: string }
+      | { id: string; name: string; slug: string }[]
+      | null
+  }[] | null
+}
 
 
 export default async function AdminUsersPage() {
   const supabase = getServiceClient()
 
-  // Fetch all profiles
   const { data: profiles } = await supabase
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false })
 
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('id, name, slug')
+    .order('name', { ascending: true })
+
+  const { data: invitationRows } = await supabase
+    .from('invitations')
+    .select(
+      'id, email, role, invited_by, status, created_at, invitation_companies(company_id, companies(id, name, slug))'
+    )
+    .order('created_at', { ascending: false })
+
   const users: Profile[] = profiles || []
+  const invitationList: InvitationWithCompanies[] = (
+    (invitationRows || []) as InvitationRow[]
+  ).map(
+    (invitation) => ({
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      invited_by: invitation.invited_by,
+      status: invitation.status,
+      created_at: invitation.created_at,
+      companies: (invitation.invitation_companies || []).flatMap((row) => {
+        if (!row.companies) return []
+        if (Array.isArray(row.companies)) return row.companies
+        return [row.companies]
+      }),
+    })
+  )
 
   return (
-    <div>
+    <div className="space-y-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Manage Users</h1>
         <p className="mt-2 text-gray-600">
           View and manage user roles across the system.
         </p>
       </div>
+
+      <InviteUserForm companies={companies || []} />
+      <InvitationsTable initialInvitations={invitationList} />
 
       {/* Users Table */}
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">

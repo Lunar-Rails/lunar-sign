@@ -1,3 +1,10 @@
+import {
+  ArrowLeft,
+  ClipboardList,
+  FileText,
+  Users,
+} from 'lucide-react'
+
 import { createClient } from '@/lib/supabase/server'
 
 import { getServiceClient } from '@/lib/supabase/service'
@@ -92,9 +99,11 @@ export default async function AdminDashboardPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <a
             href="/admin/users"
-            className="rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50"
+            className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
           >
-            <div className="mb-2 text-2xl">👥</div>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+              <Users className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </div>
             <div className="font-medium text-gray-900">Manage Users</div>
             <div className="mt-1 text-xs text-gray-600">
               View and manage user roles
@@ -102,9 +111,11 @@ export default async function AdminDashboardPage() {
           </a>
           <a
             href="/admin/documents"
-            className="rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50"
+            className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
           >
-            <div className="mb-2 text-2xl">📄</div>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <FileText className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </div>
             <div className="font-medium text-gray-900">All Documents</div>
             <div className="mt-1 text-xs text-gray-600">
               View all documents across system
@@ -112,9 +123,11 @@ export default async function AdminDashboardPage() {
           </a>
           <a
             href="/admin/audit-log"
-            className="rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50"
+            className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
           >
-            <div className="mb-2 text-2xl">📊</div>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+              <ClipboardList className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </div>
             <div className="font-medium text-gray-900">Audit Log</div>
             <div className="mt-1 text-xs text-gray-600">
               View system audit trail
@@ -122,9 +135,11 @@ export default async function AdminDashboardPage() {
           </a>
           <a
             href="/dashboard"
-            className="rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50"
+            className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
           >
-            <div className="mb-2 text-2xl">←</div>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+              <ArrowLeft className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </div>
             <div className="font-medium text-gray-900">Back to Dashboard</div>
             <div className="mt-1 text-xs text-gray-600">
               Return to main dashboard

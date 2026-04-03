@@ -30,6 +30,12 @@ export const AddCompanyMemberSchema = z.object({
   email: z.string().email('Invalid email address'),
 })
 
+export const CreateInvitationSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  role: z.enum(['admin', 'member']),
+  companyIds: z.array(z.string().uuid('Invalid company ID')).default([]),
+})
+
 export type DocumentUploadInput = z.infer<typeof DocumentUploadSchema>
 export type DocumentCompanyIdsInput = z.infer<typeof DocumentCompanyIdsSchema>
 export type AddSignerInput = z.infer<typeof AddSignerSchema>
@@ -37,3 +43,4 @@ export type SendDocumentInput = z.infer<typeof SendDocumentSchema>
 export type CompanyCreateInput = z.infer<typeof CompanyCreateSchema>
 export type CompanyUpdateInput = z.infer<typeof CompanyUpdateSchema>
 export type AddCompanyMemberInput = z.infer<typeof AddCompanyMemberSchema>
+export type CreateInvitationInput = z.infer<typeof CreateInvitationSchema>
