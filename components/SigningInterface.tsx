@@ -166,7 +166,6 @@ export default function SigningInterface({
           signer_name: displayName,
           signature_data: activeSignatureDataUrl,
           signed_pdf_base64: signedPdfBase64,
-          document_hash: documentHash,
         }),
       })
 

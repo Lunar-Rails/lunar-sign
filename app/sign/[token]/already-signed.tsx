@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation'
-
 import { getServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'

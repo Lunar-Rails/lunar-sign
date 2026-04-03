@@ -1,36 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
+import { rateLimit } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import nodemailer from 'nodemailer'
+import type {
+  Document,
+  SignatureRequest,
+  SignatureRequestWithToken,
+} from '@/lib/types'
+
+interface OwnerProfileRow {
+  email: string
+  full_name: string
+}
+
+const signatureRateLimiter = rateLimit({ windowMs: 60_000, max: 10 })
+const MAX_SIGNATURE_BODY_BYTES = 20 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip')?.trim() ||
+      'unknown'
+    const rateLimitResult = signatureRateLimiter.check(ip)
+    if (!rateLimitResult.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
+    const contentLength = request.headers.get('content-length')
+    if (contentLength && Number(contentLength) > MAX_SIGNATURE_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body too large' },
+        { status: 413 }
+      )
+    }
+
     const supabase = getServiceClient()
     const body = await request.json()
-    const {
-      token,
-      signature_data,
-      signer_name,
-      signed_pdf_base64,
-      document_hash,
-    } = body
+    const { token, signature_data, signer_name, signed_pdf_base64 } = body
 
-    if (!token || !signer_name || !signed_pdf_base64) {
+    if (
+      typeof token !== 'string' ||
+      typeof signer_name !== 'string' ||
+      typeof signature_data !== 'string' ||
+      typeof signed_pdf_base64 !== 'string' ||
+      !token ||
+      !signer_name ||
+      !signature_data ||
+      !signed_pdf_base64
+    ) {
       return NextResponse.json(
         { error: 'Missing required signing payload' },
         { status: 400 }
       )
     }
 
-    // Validate token and fetch signature request
-    const { data: signatureRequest } = await supabase
+    const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
-      .select('*')
+      .select(
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at'
+      )
       .eq('token', token)
       .eq('status', 'pending')
-      .single() as any
+      .single()
+
+    const signatureRequest =
+      signatureRequestRaw as SignatureRequestWithToken | null
 
     if (!signatureRequest) {
       return NextResponse.json(
@@ -39,12 +77,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch document
-    const { data: document } = await supabase
+    const { data: documentRaw } = await supabase
       .from('documents')
       .select('*')
       .eq('id', signatureRequest.document_id)
-      .single() as any
+      .single()
+
+    const document = documentRaw as Document | null
 
     if (!document) {
       return NextResponse.json(
@@ -61,10 +100,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const signedDocumentHash = document_hash ||
-      crypto.createHash('sha256').update(signedPdfBytes).digest('hex')
+    const { data: originalPdfData, error: originalPdfError } = await supabase.storage
+      .from('documents')
+      .download(document.file_path)
+    if (originalPdfError || !originalPdfData) {
+      console.error('Original PDF download error:', originalPdfError)
+      return NextResponse.json(
+        { error: 'Failed to load original document' },
+        { status: 500 }
+      )
+    }
 
-    // Upload signed PDF to storage
+    const originalPdfBytes = Buffer.from(await originalPdfData.arrayBuffer())
+    const originalDocumentHash = crypto
+      .createHash('sha256')
+      .update(originalPdfBytes)
+      .digest('hex')
+    const signedDocumentHash = crypto
+      .createHash('sha256')
+      .update(signedPdfBytes)
+      .digest('hex')
+
     const uploadPath = `${document.id}/${signatureRequest.id}_signed.pdf`
     const { error: uploadError } = await supabase.storage
       .from('signed-documents')
@@ -81,8 +137,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update document latest_signed_pdf_path
-    const docUpdateResult = await (supabase as any)
+    const docUpdateResult = await supabase
       .from('documents')
       .update({ latest_signed_pdf_path: uploadPath })
       .eq('id', document.id)
@@ -96,24 +151,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get client IP and user agent
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0] ||
-      request.headers.get('x-real-ip') ||
-      null
     const userAgent = request.headers.get('user-agent') || null
 
-    // Insert signature record
-    const sigInsertResult = await (supabase as any)
-      .from('signatures')
-      .insert({
-        request_id: signatureRequest.id,
-        signature_data,
-        document_hash: signedDocumentHash,
-        signed_pdf_path: uploadPath,
-        ip_address: ip,
-        user_agent: userAgent,
-      })
+    const sigInsertResult = await supabase.from('signatures').insert({
+      request_id: signatureRequest.id,
+      signature_data,
+      document_hash: signedDocumentHash,
+      original_document_hash: originalDocumentHash,
+      signed_pdf_path: uploadPath,
+      ip_address: ip === 'unknown' ? null : ip,
+      user_agent: userAgent,
+    })
     const { error: sigInsertError } = sigInsertResult
 
     if (sigInsertError) {
@@ -124,8 +172,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update signature request status
-    const reqUpdateResult = await (supabase as any)
+    const reqUpdateResult = await supabase
       .from('signature_requests')
       .update({ status: 'signed', signed_at: new Date().toISOString() })
       .eq('id', signatureRequest.id)
@@ -139,25 +186,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log audit
     await logAudit(null, 'document_signed', 'document', document.id, {
-      token,
+      token_suffix: token.slice(-8),
       signer_email: signatureRequest.signer_email,
       signer_name,
     })
 
-    // Check if all signature requests are signed
-    const { data: allRequests } = await supabase
+    const { data: allRequestsRaw } = await supabase
       .from('signature_requests')
-      .select('*')
-      .eq('document_id', document.id) as any
+      .select('id, status, signer_name, signer_email')
+      .eq('document_id', document.id)
 
-    const allSigned = allRequests?.every((req: any) => req.status === 'signed')
+    const allRequests = (allRequestsRaw ?? []) as SignatureRequest[]
+
+    const allSigned = allRequests.every((req) => req.status === 'signed')
 
     let completed = false
     if (allSigned) {
-      // Update document status to completed
-      const completeResult = await (supabase as any)
+      const completeResult = await supabase
         .from('documents')
         .update({
           status: 'completed',
@@ -171,12 +217,10 @@ export async function POST(request: NextRequest) {
       } else {
         completed = true
 
-        // Log audit
         await logAudit(null, 'document_completed', 'document', document.id, {
-          total_signers: allRequests?.length,
+          total_signers: allRequests.length,
         })
 
-        // Send completion emails
         try {
           const config = getConfig()
           const transporter = nodemailer.createTransport({
@@ -188,12 +232,13 @@ export async function POST(request: NextRequest) {
             },
           })
 
-          // Email to document owner
-          const { data: ownerProfile } = await (supabase
+          const { data: ownerProfileRaw } = await supabase
             .from('profiles')
             .select('email, full_name')
             .eq('id', document.uploaded_by)
-            .single() as any)
+            .single()
+
+          const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
 
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
@@ -214,21 +259,18 @@ export async function POST(request: NextRequest) {
             })
           }
 
-          // Email to all signers
-          if (allRequests) {
-            for (const req of allRequests as any) {
-              await transporter.sendMail({
-                from: config.EMAIL_FROM,
-                to: req.signer_email,
-                subject: `Document Fully Signed: ${document.title}`,
-                html: `
+          for (const req of allRequests) {
+            await transporter.sendMail({
+              from: config.EMAIL_FROM,
+              to: req.signer_email,
+              subject: `Document Fully Signed: ${document.title}`,
+              html: `
                   <h2>Document Complete</h2>
                   <p>Hello ${req.signer_name},</p>
                   <p>All parties have now signed <strong>${document.title}</strong>.</p>
                   <p>Thank you for signing.</p>
                 `,
-              })
-            }
+            })
           }
         } catch (emailError) {
           console.error('Completion email error:', emailError)

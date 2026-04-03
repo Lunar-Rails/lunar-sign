@@ -1,24 +1,15 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import CompanyManagementTable from '@/components/CompanyManagementTable'
 import { Company } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CompanySettingsPage() {
+export default async function AdminCompaniesPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const [{ data: profile }, { data: companies }] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).single(),
-    supabase.from('companies').select('*').order('name', { ascending: true }),
-  ])
-
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  const { data: companies } = await supabase
+    .from('companies')
+    .select('*')
+    .order('name', { ascending: true })
 
   const rows: Company[] = companies || []
 

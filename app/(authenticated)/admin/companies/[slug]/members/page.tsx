@@ -29,22 +29,11 @@ interface CompanyMemberQueryRow {
     | null
 }
 
-export default async function CompanyMembersPage({ params }: CompanyMembersPageProps) {
+export default async function AdminCompanyMembersPage({
+  params,
+}: CompanyMembersPageProps) {
   const { slug } = await params
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') redirect('/dashboard')
 
   const { data: company } = await supabase
     .from('companies')
@@ -52,7 +41,7 @@ export default async function CompanyMembersPage({ params }: CompanyMembersPageP
     .eq('slug', slug)
     .maybeSingle()
 
-  if (!company) redirect('/settings/companies')
+  if (!company) redirect('/admin/companies')
 
   const { data: members } = await supabase
     .from('company_members')

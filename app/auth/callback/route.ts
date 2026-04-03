@@ -3,6 +3,15 @@ import { createServerClient } from '@supabase/ssr'
 import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
 
+interface InvitationRow {
+  id: string
+  role: 'admin' | 'member'
+}
+
+interface InvitationCompanyRow {
+  company_id: string
+}
+
 export async function GET(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
@@ -51,21 +60,25 @@ export async function GET(request: NextRequest) {
 
   if (user?.id && user.email) {
     const serviceClient = getServiceClient()
-    await (serviceClient as any).from('profiles').upsert(
+
+    await serviceClient.from('profiles').upsert(
       {
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? '',
+        full_name:
+          user.user_metadata?.full_name ?? user.user_metadata?.name ?? '',
       },
       { onConflict: 'id' }
     )
 
-    const { data: invitation, error: invitationError } = await (serviceClient as any)
+    const { data: invitationRaw, error: invitationError } = await serviceClient
       .from('invitations')
       .select('id, role')
       .ilike('email', user.email.toLowerCase())
       .eq('status', 'pending')
       .maybeSingle()
+
+    const invitation = invitationRaw as InvitationRow | null
 
     if (invitationError) {
       console.error('Failed to load invitation:', invitationError)
@@ -73,7 +86,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (invitation) {
-      const { error: roleUpdateError } = await (serviceClient as any)
+      const { error: roleUpdateError } = await serviceClient
         .from('profiles')
         .update({ role: invitation.role })
         .eq('id', user.id)
@@ -83,12 +96,11 @@ export async function GET(request: NextRequest) {
         return redirectResponse
       }
 
-      const { data: invitationCompanies, error: invitationCompaniesError } = await (
-        serviceClient as any
-      )
-        .from('invitation_companies')
-        .select('company_id')
-        .eq('invitation_id', invitation.id)
+      const { data: invitationCompaniesRaw, error: invitationCompaniesError } =
+        await serviceClient
+          .from('invitation_companies')
+          .select('company_id')
+          .eq('invitation_id', invitation.id)
 
       if (invitationCompaniesError) {
         console.error(
@@ -98,15 +110,16 @@ export async function GET(request: NextRequest) {
         return redirectResponse
       }
 
-      const companyMemberships = (invitationCompanies || []).map(
-        (row: { company_id: string }) => ({
-          company_id: row.company_id,
-          user_id: user.id,
-        })
-      ) as { company_id: string; user_id: string }[]
+      const invitationCompanies =
+        (invitationCompaniesRaw ?? []) as InvitationCompanyRow[]
+
+      const companyMemberships = invitationCompanies.map((row) => ({
+        company_id: row.company_id,
+        user_id: user.id,
+      }))
 
       if (companyMemberships.length > 0) {
-        const { error: membershipError } = await (serviceClient as any)
+        const { error: membershipError } = await serviceClient
           .from('company_members')
           .upsert(companyMemberships, {
             onConflict: 'company_id,user_id',
@@ -118,7 +131,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      const { error: invitationStatusError } = await (serviceClient as any)
+      const { error: invitationStatusError } = await serviceClient
         .from('invitations')
         .update({ status: 'accepted' })
         .eq('id', invitation.id)
@@ -132,9 +145,7 @@ export async function GET(request: NextRequest) {
       await logAudit(user.id, 'invitation_accepted', 'invitation', invitation.id, {
         email: user.email.toLowerCase(),
         role: invitation.role,
-        company_ids: companyMemberships.map(
-          (membership: { company_id: string }) => membership.company_id
-        ),
+        company_ids: companyMemberships.map((m) => m.company_id),
       })
     }
   }

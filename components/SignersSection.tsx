@@ -25,7 +25,6 @@ function getStatusBadgeStyles(status: string) {
 }
 
 export default function SignersSection({
-  documentId,
   signers,
   isEditable,
 }: SignersSectionProps) {

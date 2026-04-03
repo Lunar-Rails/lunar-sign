@@ -1,9 +1,13 @@
 import { z } from 'zod'
 
+function normalizeAppUrl(url: string) {
+  return url.replace(/\/+$/, '')
+}
+
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  NEXT_PUBLIC_APP_URL: z.string().url(),
+  NEXT_PUBLIC_APP_URL: z.string().url().transform(normalizeAppUrl),
 })
 
 const envSchema = z.object({
@@ -14,7 +18,7 @@ const envSchema = z.object({
   MAILTRAP_USER: z.string().min(1),
   MAILTRAP_PASSWORD: z.string().min(1),
   EMAIL_FROM: z.string().email(),
-  NEXT_PUBLIC_APP_URL: z.string().url(),
+  NEXT_PUBLIC_APP_URL: z.string().url().transform(normalizeAppUrl),
 })
 
 type PublicEnvConfig = z.infer<typeof publicEnvSchema>

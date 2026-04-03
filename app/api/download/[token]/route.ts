@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase/service'
+import { rateLimit } from '@/lib/rate-limit'
 import type { Document } from '@/lib/types'
+
+const downloadRateLimiter = rateLimit({ windowMs: 60_000, max: 30 })
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip')?.trim() ||
+      'unknown'
+    const rateLimitResult = downloadRateLimiter.check(ip)
+    if (!rateLimitResult.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const supabase = getServiceClient()
     const { token } = await params
 

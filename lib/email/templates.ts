@@ -307,3 +307,103 @@ export function allPartiesSignedEmail(params: {
 
   return { subject, html }
 }
+
+export function userInvitationEmail(params: {
+  inviteeEmail: string
+  inviterName: string
+  role: 'admin' | 'member'
+  loginUrl: string
+}): { subject: string; html: string } {
+  const roleLabel = params.role === 'admin' ? 'Admin' : 'Member'
+  const subject = 'You have been invited to Lunar Sign'
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      color: #1a202c;
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      margin: 20px 0;
+    }
+    .content p {
+      margin: 10px 0;
+    }
+    .button {
+      display: inline-block;
+      background-color: #2563eb;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 5px;
+      text-decoration: none;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .button:hover {
+      background-color: #1d4ed8;
+    }
+    .invite-info {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .footer {
+      border-top: 1px solid #e0e0e0;
+      padding-top: 20px;
+      margin-top: 30px;
+      color: #666;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Lunar Sign</h1>
+    </div>
+
+    <div class="content">
+      <p>Hello,</p>
+      <p>${params.inviterName} invited <strong>${params.inviteeEmail}</strong> to join Lunar Sign.</p>
+
+      <div class="invite-info">
+        <strong>Workspace role:</strong> ${roleLabel}
+      </div>
+
+      <p>Use Google sign-in with this email to activate your access:</p>
+      <p><a href="${params.loginUrl}" class="button">Join Workspace</a></p>
+    </div>
+
+    <div class="footer">
+      <p>Lunar Sign - Lunar Rails</p>
+      <p>This is an automated message, please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `
+
+  return { subject, html }
+}

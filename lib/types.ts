@@ -26,6 +26,13 @@ export interface Document {
   completed_at: string | null
 }
 
+export interface DocumentType {
+  id: string
+  name: string
+  created_by: string
+  created_at: string
+}
+
 export interface Company {
   id: string
   name: string
@@ -62,9 +69,12 @@ export interface SignatureRequest {
   signer_email: string
   requested_by: string
   status: SignatureRequestStatus
-  token: string
   signed_at: string | null
   created_at: string
+}
+
+export interface SignatureRequestWithToken extends SignatureRequest {
+  token: string
 }
 
 export interface Signature {

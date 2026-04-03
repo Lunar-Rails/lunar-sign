@@ -1,15 +1,18 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Company, Document } from '@/lib/types'
+import { Company, Document, DocumentType } from '@/lib/types'
 import Link from 'next/link'
+import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 
 interface DashboardDocument extends Document {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
+  types: Pick<DocumentType, 'id' | 'name'>[]
 }
 
 interface DashboardSearchProps {
   documents: DashboardDocument[]
+  documentTypes: Pick<DocumentType, 'id' | 'name'>[]
 }
 
 /** Fixed locale + options so SSR (Node) and the browser produce the same string — avoids hydration mismatch. */
@@ -38,15 +41,30 @@ function getStatusBadgeStyles(status: string) {
 
 export default function DashboardSearch({
   documents,
+  documentTypes,
 }: DashboardSearchProps) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([])
+
+  function handleTypeToggle(typeId: string) {
+    setSelectedTypeIds((prev) => {
+      if (prev.includes(typeId))
+        return prev.filter((currentTypeId) => currentTypeId !== typeId)
+      return [...prev, typeId]
+    })
+  }
 
   const filteredDocuments = useMemo(() => {
-    if (!searchTerm) return documents
-    return documents.filter((doc) =>
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [documents, searchTerm])
+    return documents.filter((doc) => {
+      const matchesSearchTerm = searchTerm
+        ? doc.title.toLowerCase().includes(searchTerm.toLowerCase())
+        : true
+      if (!matchesSearchTerm) return false
+
+      if (selectedTypeIds.length === 0) return true
+      return doc.types.some((type) => selectedTypeIds.includes(type.id))
+    })
+  }, [documents, searchTerm, selectedTypeIds])
 
   if (documents.length === 0) {
     return (
@@ -64,6 +82,33 @@ export default function DashboardSearch({
 
   return (
     <div>
+      {documentTypes.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+            Filter by type
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {documentTypes.map((type) => {
+              const isSelected = selectedTypeIds.includes(type.id)
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => handleTypeToggle(type.id)}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    isSelected
+                      ? 'bg-indigo-100 text-indigo-800'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {type.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <input
         type="text"
         placeholder="Search documents by title..."
@@ -74,7 +119,7 @@ export default function DashboardSearch({
 
       {filteredDocuments.length === 0 ? (
         <p className="py-8 text-center text-gray-500">
-          No documents matching "{searchTerm}"
+          No documents matching &ldquo;{searchTerm}&rdquo;
         </p>
       ) : (
         <table className="w-full">
@@ -88,6 +133,9 @@ export default function DashboardSearch({
               </th>
               <th className="py-3 text-left text-xs font-medium text-gray-500">
                 Created
+              </th>
+              <th className="py-3 text-left text-xs font-medium text-gray-500">
+                Type
               </th>
               <th className="py-3 text-left text-xs font-medium text-gray-500">
                 Companies
@@ -108,6 +156,14 @@ export default function DashboardSearch({
                 </td>
                 <td className="py-4 text-sm text-gray-600">
                   {formatCreatedAt(doc.created_at)}
+                </td>
+                <td className="py-4 text-sm text-gray-600">
+                  <DocumentTypeInlineEditor
+                    documentId={doc.id}
+                    initialTypeNames={doc.types.map((type) => type.name)}
+                    availableTypeNames={documentTypes.map((type) => type.name)}
+                    isCompact
+                  />
                 </td>
                 <td className="py-4 text-sm text-gray-600">
                   {doc.companies.length === 0 ? (

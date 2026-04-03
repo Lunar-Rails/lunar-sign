@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
-import { UserRole } from '@/lib/types'
 
 export async function PATCH(
   request: NextRequest,
@@ -46,8 +45,7 @@ export async function PATCH(
 
     // Update profile role using service role
     const serviceClient = getServiceClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateError } = await (serviceClient as any)
+    const { error: updateError } = await serviceClient
       .from('profiles')
       .update({ role })
       .eq('id', userId)

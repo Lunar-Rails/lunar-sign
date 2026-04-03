@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 
-import { Company, Document } from '@/lib/types'
+import { Company, Document, DocumentType } from '@/lib/types'
 
 import DashboardSearch from '@/components/DashboardSearch'
+import { DashboardUploadDocumentButton } from '@/components/DashboardUploadDocumentButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,7 @@ interface DashboardPageProps {
 
 interface DashboardDocument extends Document {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
+  types: Pick<DocumentType, 'id' | 'name'>[]
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -25,6 +27,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   if (!user) {
     return null
   }
+
+  const { data: allCompanies } = await supabase
+    .from('companies')
+    .select('slug, name')
+    .order('name', { ascending: true })
+  const companyOptions = (allCompanies || []) as Pick<Company, 'slug' | 'name'>[]
 
   let activeCompany: Pick<Company, 'id' | 'name' | 'slug'> | null = null
   let docs: Document[] = []
@@ -63,10 +71,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const docIds = docs.map((doc) => doc.id)
+  const { data: allDocumentTypes } = await supabase
+    .from('document_types')
+    .select('id, name')
+    .order('name', { ascending: true })
+
   const { data: documentCompanies } = docIds.length
     ? await supabase
         .from('document_companies')
         .select('document_id, companies(id, name, slug)')
+        .in('document_id', docIds)
+    : { data: [] }
+  const { data: documentTypes } = docIds.length
+    ? await supabase
+        .from('document_document_types')
+        .select('document_id, document_types(id, name)')
         .in('document_id', docIds)
     : { data: [] }
 
@@ -81,10 +100,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const current = companiesByDocumentId.get(row.document_id) || []
     companiesByDocumentId.set(row.document_id, [...current, ...companyValues])
   })
+  const typesByDocumentId = new Map<string, Pick<DocumentType, 'id' | 'name'>[]>()
+  ;(documentTypes || []).forEach((row) => {
+    const value = row.document_types as
+      | Pick<DocumentType, 'id' | 'name'>
+      | Pick<DocumentType, 'id' | 'name'>[]
+      | null
+    if (!value) return
+    const typeValues = Array.isArray(value) ? value : [value]
+    const current = typesByDocumentId.get(row.document_id) || []
+    typesByDocumentId.set(row.document_id, [...current, ...typeValues])
+  })
 
   const docsWithCompanies: DashboardDocument[] = docs.map((doc) => ({
     ...doc,
     companies: companiesByDocumentId.get(doc.id) || [],
+    types: typesByDocumentId.get(doc.id) || [],
   }))
 
   // Calculate stats
@@ -93,15 +124,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const pendingCount = docsWithCompanies.filter((d) => d.status === 'pending').length
   const completedCount = docsWithCompanies.filter((d) => d.status === 'completed').length
 
+  const pageTitle = activeCompany ? activeCompany.name : 'All Documents'
+
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        {activeCompany && (
-          <p className="mt-2 text-sm text-gray-600">
-            Showing documents for <span className="font-medium">{activeCompany.name}</span>.
-          </p>
-        )}
+        <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
         {companySlug && !activeCompany && (
           <p className="mt-2 text-sm text-red-700">
             Company not found. Showing no documents.
@@ -135,12 +163,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {/* Documents Section */}
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
+          <DashboardUploadDocumentButton
+            activeCompanySlug={activeCompany?.slug ?? null}
+            companies={companyOptions}
+          />
         </div>
 
         <div className="px-6 py-4">
-          <DashboardSearch documents={docsWithCompanies} />
+          <DashboardSearch
+            documents={docsWithCompanies}
+            documentTypes={(allDocumentTypes || []) as Pick<DocumentType, 'id' | 'name'>[]}
+          />
         </div>
       </div>
     </div>

@@ -296,8 +296,8 @@ This is the most complex phase and the core of the product.
      - Sent to document owner and all signers
      - Includes download link to final signed PDF
 3. Create email API routes:
-   - `app/api/emails/send-request/route.ts` — triggered when document is sent
-   - `app/api/emails/send-completion/route.ts` — triggered when all signers finish
+   - `app/api/documents/[id]/send/route.ts` — triggered when document is sent
+   - `app/api/signatures/route.ts` — triggers completion emails when all signers finish
 4. Integrate email triggers into existing flows:
    - Document send flow (Phase 5) → send request emails
    - Signing completion (Phase 6) → send confirmation and completion emails

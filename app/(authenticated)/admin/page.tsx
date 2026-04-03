@@ -1,11 +1,10 @@
 import {
   ArrowLeft,
+  Building2,
   ClipboardList,
   FileText,
   Users,
 } from 'lucide-react'
-
-import { createClient } from '@/lib/supabase/server'
 
 import { getServiceClient } from '@/lib/supabase/service'
 
@@ -13,7 +12,6 @@ export const dynamic = 'force-dynamic'
 
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient()
   const serviceClient = getServiceClient()
 
   // Fetch stats using service role for accurate counts
@@ -96,7 +94,7 @@ export default async function AdminDashboardPage() {
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
           Admin Sections
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <a
             href="/admin/users"
             className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
@@ -107,6 +105,18 @@ export default async function AdminDashboardPage() {
             <div className="font-medium text-gray-900">Manage Users</div>
             <div className="mt-1 text-xs text-gray-600">
               View and manage user roles
+            </div>
+          </a>
+          <a
+            href="/admin/companies"
+            className="flex flex-col items-center rounded-lg border border-gray-200 p-4 text-center transition-colors hover:bg-gray-50"
+          >
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+              <Building2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </div>
+            <div className="font-medium text-gray-900">Companies</div>
+            <div className="mt-1 text-xs text-gray-600">
+              Manage companies and members
             </div>
           </a>
           <a

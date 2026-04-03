@@ -50,6 +50,12 @@ export default async function AdminLayout({
               Users
             </a>
             <a
+              href="/admin/companies"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+            >
+              Companies
+            </a>
+            <a
               href="/admin/documents"
               className="text-sm font-medium text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
             >

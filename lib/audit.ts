@@ -10,19 +10,15 @@ export async function logAudit(
   try {
     const supabase = getServiceClient()
 
-    const { error } = await supabase
-      .from('audit_log')
-      .insert(
-        [
-          {
-            actor_id: actorId,
-            action,
-            entity_type: entityType,
-            entity_id: entityId,
-            metadata,
-          },
-        ] as any
-      )
+    const row = {
+      actor_id: actorId,
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      metadata,
+    }
+
+    const { error } = await supabase.from('audit_log').insert([row])
 
     if (error) {
       console.error('Audit log error:', error)

@@ -37,6 +37,7 @@ export default function DocumentPdfPreview({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading: isPdfLoading,
@@ -94,6 +95,44 @@ export default function DocumentPdfPreview({
     }
   }, [documentId])
 
+  useEffect(() => {
+    const viewerContainer = viewerContainerRef.current
+    const firstPageWidth = pageDimensions[0]?.widthPt
+
+    if (!viewerContainer || !firstPageWidth) return
+
+    function setFitToWidthScale() {
+      const horizontalPaddingPx = 24
+      const container = viewerContainerRef.current
+      if (!container) return
+
+      const availableWidth = container.clientWidth - horizontalPaddingPx
+      if (availableWidth <= 0) return
+
+      const computedScale = Number((availableWidth / firstPageWidth).toFixed(2))
+      if (!Number.isFinite(computedScale) || computedScale <= 0) return
+
+      const clampedScale = Math.min(2, Math.max(0.25, computedScale))
+      setScale((previousScale) =>
+        Math.abs(previousScale - clampedScale) < 0.01 ? previousScale : clampedScale
+      )
+    }
+
+    setFitToWidthScale()
+
+    if (typeof ResizeObserver === 'undefined') return
+
+    const resizeObserver = new ResizeObserver(() => {
+      setFitToWidthScale()
+    })
+
+    resizeObserver.observe(viewerContainer)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [pageDimensions, setScale])
+
   const isLoading = isFetching || isPdfLoading
 
   return (
@@ -115,7 +154,7 @@ export default function DocumentPdfPreview({
       {!errorMessage && !isLoading && pdfData && (
         <div
           ref={viewerContainerRef}
-          className="h-[640px] overflow-auto rounded-lg border border-gray-200 bg-white"
+          className="h-[640px] overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white"
         >
           <PdfViewer
             pdfData={pdfData}

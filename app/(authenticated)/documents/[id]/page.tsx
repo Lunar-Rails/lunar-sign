@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
 
-import { Document, SignatureRequest, Company } from '@/lib/types'
+import { Document, SignatureRequest, Company, DocumentType } from '@/lib/types'
 import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 
 import AddSignerForm from '@/components/AddSignerForm'
@@ -15,6 +15,7 @@ import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
 import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
+import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,10 +71,14 @@ export default async function DocumentDetailPage({
     { data: auditLogs },
     { data: companies },
     { data: assignedCompanyRows },
+    { data: assignedTypeRows },
+    { data: allDocumentTypeRows },
   ] = await Promise.all([
     supabase
       .from('signature_requests')
-      .select('*')
+      .select(
+        'id, document_id, signer_name, signer_email, requested_by, status, signed_at, created_at'
+      )
       .eq('document_id', id)
       .order('created_at', { ascending: true }),
     supabase
@@ -98,6 +103,14 @@ export default async function DocumentDetailPage({
       .from('document_companies')
       .select('company_id, companies(id, name, slug)')
       .eq('document_id', id),
+    supabase
+      .from('document_document_types')
+      .select('document_type_id, document_types(id, name)')
+      .eq('document_id', id),
+    supabase
+      .from('document_types')
+      .select('name')
+      .order('name', { ascending: true }),
   ])
 
   const allCompanies: Company[] = companies || []
@@ -112,6 +125,16 @@ export default async function DocumentDetailPage({
       return [value]
     })
   const assignedCompanyIds = assignedCompanies.map((company) => company.id)
+  const assignedTypes = (assignedTypeRows || []).flatMap((row) => {
+    const value = row.document_types as
+      | Pick<DocumentType, 'id' | 'name'>
+      | Pick<DocumentType, 'id' | 'name'>[]
+      | null
+    if (!value) return []
+    if (Array.isArray(value)) return value
+    return [value]
+  })
+  const allDocumentTypeNames = (allDocumentTypeRows || []).map((row) => row.name)
   const signers: SignatureRequest[] = signatureRequests || []
   const logs = mapSupabaseAuditRows(auditLogs)
 
@@ -166,6 +189,16 @@ export default async function DocumentDetailPage({
                   <span className={getStatusBadgeStyles(doc.status)}>
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                   </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Type</dt>
+                <dd className="mt-1">
+                  <DocumentTypeInlineEditor
+                    documentId={doc.id}
+                    initialTypeNames={assignedTypes.map((type) => type.name)}
+                    availableTypeNames={allDocumentTypeNames}
+                  />
                 </dd>
               </div>
               <div>

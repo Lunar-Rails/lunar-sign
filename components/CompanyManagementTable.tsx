@@ -226,7 +226,7 @@ export default function CompanyManagementTable({
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <Link
-                        href={`/settings/companies/${company.slug}/members`}
+                        href={`/admin/companies/${company.slug}/members`}
                         className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
                         Members

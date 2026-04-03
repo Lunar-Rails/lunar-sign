@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { CreateInvitationSchema } from '@/lib/schemas'
 import { logAudit } from '@/lib/audit'
+import { sendEmail } from '@/lib/email/client'
+import { userInvitationEmail } from '@/lib/email/templates'
+import { getConfig } from '@/lib/config'
 
 interface InvitationCompanyRow {
   company_id: string
@@ -60,7 +63,7 @@ export async function GET() {
     if ('error' in auth) return auth.error
 
     const serviceClient = getServiceClient()
-    const { data, error } = await (serviceClient as any)
+    const { data, error } = await serviceClient
       .from('invitations')
       .select(
         'id, email, role, invited_by, status, created_at, invitation_companies(company_id, companies(id, name, slug))'
@@ -75,16 +78,24 @@ export async function GET() {
       )
     }
 
-    const invitations = ((data || []) as any[]).map((row) => ({
+    interface InvitationSelectRow {
+      id: string
+      email: string
+      role: string
+      invited_by: string
+      status: string
+      created_at: string
+      invitation_companies: InvitationCompanyRow[] | null
+    }
+
+    const invitations = ((data ?? []) as InvitationSelectRow[]).map((row) => ({
       id: row.id,
       email: row.email,
       role: row.role,
       invited_by: row.invited_by,
       status: row.status,
       created_at: row.created_at,
-      companies: mapInvitationCompanies(
-        (row.invitation_companies as InvitationCompanyRow[] | null) || []
-      ),
+      companies: mapInvitationCompanies(row.invitation_companies),
     }))
 
     return NextResponse.json({ invitations }, { status: 200 })
@@ -114,8 +125,9 @@ export async function POST(request: NextRequest) {
     const uniqueCompanyIds = [...new Set(parsed.data.companyIds)]
 
     const serviceClient = getServiceClient()
+    const config = getConfig()
 
-    const { data: pendingInvitation } = await (serviceClient as any)
+    const { data: pendingInvitation } = await serviceClient
       .from('invitations')
       .select('id')
       .ilike('email', email)
@@ -128,7 +140,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
 
-    const { data: existingProfile } = await (serviceClient as any)
+    const { data: existingProfile } = await serviceClient
       .from('profiles')
       .select('id')
       .ilike('email', email)
@@ -144,7 +156,7 @@ export async function POST(request: NextRequest) {
       )
 
     if (uniqueCompanyIds.length > 0) {
-      const { data: existingCompanies, error: companyError } = await (serviceClient as any)
+      const { data: existingCompanies, error: companyError } = await serviceClient
         .from('companies')
         .select('id')
         .in('id', uniqueCompanyIds)
@@ -162,7 +174,7 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    const { data: invitation, error: invitationError } = await (serviceClient as any)
+    const { data: invitation, error: invitationError } = await serviceClient
       .from('invitations')
       .insert({
         email,
@@ -191,18 +203,48 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
       }))
 
-      const { error: companiesError } = await (serviceClient as any)
+      const { error: companiesError } = await serviceClient
         .from('invitation_companies')
         .insert(invitationCompanies)
 
       if (companiesError) {
         console.error('Failed to assign invitation companies:', companiesError)
-        await (serviceClient as any).from('invitations').delete().eq('id', invitation.id)
+        await serviceClient.from('invitations').delete().eq('id', invitation.id)
         return NextResponse.json(
           { error: 'Failed to assign invitation companies' },
           { status: 500 }
         )
       }
+    }
+
+    const { data: inviterProfile } = await serviceClient
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', auth.user.id)
+      .maybeSingle()
+
+    const inviterName =
+      inviterProfile?.full_name || inviterProfile?.email || 'Workspace admin'
+    const loginUrl = `${config.NEXT_PUBLIC_APP_URL}/login`
+    const { subject, html } = userInvitationEmail({
+      inviteeEmail: email,
+      inviterName,
+      role: parsed.data.role,
+      loginUrl,
+    })
+
+    const emailSent = await sendEmail({
+      to: email,
+      subject,
+      html,
+    })
+
+    if (!emailSent) {
+      await serviceClient.from('invitations').delete().eq('id', invitation.id)
+      return NextResponse.json(
+        { error: 'Invitation email could not be sent. Please retry.' },
+        { status: 500 }
+      )
     }
 
     await logAudit(auth.user.id, 'user_invited', 'invitation', invitation.id, {

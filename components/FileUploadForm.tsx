@@ -1,20 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DocumentCompanyIdsSchema, DocumentUploadSchema } from '@/lib/schemas'
-import { Company } from '@/lib/types'
+import {
+  DocumentCompanyIdsSchema,
+  DocumentTypeNamesSchema,
+  DocumentUploadSchema,
+} from '@/lib/schemas'
+import { Company, DocumentType } from '@/lib/types'
 
 interface FileUploadFormProps {
   companies: Company[]
+  documentTypes: DocumentType[]
+  initialCompanyIds?: string[]
 }
 
-export default function FileUploadForm({ companies }: FileUploadFormProps) {
+function normalizeTypeName(name: string) {
+  return name.trim().replace(/\s+/g, ' ')
+}
+
+function isSameTypeName(a: string, b: string) {
+  return a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0
+}
+
+export default function FileUploadForm({
+  companies,
+  documentTypes,
+  initialCompanyIds = [],
+}: FileUploadFormProps) {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([])
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>(() => {
+    const allowed = new Set(companies.map((c) => c.id))
+    return initialCompanyIds.filter((id) => allowed.has(id))
+  })
+  const [selectedTypeNames, setSelectedTypeNames] = useState<string[]>([])
+  const [typeInput, setTypeInput] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +88,43 @@ export default function FileUploadForm({ companies }: FileUploadFormProps) {
     })
   }
 
+  function handleAddType(rawName: string) {
+    const normalized = normalizeTypeName(rawName)
+    if (!normalized) return
+
+    setSelectedTypeNames((prev) => {
+      const alreadySelected = prev.some((name) => isSameTypeName(name, normalized))
+      if (alreadySelected) return prev
+      return [...prev, normalized]
+    })
+    setTypeInput('')
+  }
+
+  function handleRemoveType(typeName: string) {
+    setSelectedTypeNames((prev) => prev.filter((name) => name !== typeName))
+  }
+
+  function handleTypeInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing) return
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    handleAddType(typeInput)
+  }
+
+  const filteredTypeOptions = useMemo(() => {
+    const normalizedInput = normalizeTypeName(typeInput).toLowerCase()
+    return documentTypes
+      .filter((type) => {
+        const alreadySelected = selectedTypeNames.some((name) =>
+          isSameTypeName(name, type.name)
+        )
+        if (alreadySelected) return false
+        if (!normalizedInput) return true
+        return type.name.toLowerCase().includes(normalizedInput)
+      })
+      .slice(0, 8)
+  }, [documentTypes, selectedTypeNames, typeInput])
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
@@ -86,6 +146,14 @@ export default function FileUploadForm({ companies }: FileUploadFormProps) {
       return
     }
 
+    const typeValidation = DocumentTypeNamesSchema.safeParse({
+      typeNames: selectedTypeNames,
+    })
+    if (!typeValidation.success) {
+      setError('Invalid document type selection')
+      return
+    }
+
     if (!file) {
       setError('Please select a PDF file')
       return
@@ -103,6 +171,9 @@ export default function FileUploadForm({ companies }: FileUploadFormProps) {
       formData.append('title', title)
       formData.append('description', description || '')
       formData.append('file', file)
+      typeValidation.data.typeNames.forEach((typeName) =>
+        formData.append('typeNames', typeName)
+      )
       selectedCompanyIds.forEach((companyId) =>
         formData.append('companyIds', companyId)
       )
@@ -163,6 +234,62 @@ export default function FileUploadForm({ companies }: FileUploadFormProps) {
           rows={3}
           placeholder="Add details about this document"
         />
+      </div>
+
+      {/* Document Types */}
+      <div>
+        <label
+          htmlFor="documentTypeInput"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Document Types
+        </label>
+        <div className="mt-2 rounded-md border border-gray-300 p-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5">
+            {selectedTypeNames.map((typeName) => (
+              <span
+                key={typeName}
+                className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+              >
+                {typeName}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveType(typeName)}
+                  className="rounded-full p-0.5 text-indigo-600 hover:bg-indigo-100"
+                  aria-label={`Remove ${typeName}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              id="documentTypeInput"
+              type="text"
+              value={typeInput}
+              onChange={(e) => setTypeInput(e.target.value)}
+              onKeyDown={handleTypeInputKeyDown}
+              className="min-w-[220px] flex-1 border-0 bg-transparent px-1 py-1 text-sm focus:outline-none"
+              placeholder="Type and press Enter to create a tag (e.g., NDA)"
+            />
+          </div>
+          {filteredTypeOptions.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-200 bg-white">
+              {filteredTypeOptions.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => handleAddType(type.name)}
+                  className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  {type.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Press Enter to convert typed text into a document type tag.
+        </p>
       </div>
 
       {/* Company Assignment */}

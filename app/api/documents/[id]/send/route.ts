@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
 import { canAccessDocument } from '@/lib/authorization'
 import { getConfig } from '@/lib/config'
@@ -52,9 +53,10 @@ export async function POST(
     }
 
     // Check there is at least 1 signature request
-    const { data: signatureRequests } = await supabase
+    const serviceSupabase = getServiceClient()
+    const { data: signatureRequests } = await serviceSupabase
       .from('signature_requests')
-      .select('*')
+      .select('id, signer_name, signer_email, token')
       .eq('document_id', documentId)
 
     if (!signatureRequests || signatureRequests.length === 0) {

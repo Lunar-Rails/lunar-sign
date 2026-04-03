@@ -13,7 +13,6 @@ interface CompanySidebarItem {
 interface CompanySidebarClientProps {
   companies: CompanySidebarItem[]
   totalDocumentCount: number
-  canManageCompanies: boolean
 }
 
 function getItemClasses(isActive: boolean) {
@@ -26,7 +25,6 @@ function getItemClasses(isActive: boolean) {
 export default function CompanySidebarClient({
   companies,
   totalDocumentCount,
-  canManageCompanies,
 }: CompanySidebarClientProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -69,18 +67,6 @@ export default function CompanySidebarClient({
               <span className="text-xs">{company.documentCount}</span>
             </Link>
           ))}
-
-          {canManageCompanies && (
-            <>
-              <div className="my-3 border-t border-gray-200" />
-              <Link
-                href="/settings/companies"
-                className={getItemClasses(pathname === '/settings/companies')}
-              >
-                <span>Manage Companies</span>
-              </Link>
-            </>
-          )}
         </nav>
       </div>
     </aside>

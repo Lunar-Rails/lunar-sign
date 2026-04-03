@@ -1,16 +1,30 @@
 import { getServiceClient } from '@/lib/supabase/service'
 
-import { Document } from '@/lib/types'
-
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
+interface AdminDocumentRow {
+  id: string
+  title: string
+  status: string
+  created_at: string
+  uploaded_by: string
+  profiles?:
+    | { email: string; full_name: string }
+    | { email: string; full_name: string }[]
+    | null
+}
+
+function profileFromDoc(doc: AdminDocumentRow) {
+  const p = doc.profiles
+  if (!p) return undefined
+  return Array.isArray(p) ? p[0] : p
+}
 
 export default async function AdminDocumentsPage() {
   const supabase = getServiceClient()
 
-  // Fetch all documents with owner info
   const { data: documentsData } = await supabase
     .from('documents')
     .select(
@@ -25,7 +39,7 @@ export default async function AdminDocumentsPage() {
     )
     .order('created_at', { ascending: false })
 
-  const documents = (documentsData as any[]) || []
+  const documents = (documentsData ?? []) as AdminDocumentRow[]
 
   return (
     <div>
@@ -66,48 +80,52 @@ export default async function AdminDocumentsPage() {
                 </td>
               </tr>
             ) : (
-              documents.map((doc: any) => (
-                <tr
-                  key={doc.id}
-                  className="border-b border-gray-200 hover:bg-gray-50"
-                >
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {doc.title}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <div>{doc.profiles?.full_name}</div>
-                    <div className="text-xs text-gray-500">
-                      {doc.profiles?.email}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        doc.status === 'draft'
-                          ? 'bg-gray-100 text-gray-800'
-                          : doc.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : doc.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(doc.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <Link
-                      href={`/admin/documents/${doc.id}`}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))
+              documents.map((doc) => {
+                const profile = profileFromDoc(doc)
+                return (
+                  <tr
+                    key={doc.id}
+                    className="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {doc.title}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      <div>{profile?.full_name}</div>
+                      <div className="text-xs text-gray-500">
+                        {profile?.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          doc.status === 'draft'
+                            ? 'bg-gray-100 text-gray-800'
+                            : doc.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : doc.status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {doc.status.charAt(0).toUpperCase() +
+                          doc.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {new Date(doc.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <Link
+                        href={`/admin/documents/${doc.id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

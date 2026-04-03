@@ -34,7 +34,7 @@ export async function DELETE(
     const { id } = await params
     const serviceClient = getServiceClient()
 
-    const { data: invitation, error } = await (serviceClient as any)
+    const { data: invitation, error } = await serviceClient
       .from('invitations')
       .update({ status: 'revoked' })
       .eq('id', id)

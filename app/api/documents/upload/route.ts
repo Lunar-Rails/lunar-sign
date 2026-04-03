@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { DocumentCompanyIdsSchema, DocumentUploadSchema } from '@/lib/schemas'
+import {
+  DocumentCompanyIdsSchema,
+  DocumentTypeNamesSchema,
+  DocumentUploadSchema,
+} from '@/lib/schemas'
 import { logAudit } from '@/lib/audit'
 import { isMemberOfCompany } from '@/lib/authorization'
 import { randomUUID } from 'crypto'
@@ -25,6 +29,9 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const companyIdsInput = formData
       .getAll('companyIds')
+      .filter((value): value is string => typeof value === 'string')
+    const typeNamesInput = formData
+      .getAll('typeNames')
       .filter((value): value is string => typeof value === 'string')
 
     // Validate
@@ -51,6 +58,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    const typeValidation = DocumentTypeNamesSchema.safeParse({
+      typeNames: typeNamesInput,
+    })
+    if (!typeValidation.success)
+      return NextResponse.json(
+        { error: 'Invalid document type selection' },
+        { status: 400 }
+      )
 
     if (!file) {
       return NextResponse.json(
@@ -76,6 +91,11 @@ export async function POST(request: NextRequest) {
     // Generate document ID
     const documentId = randomUUID()
     const uniqueCompanyIds = [...new Set(companyValidation.data.companyIds)]
+    const uniqueTypeNames = Array.from(
+      new Map(
+        typeValidation.data.typeNames.map((typeName) => [typeName.toLowerCase(), typeName])
+      ).values()
+    )
 
     if (uniqueCompanyIds.length > 0) {
       const { data: matchedCompanies, error: companyLookupError } = await supabase
@@ -113,6 +133,67 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         )
       }
+    }
+
+    const resolvedTypeIds: string[] = []
+    for (const typeName of uniqueTypeNames) {
+      const { data: existingType, error: existingTypeError } = await supabase
+        .from('document_types')
+        .select('id')
+        .ilike('name', typeName)
+        .maybeSingle()
+
+      if (existingTypeError) {
+        console.error('Document type lookup error:', existingTypeError)
+        return NextResponse.json(
+          { error: 'Failed to validate document type selection' },
+          { status: 500 }
+        )
+      }
+
+      if (existingType) {
+        resolvedTypeIds.push(existingType.id)
+        continue
+      }
+
+      const { data: createdType, error: createdTypeError } = await supabase
+        .from('document_types')
+        .insert({
+          name: typeName,
+          created_by: user.id,
+        })
+        .select('id')
+        .single()
+
+      if (!createdTypeError && createdType) {
+        resolvedTypeIds.push(createdType.id)
+        continue
+      }
+
+      const isDuplicateType = createdTypeError?.code === '23505'
+      if (!isDuplicateType) {
+        console.error('Document type insert error:', createdTypeError)
+        return NextResponse.json(
+          { error: 'Failed to create document type' },
+          { status: 500 }
+        )
+      }
+
+      const { data: duplicateType, error: duplicateLookupError } = await supabase
+        .from('document_types')
+        .select('id')
+        .ilike('name', typeName)
+        .maybeSingle()
+
+      if (duplicateLookupError || !duplicateType) {
+        console.error('Duplicate document type lookup error:', duplicateLookupError)
+        return NextResponse.json(
+          { error: 'Failed to resolve document type' },
+          { status: 500 }
+        )
+      }
+
+      resolvedTypeIds.push(duplicateType.id)
     }
 
     // Upload to storage
@@ -174,11 +255,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (resolvedTypeIds.length > 0) {
+      const typeLinks = resolvedTypeIds.map((documentTypeId) => ({
+        document_id: documentId,
+        document_type_id: documentTypeId,
+      }))
+
+      const { error: documentTypesError } = await supabase
+        .from('document_document_types')
+        .insert(typeLinks)
+
+      if (documentTypesError) {
+        console.error('Document types insert error:', documentTypesError)
+        return NextResponse.json(
+          { error: 'Document created but failed to assign document types' },
+          { status: 500 }
+        )
+      }
+    }
+
     // Log audit
     await logAudit(user.id, 'document_uploaded', 'document', documentId, {
       title,
       fileName: file.name,
       company_ids: uniqueCompanyIds,
+      document_type_names: uniqueTypeNames,
     })
 
     return NextResponse.json(

@@ -17,12 +17,10 @@ export default async function CompanySidebar() {
 
   if (!user) return null
 
-  const [{ data: profile }, { data: companies }, { data: documents }] =
-    await Promise.all([
-      supabase.from('profiles').select('role').eq('id', user.id).single(),
-      supabase.from('companies').select('*').order('name', { ascending: true }),
-      supabase.from('documents').select('id'),
-    ])
+  const [{ data: companies }, { data: documents }] = await Promise.all([
+    supabase.from('companies').select('*').order('name', { ascending: true }),
+    supabase.from('documents').select('id'),
+  ])
 
   const docs = documents || []
   const baseCompanies: Company[] = companies || []
@@ -52,7 +50,6 @@ export default async function CompanySidebar() {
     <CompanySidebarClient
       companies={sidebarCompanies}
       totalDocumentCount={docs.length}
-      canManageCompanies={profile?.role === 'admin'}
     />
   )
 }

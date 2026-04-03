@@ -9,6 +9,16 @@ export const DocumentCompanyIdsSchema = z.object({
   companyIds: z.array(z.string().uuid('Invalid company ID')).default([]),
 })
 
+const DocumentTypeNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Document type name is required')
+  .max(60, 'Document type name is too long')
+
+export const DocumentTypeNamesSchema = z.object({
+  typeNames: z.array(DocumentTypeNameSchema).default([]),
+})
+
 export const AddSignerSchema = z.object({
   signer_name: z.string().min(1, 'Signer name is required'),
   signer_email: z.string().email('Invalid email address'),
@@ -38,6 +48,7 @@ export const CreateInvitationSchema = z.object({
 
 export type DocumentUploadInput = z.infer<typeof DocumentUploadSchema>
 export type DocumentCompanyIdsInput = z.infer<typeof DocumentCompanyIdsSchema>
+export type DocumentTypeNamesInput = z.infer<typeof DocumentTypeNamesSchema>
 export type AddSignerInput = z.infer<typeof AddSignerSchema>
 export type SendDocumentInput = z.infer<typeof SendDocumentSchema>
 export type CompanyCreateInput = z.infer<typeof CompanyCreateSchema>
