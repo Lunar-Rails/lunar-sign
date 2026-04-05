@@ -332,12 +332,6 @@ alter table public.documents
 
 The template field **designer** (admin-facing) is built natively in LunarSign. However, the **signer experience** with pre-positioned fields requires small additions to the signing library. Today, `useFieldPlacement()` starts with empty fields and `FieldOverlay`/`SignatureField` allow unrestricted drag/resize/remove. For template-based contracts, signer fields must be pre-loaded and locked.
 
-**Required changes (3 non-breaking additions):**
-
-1. **`initialFields?: FieldPlacement[]`** on `UseFieldPlacementOptions` — pre-loads fields on mount instead of starting empty. LunarSign maps template signer-fill fields (filtered by signer role) to `FieldPlacement[]` and passes them in.
-2. **`locked?: boolean`** on `FieldPlacement` — when true, the field cannot be dragged, resized, or removed. Visually distinguished (e.g., subtle lock icon, no resize handles).
-3. **`FieldOverlay` and `SignatureField` respect `locked`** — skip drag/resize handlers, hide remove button, show lock indicator.
-
 **Why not build this natively in LunarSign instead?**
 
 | Approach | Feasibility | Outcome |
@@ -347,9 +341,237 @@ The template field **designer** (admin-facing) is built natively in LunarSign. H
 | Fork/wrap `FieldOverlay` to add locking | Maintains shadow copy of library internals | Fragile, high maintenance |
 | Build entirely custom field overlay | Massive duplication of rendering, drag, resize logic | Scope explosion |
 
-The library change request is minimal (3 optional additions), non-breaking, and makes the library genuinely more reusable. The alternative approaches are all fragile workarounds.
+The library change request is minimal, non-breaking, and makes the library genuinely more reusable. The alternative approaches are all fragile workarounds. The full specification follows.
 
-**Coordinate system compatibility**: The template field designer stores positions as `(page, xPercent, yPercent, widthPercent, heightPercent)` — the same coordinate system the signing library uses. No conversion needed when mapping template signer-fill fields to `FieldPlacement[]`.
+---
+
+## Appendix A: `@drvillo/react-browser-e-signing` change request
+
+### Motivation
+
+LunarSign needs to pre-position fields on a PDF for signers and prevent them from moving, resizing, or removing those fields. This enables a template-based workflow where an admin defines where each signer's fields go, and signers fill them in at fixed positions.
+
+The library currently assumes all fields are created interactively by the user. This change request adds two capabilities: (1) initializing the hook with pre-existing fields, and (2) marking individual fields as locked so the UI prevents repositioning.
+
+All changes are **additive and non-breaking**. Existing consumers that don't use the new options see zero behavior change.
+
+### Change 1: Add `locked` to `FieldPlacement`
+
+#### Current interface
+
+```typescript
+interface FieldPlacement {
+  id: string
+  type: FieldType
+  pageIndex: number
+  xPercent: number
+  yPercent: number
+  widthPercent: number
+  heightPercent: number
+}
+```
+
+#### New interface
+
+```typescript
+interface FieldPlacement {
+  id: string
+  type: FieldType
+  pageIndex: number
+  xPercent: number
+  yPercent: number
+  widthPercent: number
+  heightPercent: number
+  locked?: boolean // NEW — defaults to false/undefined
+}
+```
+
+#### Behavioral requirements
+
+- `locked` is optional. When `undefined` or `false`, behavior is identical to today.
+- `locked` is a **UI-level concern only**. It controls whether the user can interact with the field's position/size/removal. It does NOT affect the hook's `updateField`/`removeField` functions — those remain callable programmatically regardless of `locked` status. This keeps the hook as a pure data layer and the components as the interaction layer.
+- `locked` fields are passed through to `modifyPdf` unchanged — `modifyPdf` stamps values into the PDF identically for locked and unlocked fields.
+
+### Change 2: `SignatureField` respects `locked`
+
+#### Current behavior
+
+`SignatureField` renders:
+- A draggable container (drag to reposition)
+- A resize handle at the bottom-right (slot: `signatureFieldResize`)
+- A remove button at the top-right (slot: `signatureFieldRemove`)
+- Content/preview area (slot: `signatureFieldContent`)
+
+#### New behavior when `field.locked === true`
+
+| Element | Current | When `locked` |
+|---------|---------|---------------|
+| Drag handler on container | Active (mousedown/touchstart initiates drag) | **Disabled** — no drag events bound. Cursor remains `default` (not `grab`/`move`). |
+| Resize handle (`signatureFieldResize`) | Visible, interactive | **Hidden** (`display: none` or not rendered). |
+| Remove button (`signatureFieldRemove`) | Visible, clickable | **Hidden** (`display: none` or not rendered). |
+| Content/preview (`signatureFieldContent`) | Renders preview (signature image, name text, etc.) | **Unchanged** — preview renders identically. |
+| Visual styling | Current border/background | **Add a visual lock indicator**: render a small lock icon (inline SVG, no external assets) in the top-right corner where the remove button normally appears. Use slot name `signatureFieldLock`. Additionally, apply a subtle visual distinction (e.g., dashed border instead of solid, or a slightly different border color) so the user can tell locked fields apart at a glance. Exact styling at implementer's discretion — the key requirement is that locked fields are visually distinguishable from unlocked ones. |
+
+#### New CSS slot
+
+Add to the `SLOTS` constant:
+
+```typescript
+readonly signatureFieldLock: "signature-field-lock"
+```
+
+This slot targets the lock icon element, allowing consumers to style or hide it via CSS.
+
+#### Prop changes
+
+None. `SignatureField` already receives `field: FieldPlacement`. It reads `field.locked` from the existing prop.
+
+### Change 3: `FieldOverlay` respects `locked`
+
+#### Current behavior
+
+`FieldOverlay` renders all `fields` for a given `pageIndex` as `SignatureField` components. Clicking on the overlay (not on a field) calls `onAddField`. Fields can be dragged, resized, and removed.
+
+#### New behavior
+
+- `FieldOverlay` passes `field` (including `locked`) to `SignatureField` as it does today. No changes needed in `FieldOverlay` itself for rendering — `SignatureField` handles the locked visual/interaction changes.
+- **Click-to-add behavior is unchanged.** When `selectedFieldType` is not null, clicking empty space on the overlay still calls `onAddField`. The consumer controls whether adding is allowed by setting `selectedFieldType` to `null`. This keeps `FieldOverlay` simple and avoids a new prop.
+- `onUpdateField` and `onRemoveField` callbacks are still passed to `SignatureField`, but `SignatureField` does not invoke them when `field.locked === true` (drag/resize/remove interactions are disabled, so these callbacks are never triggered for locked fields from the UI).
+
+### Change 4: Add `initialFields` to `useFieldPlacement`
+
+#### Current interface
+
+```typescript
+interface UseFieldPlacementOptions {
+  defaultWidthPercent?: number
+  defaultHeightPercent?: number
+}
+
+declare function useFieldPlacement(options?: UseFieldPlacementOptions): {
+  addField: ({ pageIndex, type, xPercent, yPercent }: AddFieldInput) => FieldPlacement
+  updateField: (id: string, partial: Partial<FieldPlacement>) => void
+  removeField: (id: string) => void
+  clearFields: () => void
+  fields: FieldPlacement[]
+}
+```
+
+#### New interface
+
+```typescript
+interface UseFieldPlacementOptions {
+  defaultWidthPercent?: number
+  defaultHeightPercent?: number
+  initialFields?: FieldPlacement[] // NEW — defaults to []
+}
+```
+
+Return type is unchanged.
+
+#### Behavioral requirements
+
+- `initialFields` sets the **initial value** of the internal fields state, equivalent to `useState(initialFields ?? [])`.
+- It is **not reactive**. Changing `initialFields` after mount does NOT reset the fields. This follows React's `useState(initialValue)` convention. To reset fields (e.g., when navigating between documents), the consumer should use React's `key` prop on the parent component to force remount.
+- `initialFields` entries are stored as-is, including their `id`, `locked`, and all position/size properties. The hook does not generate new IDs or apply `defaultWidthPercent`/`defaultHeightPercent` to initial fields — those defaults only apply to fields created via `addField`.
+- `addField` continues to work alongside initial fields. New fields are appended to the array. This supports use cases where some fields are pre-positioned (locked) and the user can add additional ones.
+- `clearFields` removes **all** fields, including initial/locked ones. It resets to an empty array. (The consumer is responsible for not exposing a "clear all" action when locked fields are present.)
+- `updateField` and `removeField` work on any field by ID, regardless of `locked` status. Locking is enforced at the UI layer, not the data layer.
+
+#### ID handling
+
+The consumer must provide stable, unique `id` values on each entry in `initialFields`. The hook does not validate uniqueness — this is the consumer's responsibility (same as the existing contract where `addField` generates IDs internally, but `updateField`/`removeField` match by ID).
+
+### Summary of all interface changes
+
+```typescript
+// FieldPlacement — one new optional property
+interface FieldPlacement {
+  id: string
+  type: FieldType
+  pageIndex: number
+  xPercent: number
+  yPercent: number
+  widthPercent: number
+  heightPercent: number
+  locked?: boolean              // NEW
+}
+
+// UseFieldPlacementOptions — one new optional property
+interface UseFieldPlacementOptions {
+  defaultWidthPercent?: number
+  defaultHeightPercent?: number
+  initialFields?: FieldPlacement[]  // NEW
+}
+
+// SLOTS — one new entry
+readonly signatureFieldLock: "signature-field-lock"  // NEW
+
+// Everything else is unchanged:
+// - useFieldPlacement return type: unchanged
+// - FieldOverlay props: unchanged
+// - SignatureField props: unchanged
+// - FieldPalette: unchanged
+// - modifyPdf: unchanged
+// - All other hooks, components, utilities: unchanged
+```
+
+### Backward compatibility
+
+| Concern | Status |
+|---------|--------|
+| Consumers that don't pass `initialFields` | No change — hook starts with `[]` as today |
+| Consumers that don't set `locked` on fields | No change — `undefined` is treated as `false` |
+| Fields created via `addField` | No change — `locked` is not set, field is interactive |
+| `modifyPdf` behavior | No change — stamps all fields regardless of `locked` |
+| Existing CSS targeting SLOTS | No change — all existing slots preserved. New `signatureFieldLock` slot is additive |
+| Bundle size | Negligible — one SVG lock icon, a few conditional checks |
+
+### Consumer usage example (LunarSign integration)
+
+```typescript
+// In the signing page, when the contract was created from a template:
+const templateSignerFields: FieldPlacement[] = templateFields
+  .filter(f => f.category === 'signer_fill' && f.signer_role === signerRoleIndex)
+  .map(f => ({
+    id: f.id,
+    type: mapFieldType(f.field_type), // 'name' → 'fullName', etc.
+    pageIndex: f.page,
+    xPercent: f.x,
+    yPercent: f.y,
+    widthPercent: f.width,
+    heightPercent: f.height,
+    locked: true,
+  }))
+
+const { fields, addField, updateField, removeField, clearFields } =
+  useFieldPlacement({ initialFields: templateSignerFields })
+
+// fields starts pre-populated with locked entries.
+// SignatureField renders them without drag/resize/remove.
+// Signer fills in values (signature, name, etc.) — preview renders in-place.
+// modifyPdf stamps values at the template-defined positions.
+```
+
+### Test scenarios
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | `useFieldPlacement()` with no options | Fields start empty (current behavior) |
+| 2 | `useFieldPlacement({ initialFields: [...] })` | Fields start pre-populated with provided entries |
+| 3 | `addField` after `initialFields` | New field appended; initial fields unchanged |
+| 4 | `clearFields` after `initialFields` | All fields removed (empty array) |
+| 5 | `updateField` on a locked field (programmatic) | Field is updated (hook allows it) |
+| 6 | `removeField` on a locked field (programmatic) | Field is removed (hook allows it) |
+| 7 | Render `SignatureField` with `field.locked = true` | No resize handle, no remove button, lock icon visible, not draggable |
+| 8 | Render `SignatureField` with `field.locked = undefined` | Current behavior (draggable, resizable, removable) |
+| 9 | Drag attempt on a locked `SignatureField` | No movement; cursor stays `default` |
+| 10 | Click overlay with `selectedFieldType` set + locked fields present | New unlocked field added at click position (locked fields unaffected) |
+| 11 | `modifyPdf` with mix of locked and unlocked fields | All fields stamped identically into PDF |
+| 12 | Re-render with changed `initialFields` prop (no remount) | Fields do NOT reset (initial value semantics) |
+| 13 | Remount via React `key` change with new `initialFields` | Fields reset to new initial values |
+
+---
 
 ### Performance / scalability
 
