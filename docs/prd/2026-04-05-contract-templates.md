@@ -79,6 +79,7 @@ This is a foundational capability for any e-signing product. Without templates, 
 | T8 | Admins can edit template metadata and field definitions | Must |
 | T9 | Admins can delete templates (only if no active/pending contracts reference them) | Should |
 | T10 | Templates can be tagged with one or more document types (migrated from the current document-level tagging) | Must |
+| T11 | Template designer includes a "preview as signer" mode: admin selects a signer role and sees the template as that signer would see it (pre-positioned locked fields, no owner-fill fields visible) | Should |
 
 ### Contract instantiation
 
@@ -88,7 +89,7 @@ This is a foundational capability for any e-signing product. Without templates, 
 | C2 | The system generates a contract PDF by injecting owner-fill values into the template PDF at the defined positions using `pdf-lib` | Must |
 | C3 | The generated contract is stored as a new `document` with a foreign key reference to the source template | Must |
 | C4 | After generation, the contract enters `draft` status and follows the existing signing workflow (add signers → send → sign → complete) | Must |
-| C5 | When signers open the contract, signer-fill fields from the template are pre-positioned on the PDF based on the template's field definitions and the signer's assigned role | Should |
+| C5 | When signers open the contract, signer-fill fields from the template are pre-positioned and **locked** on the PDF based on the template's field definitions and the signer's assigned role. Requires signing library change request (see section 6). | Should |
 | C6 | The number of signers added must match the template's required signer count | Must |
 
 ### Navigation & lineage
@@ -126,7 +127,8 @@ This is a foundational capability for any e-signing product. Without templates, 
 6. Admin clicks on the PDF to place fields; fields are draggable/resizable
 7. For signer-fill fields, admin assigns each to a signer role (Signer 1, Signer 2, …)
 8. Admin sets the required number of signers
-9. Admin saves the template
+9. Admin can toggle "Preview as signer" mode, selecting a signer role to see the template from that signer's perspective (locked pre-positioned fields, owner-fill fields hidden)
+10. Admin saves the template
 
 #### Flow 2: Create a contract from template (Member)
 
@@ -326,6 +328,29 @@ alter table public.documents
 - RLS policies enforce at DB level; API routes double-check via `lib/authorization.ts`
 - Template PDFs in storage: access via signed URLs, same pattern as document PDFs
 
+### Signing library change request (`@drvillo/react-browser-e-signing`)
+
+The template field **designer** (admin-facing) is built natively in LunarSign. However, the **signer experience** with pre-positioned fields requires small additions to the signing library. Today, `useFieldPlacement()` starts with empty fields and `FieldOverlay`/`SignatureField` allow unrestricted drag/resize/remove. For template-based contracts, signer fields must be pre-loaded and locked.
+
+**Required changes (3 non-breaking additions):**
+
+1. **`initialFields?: FieldPlacement[]`** on `UseFieldPlacementOptions` — pre-loads fields on mount instead of starting empty. LunarSign maps template signer-fill fields (filtered by signer role) to `FieldPlacement[]` and passes them in.
+2. **`locked?: boolean`** on `FieldPlacement` — when true, the field cannot be dragged, resized, or removed. Visually distinguished (e.g., subtle lock icon, no resize handles).
+3. **`FieldOverlay` and `SignatureField` respect `locked`** — skip drag/resize handlers, hide remove button, show lock indicator.
+
+**Why not build this natively in LunarSign instead?**
+
+| Approach | Feasibility | Outcome |
+|----------|------------|---------|
+| Call `addField()` in `useEffect` per template field | Works but fields flash in; timing-dependent | Poor UX |
+| Can't lock fields without library change | Signers can move/delete pre-positioned fields | Defeats the purpose |
+| Fork/wrap `FieldOverlay` to add locking | Maintains shadow copy of library internals | Fragile, high maintenance |
+| Build entirely custom field overlay | Massive duplication of rendering, drag, resize logic | Scope explosion |
+
+The library change request is minimal (3 optional additions), non-breaking, and makes the library genuinely more reusable. The alternative approaches are all fragile workarounds.
+
+**Coordinate system compatibility**: The template field designer stores positions as `(page, xPercent, yPercent, widthPercent, heightPercent)` — the same coordinate system the signing library uses. No conversion needed when mapping template signer-fill fields to `FieldPlacement[]`.
+
 ### Performance / scalability
 
 - Template field definitions are small (tens of fields per template) — no pagination needed
@@ -402,6 +427,8 @@ Rollback: each phase is independently revertible. The migration adds columns/tab
 
 - Full template creation flow: upload PDF → place fields → save template
 - Full instantiation flow: select template → fill fields → generate contract → add signers → send
+- Signer experience: template-based contract shows pre-positioned locked fields; signer fills and signs
+- "Preview as signer" mode: toggle in template designer shows locked fields per signer role
 - Navigation: company → templates → template detail → contract list → contract detail → back to template
 - Permission enforcement: member cannot create template, admin can
 
@@ -419,6 +446,8 @@ Rollback: each phase is independently revertible. The migration adds columns/tab
 - [ ] Document types are assignable to templates and inherited by contracts
 - [ ] Existing direct-upload contracts continue to work unchanged
 - [ ] Templates are scoped to companies with proper access control (admin create, member use)
+- [ ] Template designer includes a "preview as signer" toggle showing locked pre-positioned fields per signer role
+- [ ] Signers see pre-positioned locked fields for template-based contracts (after library update)
 - [ ] All new features covered by automated tests
 
 ---
@@ -437,14 +466,17 @@ Rollback: each phase is independently revertible. The migration adds columns/tab
 | M6 | Contract instantiation UI: owner-fill form with live PDF preview, generation wizard | Medium | M5 |
 | M7 | Navigation updates: company sidebar templates section, template ↔ contract lineage links, dashboard updates | Small | M4, M6 |
 | M8 | Document type migration: re-point to templates, backward compat for legacy docs | Small | M4 |
-| M9 | Signer field pre-positioning: when creating signature requests from template-based contracts, pre-position signer fields based on template definitions | Medium | M5, existing signing flow |
-| M10 | Testing: unit, integration, e2e test suites for all new features | Medium | M1–M9 |
+| M9 | Signing library change request: `initialFields` + `locked` on `FieldPlacement` + `FieldOverlay`/`SignatureField` lock support | Small | None (parallel track) |
+| M10 | Signer field pre-positioning: map template signer-fill fields to `initialFields` with `locked: true`; integrate updated signing library | Medium | M5, M9 |
+| M11 | "Preview as signer" mode in template designer: toggle that shows the template as a signer would see it (pre-positioned locked fields, signer role selector) | Small | M3 |
+| M12 | Testing: unit, integration, e2e test suites for all new features | Medium | M1–M11 (incremental, not blocked) |
 
 ### Dependencies
 
 - M3 depends on the signing library's `PdfViewer` component being importable and usable standalone (it currently is — exported from `@drvillo/react-browser-e-signing`)
 - M5 requires `pdf-lib` as a direct dependency (currently indirect via signing library — needs explicit `npm install`)
-- M9 may require coordination with the signing library's field overlay to accept pre-defined field positions
+- M9 is a change request to `@drvillo/react-browser-e-signing` — can be developed in parallel with LunarSign work
+- M10 depends on M9 (updated library release) and M5 (template field definitions available in DB)
 
 ### Risks & mitigations
 
@@ -454,10 +486,11 @@ Rollback: each phase is independently revertible. The migration adds columns/tab
 | Complex PDFs (scanned, image-heavy) cause slow field injection | Low | Medium | pdf-lib operates on PDF structure, not rendering. Benchmark with representative documents. |
 | Font embedding issues when injecting text | Medium | Medium | Use pdf-lib's standard fonts (Helvetica, etc.) for V1. Custom font support is a future enhancement. |
 | Template field designer UX complexity | Medium | Medium | Start with a minimal palette (5 field types). Iterate based on user feedback. |
-| Signer field pre-positioning interaction with free-form signing flow | Medium | Medium | M9 is "should" priority. Degrade gracefully: if pre-positioning fails, fall back to manual field placement. |
+| Signing library change request rejected or delayed | Low | High | The 3 additions are non-breaking and minimal. If delayed, degrade gracefully: signers place fields manually (current behavior). |
+| Signer field pre-positioning interaction with free-form signing flow | Medium | Medium | M10 is "should" priority. Degrade gracefully: if pre-positioning fails, fall back to manual field placement. |
 
-### Open questions
+### Resolved questions
 
-1. Should template PDFs be editable after contracts have been created from them? (Current answer: yes, but changes don't affect existing contracts since they have their own PDFs)
-2. Should there be a "preview as signer" mode in the template designer so admins can see what signers will experience?
-3. When pre-positioning signer fields (M9), should signers be able to move/resize them, or are positions locked?
+1. **Template editability post-instantiation**: Yes — editing a template does not affect existing contracts since each contract has its own independent PDF.
+2. **"Preview as signer" mode**: Yes — the template designer should include a preview mode that shows admins what signers will experience (pre-positioned signer fields, locked positions).
+3. **Signer field locking**: Positions are locked. Signers see pre-positioned fields and fill them in, but cannot move, resize, or delete them. This requires a change request to `@drvillo/react-browser-e-signing` (see section 6, "Signing library change request").
