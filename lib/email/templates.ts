@@ -1,3 +1,5 @@
+import { renderEmail } from './render'
+
 export function signatureRequestEmail(params: {
   signerName: string
   documentTitle: string
@@ -6,97 +8,14 @@ export function signatureRequestEmail(params: {
 }): { subject: string; html: string } {
   const subject = `Please sign: ${params.documentTitle}`
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      border-bottom: 1px solid #e0e0e0;
-      padding-bottom: 20px;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      color: #1a202c;
-      margin: 0;
-      font-size: 24px;
-    }
-    .content {
-      margin: 20px 0;
-    }
-    .content p {
-      margin: 10px 0;
-    }
-    .button {
-      display: inline-block;
-      background-color: #2563eb;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 5px;
-      text-decoration: none;
-      font-weight: bold;
-      margin: 20px 0;
-    }
-    .button:hover {
-      background-color: #1d4ed8;
-    }
-    .footer {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 20px;
-      margin-top: 30px;
-      color: #666;
-      font-size: 12px;
-      text-align: center;
-    }
-    .document-info {
-      background-color: #f5f5f5;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Lunar Sign</h1>
-    </div>
-
-    <div class="content">
-      <p>Hello ${params.signerName},</p>
-
-      <p>${params.requesterName} has requested your signature on the following document:</p>
-
-      <div class="document-info">
-        <strong>Document:</strong> ${params.documentTitle}
-      </div>
-
-      <p>Please click the button below to review and sign the document:</p>
-
-      <a href="${params.signingUrl}" class="button">Sign Document</a>
-
-      <p>This link is unique to you and can only be used once. If you have any questions or concerns, please contact ${params.requesterName}.</p>
-    </div>
-
-    <div class="footer">
-      <p>Lunar Sign - Lunar Rails</p>
-      <p>This is an automated message, please do not reply to this email.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `
+  const html = renderEmail('signature-request', {
+    subject,
+    preheader: `${params.requesterName} requested your signature on ${params.documentTitle}`,
+    signerName: params.signerName,
+    documentTitle: params.documentTitle,
+    requesterName: params.requesterName,
+    signingUrl: params.signingUrl,
+  })
 
   return { subject, html }
 }
@@ -109,97 +28,14 @@ export function documentSignedEmail(params: {
 }): { subject: string; html: string } {
   const subject = `Signature Received: ${params.documentTitle}`
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      border-bottom: 1px solid #e0e0e0;
-      padding-bottom: 20px;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      color: #1a202c;
-      margin: 0;
-      font-size: 24px;
-    }
-    .content {
-      margin: 20px 0;
-    }
-    .content p {
-      margin: 10px 0;
-    }
-    .button {
-      display: inline-block;
-      background-color: #2563eb;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 5px;
-      text-decoration: none;
-      font-weight: bold;
-      margin: 20px 0;
-    }
-    .button:hover {
-      background-color: #1d4ed8;
-    }
-    .footer {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 20px;
-      margin-top: 30px;
-      color: #666;
-      font-size: 12px;
-      text-align: center;
-    }
-    .signer-info {
-      background-color: #f0fdf4;
-      padding: 15px;
-      border-left: 4px solid #22c55e;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Lunar Sign</h1>
-    </div>
-
-    <div class="content">
-      <p>Hello ${params.ownerName},</p>
-
-      <p>${params.signerName} has signed your document.</p>
-
-      <div class="signer-info">
-        <strong>Document:</strong> ${params.documentTitle}<br>
-        <strong>Signed by:</strong> ${params.signerName}
-      </div>
-
-      <p>
-        <a href="${params.documentUrl}" class="button">View Document</a>
-      </p>
-    </div>
-
-    <div class="footer">
-      <p>Lunar Sign - Lunar Rails</p>
-      <p>This is an automated message, please do not reply to this email.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `
+  const html = renderEmail('document-signed', {
+    subject,
+    preheader: `${params.signerName} has signed ${params.documentTitle}`,
+    ownerName: params.ownerName,
+    documentTitle: params.documentTitle,
+    signerName: params.signerName,
+    documentUrl: params.documentUrl,
+  })
 
   return { subject, html }
 }
@@ -211,99 +47,29 @@ export function allPartiesSignedEmail(params: {
 }): { subject: string; html: string } {
   const subject = `All Signatures Complete: ${params.documentTitle}`
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      border-bottom: 1px solid #e0e0e0;
-      padding-bottom: 20px;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      color: #1a202c;
-      margin: 0;
-      font-size: 24px;
-    }
-    .content {
-      margin: 20px 0;
-    }
-    .content p {
-      margin: 10px 0;
-    }
-    .button {
-      display: inline-block;
-      background-color: #22c55e;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 5px;
-      text-decoration: none;
-      font-weight: bold;
-      margin: 20px 0;
-    }
-    .button:hover {
-      background-color: #16a34a;
-    }
-    .footer {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 20px;
-      margin-top: 30px;
-      color: #666;
-      font-size: 12px;
-      text-align: center;
-    }
-    .completion-info {
-      background-color: #f0fdf4;
-      padding: 15px;
-      border-left: 4px solid #22c55e;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Lunar Sign</h1>
-    </div>
+  const html = renderEmail('all-parties-signed', {
+    subject,
+    preheader: `All parties have signed ${params.documentTitle}`,
+    recipientName: params.recipientName,
+    documentTitle: params.documentTitle,
+    downloadUrl: params.downloadUrl,
+  })
 
-    <div class="content">
-      <p>Hello ${params.recipientName},</p>
+  return { subject, html }
+}
 
-      <p>All parties have now signed <strong>${params.documentTitle}</strong>.</p>
+export function documentCompleteSignerEmail(params: {
+  signerName: string
+  documentTitle: string
+}): { subject: string; html: string } {
+  const subject = `Document Fully Signed: ${params.documentTitle}`
 
-      <div class="completion-info">
-        <strong>Status:</strong> Complete<br>
-        <strong>Document:</strong> ${params.documentTitle}
-      </div>
-
-      <p>You can now download the fully signed document:</p>
-
-      <p>
-        <a href="${params.downloadUrl}" class="button">Download Signed Document</a>
-      </p>
-    </div>
-
-    <div class="footer">
-      <p>Lunar Sign - Lunar Rails</p>
-      <p>This is an automated message, please do not reply to this email.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `
+  const html = renderEmail('document-complete-signer', {
+    subject,
+    preheader: `All parties have signed ${params.documentTitle}`,
+    signerName: params.signerName,
+    documentTitle: params.documentTitle,
+  })
 
   return { subject, html }
 }
@@ -317,93 +83,14 @@ export function userInvitationEmail(params: {
   const roleLabel = params.role === 'admin' ? 'Admin' : 'Member'
   const subject = 'You have been invited to Lunar Sign'
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      border-bottom: 1px solid #e0e0e0;
-      padding-bottom: 20px;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      color: #1a202c;
-      margin: 0;
-      font-size: 24px;
-    }
-    .content {
-      margin: 20px 0;
-    }
-    .content p {
-      margin: 10px 0;
-    }
-    .button {
-      display: inline-block;
-      background-color: #2563eb;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 5px;
-      text-decoration: none;
-      font-weight: bold;
-      margin: 20px 0;
-    }
-    .button:hover {
-      background-color: #1d4ed8;
-    }
-    .invite-info {
-      background-color: #f5f5f5;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-    .footer {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 20px;
-      margin-top: 30px;
-      color: #666;
-      font-size: 12px;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Lunar Sign</h1>
-    </div>
-
-    <div class="content">
-      <p>Hello,</p>
-      <p>${params.inviterName} invited <strong>${params.inviteeEmail}</strong> to join Lunar Sign.</p>
-
-      <div class="invite-info">
-        <strong>Workspace role:</strong> ${roleLabel}
-      </div>
-
-      <p>Use Google sign-in with this email to activate your access:</p>
-      <p><a href="${params.loginUrl}" class="button">Join Workspace</a></p>
-    </div>
-
-    <div class="footer">
-      <p>Lunar Sign - Lunar Rails</p>
-      <p>This is an automated message, please do not reply to this email.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `
+  const html = renderEmail('user-invitation', {
+    subject,
+    preheader: `${params.inviterName} invited you to join Lunar Sign as ${roleLabel}`,
+    inviteeEmail: params.inviteeEmail,
+    inviterName: params.inviterName,
+    roleLabel,
+    loginUrl: params.loginUrl,
+  })
 
   return { subject, html }
 }

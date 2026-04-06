@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   allPartiesSignedEmail,
+  documentCompleteSignerEmail,
   documentSignedEmail,
   signatureRequestEmail,
   userInvitationEmail,
@@ -16,7 +17,23 @@ describe('signatureRequestEmail', () => {
     })
     expect(subject).toContain('Lease')
     expect(html).toContain('Sam')
+    expect(html).toContain('Pat')
     expect(html).toContain('https://app/sign/abc')
+    expect(html).toContain('Lease')
+    expect(html).toContain('Sign Document')
+  })
+
+  it('renders a valid HTML document with table layout', () => {
+    const { html } = signatureRequestEmail({
+      signerName: 'Sam',
+      documentTitle: 'Lease',
+      requesterName: 'Pat',
+      signingUrl: 'https://app/sign/abc',
+    })
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('<table')
+    expect(html).toContain('Lunar Sign')
+    expect(html).toContain('role="presentation"')
   })
 })
 
@@ -32,11 +49,12 @@ describe('documentSignedEmail', () => {
     expect(html).toContain('Owner')
     expect(html).toContain('Signer')
     expect(html).toContain('https://app/doc/1')
+    expect(html).toContain('View Document')
   })
 })
 
 describe('allPartiesSignedEmail', () => {
-  it('includes download URL', () => {
+  it('includes download URL and document title', () => {
     const { subject, html } = allPartiesSignedEmail({
       recipientName: 'R',
       documentTitle: 'T',
@@ -44,6 +62,22 @@ describe('allPartiesSignedEmail', () => {
     })
     expect(subject).toContain('T')
     expect(html).toContain('https://dl/1')
+    expect(html).toContain('Download Signed Document')
+    expect(html).toContain('Complete')
+  })
+})
+
+describe('documentCompleteSignerEmail', () => {
+  it('includes signer name and document title', () => {
+    const { subject, html } = documentCompleteSignerEmail({
+      signerName: 'Alice',
+      documentTitle: 'Contract',
+    })
+    expect(subject).toContain('Contract')
+    expect(subject).toContain('Fully Signed')
+    expect(html).toContain('Alice')
+    expect(html).toContain('Contract')
+    expect(html).toContain('Thank you for signing')
   })
 })
 
@@ -56,8 +90,10 @@ describe('userInvitationEmail', () => {
       loginUrl: 'https://login',
     })
     expect(admin.html).toContain('Admin')
-    expect(admin.html).toContain('Workspace role:</strong> Admin')
+    expect(admin.html).toContain('Workspace role:')
+    expect(admin.html).toContain('Admin')
     expect(admin.html).toContain('https://login')
+    expect(admin.html).toContain('Join Workspace')
   })
   it('maps member role label', () => {
     const m = userInvitationEmail({
@@ -66,6 +102,6 @@ describe('userInvitationEmail', () => {
       role: 'member',
       loginUrl: 'https://l',
     })
-    expect(m.html).toContain('Workspace role:</strong> Member')
+    expect(m.html).toContain('Member')
   })
 })

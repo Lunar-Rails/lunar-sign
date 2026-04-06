@@ -1,0 +1,62 @@
+<!-- Body content for all parties signed email -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+  <tr>
+    <td style="font-size: 16px; color: #171717; padding-bottom: 16px;">
+      Hello {{recipientName}},
+    </td>
+  </tr>
+  <tr>
+    <td style="font-size: 16px; color: #374151; padding-bottom: 20px;">
+      All parties have now signed <strong>{{documentTitle}}</strong>.
+    </td>
+  </tr>
+
+  <!-- Completion info card -->
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 6px; border-left: 4px solid #22c55e;">
+        <tr>
+          <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+              <tr>
+                <td style="font-size: 14px; color: #374151; padding-bottom: 6px;">
+                  <span style="color: #6b7280;">Status:</span>&nbsp;
+                  <strong style="color: #16a34a;">Complete</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size: 14px; color: #374151;">
+                  <span style="color: #6b7280;">Document:</span>&nbsp;
+                  <strong style="color: #171717;">{{documentTitle}}</strong>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="font-size: 16px; color: #374151; padding-bottom: 24px;">
+      You can now download the fully signed document:
+    </td>
+  </tr>
+
+  <!-- CTA button -->
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+          <td style="border-radius: 6px; background-color: #22c55e;">
+            <a href="{{downloadUrl}}" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 6px; background-color: #22c55e;">
+              <!--[if mso]><i style="mso-font-width: -100%; mso-text-raise: 21pt;">&nbsp;</i><![endif]-->
+              <span style="mso-text-raise: 10pt;">Download Signed Document</span>
+              <!--[if mso]><i style="mso-font-width: -100%;">&nbsp;</i><![endif]-->
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

@@ -4,7 +4,8 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
 import { canAccessDocument } from '@/lib/authorization'
 import { getConfig } from '@/lib/config'
-import nodemailer from 'nodemailer'
+import { sendEmail } from '@/lib/email/client'
+import { signatureRequestEmail } from '@/lib/email/templates'
 
 export async function POST(
   request: NextRequest,
@@ -83,39 +84,20 @@ export async function POST(
     // Send emails to signers
     try {
       const config = getConfig()
-      const transporter = nodemailer.createTransport({
-        host: config.MAILTRAP_HOST,
-        port: config.MAILTRAP_PORT,
-        auth: {
-          user: config.MAILTRAP_USER,
-          pass: config.MAILTRAP_PASSWORD,
-        },
-      })
 
       for (const sigRequest of signatureRequests) {
         const signingUrl = `${config.NEXT_PUBLIC_APP_URL}/sign/${sigRequest.token}`
-
-        await transporter.sendMail({
-          from: config.EMAIL_FROM,
-          to: sigRequest.signer_email,
-          subject: `Please sign: ${document.title}`,
-          html: `
-            <h2>Signature Request</h2>
-            <p>Hello ${sigRequest.signer_name},</p>
-            <p>You have been requested to sign the following document:</p>
-            <p><strong>${document.title}</strong></p>
-            <p>
-              <a href="${signingUrl}" style="display: inline-block; padding: 10px 20px; background-color: #1a202c; color: white; text-decoration: none; border-radius: 5px;">
-                Sign Document
-              </a>
-            </p>
-            <p>This link is unique to you and expires after signing.</p>
-          `,
+        const { subject, html } = signatureRequestEmail({
+          signerName: sigRequest.signer_name,
+          documentTitle: document.title,
+          requesterName: 'The document owner',
+          signingUrl,
         })
+
+        await sendEmail({ to: sigRequest.signer_email, subject, html })
       }
     } catch (emailError) {
       console.error('Email sending error:', emailError)
-      // Don't fail the API call if emails fail - document status is already updated
     }
 
     // Log audit

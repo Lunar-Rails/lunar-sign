@@ -4,7 +4,8 @@ import { logAudit } from '@/lib/audit'
 import { rateLimit } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
-import nodemailer from 'nodemailer'
+import { sendEmail } from '@/lib/email/client'
+import { allPartiesSignedEmail, documentCompleteSignerEmail } from '@/lib/email/templates'
 import type {
   Document,
   SignatureRequest,
@@ -223,14 +224,6 @@ export async function POST(request: NextRequest) {
 
         try {
           const config = getConfig()
-          const transporter = nodemailer.createTransport({
-            host: config.MAILTRAP_HOST,
-            port: config.MAILTRAP_PORT,
-            auth: {
-              user: config.MAILTRAP_USER,
-              pass: config.MAILTRAP_PASSWORD,
-            },
-          })
 
           const { data: ownerProfileRaw } = await supabase
             .from('profiles')
@@ -242,35 +235,20 @@ export async function POST(request: NextRequest) {
 
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
-            await transporter.sendMail({
-              from: config.EMAIL_FROM,
-              to: ownerProfile.email,
-              subject: `Document Completed: ${document.title}`,
-              html: `
-                <h2>All Signatures Received</h2>
-                <p>Hello ${ownerProfile.full_name},</p>
-                <p>All parties have signed your document <strong>${document.title}</strong>.</p>
-                <p>
-                  <a href="${downloadUrl}" style="display: inline-block; padding: 10px 20px; background-color: #1a202c; color: white; text-decoration: none; border-radius: 5px;">
-                    Download Signed Document
-                  </a>
-                </p>
-              `,
+            const { subject, html } = allPartiesSignedEmail({
+              recipientName: ownerProfile.full_name,
+              documentTitle: document.title,
+              downloadUrl,
             })
+            await sendEmail({ to: ownerProfile.email, subject, html })
           }
 
           for (const req of allRequests) {
-            await transporter.sendMail({
-              from: config.EMAIL_FROM,
-              to: req.signer_email,
-              subject: `Document Fully Signed: ${document.title}`,
-              html: `
-                  <h2>Document Complete</h2>
-                  <p>Hello ${req.signer_name},</p>
-                  <p>All parties have now signed <strong>${document.title}</strong>.</p>
-                  <p>Thank you for signing.</p>
-                `,
+            const { subject, html } = documentCompleteSignerEmail({
+              signerName: req.signer_name,
+              documentTitle: document.title,
             })
+            await sendEmail({ to: req.signer_email, subject, html })
           }
         } catch (emailError) {
           console.error('Completion email error:', emailError)
