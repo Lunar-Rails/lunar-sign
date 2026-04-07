@@ -3,6 +3,8 @@ import {
   allPartiesSignedEmail,
   documentCompleteSignerEmail,
   documentSignedEmail,
+  documentCompletedOwnerEmail,
+  documentCompletedSignerEmail,
   signatureRequestEmail,
   userInvitationEmail,
 } from '@/lib/email/templates'
@@ -34,6 +36,17 @@ describe('signatureRequestEmail', () => {
     expect(html).toContain('<table')
     expect(html).toContain('Lunar Sign')
     expect(html).toContain('role="presentation"')
+  })
+
+  it('uses table-based layout', () => {
+    const { html } = signatureRequestEmail({
+      signerName: 'Sam',
+      documentTitle: 'Lease',
+      requesterName: 'Pat',
+      signingUrl: 'https://app/sign/abc',
+    })
+    expect(html).toContain('role="presentation"')
+    expect(html).toContain('Lunar Sign')
   })
 })
 
@@ -81,6 +94,31 @@ describe('documentCompleteSignerEmail', () => {
   })
 })
 
+describe('documentCompletedOwnerEmail', () => {
+  it('includes owner name, title, and download URL', () => {
+    const { subject, html } = documentCompletedOwnerEmail({
+      ownerName: 'Alice',
+      documentTitle: 'Contract',
+      downloadUrl: 'https://dl/2',
+    })
+    expect(subject).toContain('Contract')
+    expect(html).toContain('Alice')
+    expect(html).toContain('https://dl/2')
+  })
+})
+
+describe('documentCompletedSignerEmail', () => {
+  it('includes signer name and title', () => {
+    const { subject, html } = documentCompletedSignerEmail({
+      signerName: 'Bob',
+      documentTitle: 'Agreement',
+    })
+    expect(subject).toContain('Agreement')
+    expect(html).toContain('Bob')
+    expect(html).toContain('Agreement')
+  })
+})
+
 describe('userInvitationEmail', () => {
   it('maps admin role label and includes login URL', () => {
     const admin = userInvitationEmail({
@@ -103,5 +141,43 @@ describe('userInvitationEmail', () => {
       loginUrl: 'https://l',
     })
     expect(m.html).toContain('Member')
+  })
+})
+
+describe('shared layout structure', () => {
+  it('wraps all templates in the same branded layout', () => {
+    const templates = [
+      signatureRequestEmail({
+        signerName: 'S',
+        documentTitle: 'D',
+        requesterName: 'R',
+        signingUrl: 'https://s',
+      }),
+      documentSignedEmail({
+        ownerName: 'O',
+        documentTitle: 'D',
+        signerName: 'S',
+        documentUrl: 'https://d',
+      }),
+      allPartiesSignedEmail({
+        recipientName: 'R',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }),
+      userInvitationEmail({
+        inviteeEmail: 'e@e.com',
+        inviterName: 'I',
+        role: 'member',
+        loginUrl: 'https://l',
+      }),
+    ]
+
+    for (const { html } of templates) {
+      expect(html).toContain('<!DOCTYPE html')
+      expect(html).toContain('Lunar Sign')
+      expect(html).toContain('Lunar Rails')
+      expect(html).toContain('role="presentation"')
+      expect(html).toContain('automated message')
+    }
   })
 })

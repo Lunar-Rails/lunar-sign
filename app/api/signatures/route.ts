@@ -5,7 +5,10 @@ import { rateLimit } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import { sendEmail } from '@/lib/email/client'
-import { allPartiesSignedEmail, documentCompleteSignerEmail } from '@/lib/email/templates'
+import {
+  documentCompletedOwnerEmail,
+  documentCompletedSignerEmail,
+} from '@/lib/email/templates'
 import type {
   Document,
   SignatureRequest,
@@ -235,8 +238,8 @@ export async function POST(request: NextRequest) {
 
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
-            const { subject, html } = allPartiesSignedEmail({
-              recipientName: ownerProfile.full_name,
+            const { subject, html } = documentCompletedOwnerEmail({
+              ownerName: ownerProfile.full_name,
               documentTitle: document.title,
               downloadUrl,
             })
@@ -244,7 +247,7 @@ export async function POST(request: NextRequest) {
           }
 
           for (const req of allRequests) {
-            const { subject, html } = documentCompleteSignerEmail({
+            const { subject, html } = documentCompletedSignerEmail({
               signerName: req.signer_name,
               documentTitle: document.title,
             })

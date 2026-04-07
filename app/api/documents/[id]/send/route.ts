@@ -90,7 +90,7 @@ export async function POST(
         const { subject, html } = signatureRequestEmail({
           signerName: sigRequest.signer_name,
           documentTitle: document.title,
-          requesterName: 'The document owner',
+          requesterName: user.email ?? 'Document owner',
           signingUrl,
         })
 

@@ -1,37 +1,41 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-const templateDir = join(process.cwd(), 'lib', 'email', 'html')
-const templateCache = new Map<string, string>()
+const TEMPLATES_DIR = join(process.cwd(), 'lib', 'email', 'templates')
 
-function loadTemplate(name: string): string {
-  const cached = templateCache.get(name)
+const fileCache = new Map<string, string>()
+
+function readTemplate(filename: string): string {
+  const cached = fileCache.get(filename)
   if (cached) return cached
 
-  const filePath = join(templateDir, `${name}.html`)
-  const content = readFileSync(filePath, 'utf-8')
-  templateCache.set(name, content)
+  const filepath = join(TEMPLATES_DIR, filename)
+  const content = readFileSync(filepath, 'utf-8')
+  fileCache.set(filename, content)
   return content
 }
 
 function interpolate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>
-    Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match
-  )
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
+    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match
+  })
 }
 
 export function renderEmail(
   templateName: string,
   vars: Record<string, string> & { subject: string; preheader?: string }
 ): string {
-  const base = loadTemplate('base')
-  const body = loadTemplate(templateName)
+  const layout = readTemplate('layout.html')
+  const content = readTemplate(`${templateName}.html`)
 
-  const renderedBody = interpolate(body, vars)
-
-  return interpolate(base, {
+  const renderedContent = interpolate(content, vars)
+  return interpolate(layout, {
     ...vars,
-    body: renderedBody,
     preheader: vars.preheader ?? vars.subject,
+    content: renderedContent,
   })
+}
+
+export function clearTemplateCache(): void {
+  fileCache.clear()
 }
