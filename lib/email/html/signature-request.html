@@ -1,0 +1,71 @@
+<!-- Body content for signature request email -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+  <tr>
+    <td style="font-size: 16px; color: #171717; padding-bottom: 16px;">
+      Hello {{signerName}},
+    </td>
+  </tr>
+  <tr>
+    <td style="font-size: 16px; color: #374151; padding-bottom: 20px;">
+      {{requesterName}} has requested your signature on the following document:
+    </td>
+  </tr>
+
+  <!-- Document info card -->
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb;">
+        <tr>
+          <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+              <tr>
+                <td style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">
+                  Document
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size: 16px; font-weight: 600; color: #171717;">
+                  {{documentTitle}}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="font-size: 16px; color: #374151; padding-bottom: 24px;">
+      Please review and sign the document by clicking the button below:
+    </td>
+  </tr>
+
+  <!-- CTA button -->
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+          <td style="border-radius: 6px; background-color: #2563eb;">
+            <a href="{{signingUrl}}" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 6px; background-color: #2563eb;">
+              <!--[if mso]><i style="mso-font-width: -100%; mso-text-raise: 21pt;">&nbsp;</i><![endif]-->
+              <span style="mso-text-raise: 10pt;">Sign Document</span>
+              <!--[if mso]><i style="mso-font-width: -100%;">&nbsp;</i><![endif]-->
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="font-size: 14px; color: #6b7280; padding-bottom: 8px;">
+      This link is unique to you and can only be used once. If you have any questions, please contact {{requesterName}}.
+    </td>
+  </tr>
+  <tr>
+    <td style="font-size: 12px; color: #9ca3af; word-break: break-all;">
+      <a href="{{signingUrl}}" style="color: #9ca3af; text-decoration: underline;">{{signingUrl}}</a>
+    </td>
+  </tr>
+</table>

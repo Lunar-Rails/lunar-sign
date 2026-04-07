@@ -23,13 +23,17 @@ function interpolate(template: string, vars: Record<string, string>): string {
 
 export function renderEmail(
   templateName: string,
-  vars: Record<string, string>
+  vars: Record<string, string> & { subject: string; preheader?: string }
 ): string {
   const layout = readTemplate('layout.html')
   const content = readTemplate(`${templateName}.html`)
 
   const renderedContent = interpolate(content, vars)
-  return interpolate(layout, { ...vars, content: renderedContent })
+  return interpolate(layout, {
+    ...vars,
+    preheader: vars.preheader ?? vars.subject,
+    content: renderedContent,
+  })
 }
 
 export function clearTemplateCache(): void {

@@ -82,6 +82,14 @@ export function documentCompletedSignerEmail(params: {
   return { subject, html }
 }
 
+// Backward-compatible alias for legacy call sites.
+export function documentCompleteSignerEmail(params: {
+  signerName: string
+  documentTitle: string
+}): { subject: string; html: string } {
+  return documentCompletedSignerEmail(params)
+}
+
 export function userInvitationEmail(params: {
   inviteeEmail: string
   inviterName: string
