@@ -16,6 +16,13 @@ interface DashboardDocument extends Document {
   types: Pick<DocumentType, 'id' | 'name'>[]
 }
 
+const statCards = [
+  { key: 'total', label: 'Total documents' },
+  { key: 'draft', label: 'Draft lane' },
+  { key: 'pending', label: 'Awaiting signatures' },
+  { key: 'completed', label: 'Completed' },
+] as const
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const supabase = await createClient()
   const { company: companySlug } = await searchParams
@@ -118,66 +125,72 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     types: typesByDocumentId.get(doc.id) || [],
   }))
 
-  // Calculate stats
   const totalDocs = docsWithCompanies.length
   const draftCount = docsWithCompanies.filter((d) => d.status === 'draft').length
   const pendingCount = docsWithCompanies.filter((d) => d.status === 'pending').length
   const completedCount = docsWithCompanies.filter((d) => d.status === 'completed').length
 
   const pageTitle = activeCompany ? activeCompany.name : 'All Documents'
+  const statValues = {
+    total: totalDocs,
+    draft: draftCount,
+    pending: pendingCount,
+    completed: completedCount,
+  }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
-        {companySlug && !activeCompany && (
-          <p className="mt-2 text-sm text-red-700">
-            Company not found. Showing no documents.
-          </p>
-        )}
-      </div>
+    <div className="space-y-8">
+      <section className="lr-panel px-6 py-6 sm:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="lr-label">Signing dashboard</p>
+            <h1 className="font-display mt-3 text-[2.4rem] font-semibold tracking-[-0.04em] text-white">
+              {pageTitle}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--lr-text-soft)]">
+              Review documents, watch signature progress, and move between
+              company lanes without leaving the shared Lunar Sign shell.
+            </p>
+            {companySlug && !activeCompany && (
+              <p className="mt-3 text-sm text-[var(--lr-danger)]">
+                Company not found. Showing no documents.
+              </p>
+            )}
+          </div>
 
-      {/* Stats Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-600">Total Documents</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{totalDocs}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-600">Draft</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{draftCount}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-600">Pending</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">
-            {pendingCount}
-          </p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-600">Completed</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">
-            {completedCount}
-          </p>
-        </div>
-      </div>
-
-      {/* Documents Section */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
           <DashboardUploadDocumentButton
             activeCompanySlug={activeCompany?.slug ?? null}
             companies={companyOptions}
           />
         </div>
+      </section>
 
-        <div className="px-6 py-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((card) => (
+          <div key={card.key} className="lr-grid-card p-5">
+            <p className="lr-label">{card.label}</p>
+            <p className="lr-kpi mt-4">{statValues[card.key]}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="lr-panel overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-[rgba(193,178,255,0.12)] px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="lr-label">Document library</p>
+            <h2 className="font-display mt-2 text-xl font-semibold text-white">
+              Card-first document view
+            </h2>
+          </div>
+        </div>
+
+        <div className="px-6 py-6">
           <DashboardSearch
             documents={docsWithCompanies}
             documentTypes={(allDocumentTypes || []) as Pick<DocumentType, 'id' | 'name'>[]}
           />
         </div>
-      </div>
+      </section>
     </div>
   )
 }

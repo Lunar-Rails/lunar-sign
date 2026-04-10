@@ -136,17 +136,18 @@ export default function DocumentPdfPreview({
   const isLoading = isFetching || isPdfLoading
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Document Preview</h2>
+    <div className="lr-panel p-6">
+      <p className="lr-label">Presentation frame</p>
+      <h2 className="font-display mt-2 text-xl font-semibold text-white">Document preview</h2>
 
       {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-4 rounded-[14px] border border-[rgba(255,141,151,0.3)] bg-[rgba(255,141,151,0.08)] p-4 text-sm text-[var(--lr-danger)]">
           {errorMessage}
         </div>
       )}
 
       {!errorMessage && isLoading && (
-        <div className="flex h-[640px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600">
+        <div className="mt-4 flex h-[640px] items-center justify-center rounded-[16px] border border-[rgba(193,178,255,0.12)] bg-[rgba(255,255,255,0.03)] text-sm text-[var(--lr-text-soft)]">
           Loading PDF preview...
         </div>
       )}
@@ -154,7 +155,7 @@ export default function DocumentPdfPreview({
       {!errorMessage && !isLoading && pdfData && (
         <div
           ref={viewerContainerRef}
-          className="h-[640px] overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white"
+          className="mt-4 h-[640px] overflow-y-auto overflow-x-hidden rounded-[16px] border border-[rgba(193,178,255,0.12)] bg-[rgba(7,9,18,0.42)]"
         >
           <PdfViewer
             pdfData={pdfData}

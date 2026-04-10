@@ -1,10 +1,24 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_ROUTES = ['/login', '/auth', '/sign', '/api/signatures', '/api/download']
+const PUBLIC_ROUTE_PREFIXES = [
+  '/login',
+  '/auth',
+  '/sign',
+  '/api/signatures',
+  '/api/download',
+]
 
 function isPublicRoute(path: string) {
-  if (PUBLIC_ROUTES.some((route) => path.startsWith(route))) return true
+  if (path === '/') return true
+
+  if (
+    PUBLIC_ROUTE_PREFIXES.some(
+      (route) => path === route || path.startsWith(`${route}/`)
+    )
+  ) {
+    return true
+  }
 
   // PDF preview is guarded in the route handler itself.
   // Skipping proxy auth refresh here avoids client remount loops on /documents/[id].
@@ -31,9 +45,7 @@ export async function proxy(request: NextRequest) {
         return request.cookies.getAll()
       },
       setAll(cookiesToSet, headers) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value)
-        )
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         supabaseResponse = NextResponse.next({ request })
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
@@ -45,10 +57,10 @@ export async function proxy(request: NextRequest) {
     },
   })
 
-  // Refresh session
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to login for protected routes
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

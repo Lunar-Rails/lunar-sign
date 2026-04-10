@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import clsx from 'clsx'
+import { Building2, Files } from 'lucide-react'
 
 interface CompanySidebarItem {
   id: string
@@ -15,13 +17,6 @@ interface CompanySidebarClientProps {
   totalDocumentCount: number
 }
 
-function getItemClasses(isActive: boolean) {
-  if (isActive)
-    return 'flex items-center justify-between rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white'
-
-  return 'flex items-center justify-between rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100'
-}
-
 export default function CompanySidebarClient({
   companies,
   totalDocumentCount,
@@ -32,26 +27,31 @@ export default function CompanySidebarClient({
   const isDashboard = pathname === '/dashboard'
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white lg:block">
-      <div className="p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Companies
-        </p>
+    <aside className="hidden w-[220px] shrink-0 lg:block">
+      <div className="lr-panel sticky top-24 p-4">
+        <p className="lr-label mb-3">Workspace lanes</p>
 
-        <nav className="space-y-1">
+        <nav className="space-y-2">
           <Link
             href="/dashboard"
-            className={getItemClasses(isDashboard && !activeCompany)}
+            className={clsx('lr-sidebar-link', {
+              'lr-sidebar-link-active': isDashboard && !activeCompany,
+            })}
           >
-            <span>All Documents</span>
-            <span className="text-xs">{totalDocumentCount}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <Files className="h-4 w-4 text-[var(--lr-accent-soft)]" />
+              <span>All Documents</span>
+            </span>
+            <span className="font-display text-xs text-[var(--lr-text-muted)]">
+              {totalDocumentCount}
+            </span>
           </Link>
 
-          <div className="my-3 border-t border-gray-200" />
+          <div className="my-4 border-t border-[rgba(193,178,255,0.12)]" />
 
           {companies.length === 0 && (
-            <p className="px-2 py-1 text-xs text-gray-500">
-              No companies configured
+            <p className="px-2 py-1 text-xs text-[var(--lr-text-muted)]">
+              No companies configured yet.
             </p>
           )}
 
@@ -59,12 +59,18 @@ export default function CompanySidebarClient({
             <Link
               key={company.id}
               href={`/dashboard?company=${company.slug}`}
-              className={getItemClasses(
-                isDashboard && activeCompany === company.slug
-              )}
+              className={clsx('lr-sidebar-link', {
+                'lr-sidebar-link-active':
+                  isDashboard && activeCompany === company.slug,
+              })}
             >
-              <span className="truncate pr-2">{company.name}</span>
-              <span className="text-xs">{company.documentCount}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <Building2 className="h-4 w-4 text-[var(--lr-accent-soft)]" />
+                <span className="truncate">{company.name}</span>
+              </span>
+              <span className="font-display text-xs text-[var(--lr-text-muted)]">
+                {company.documentCount}
+              </span>
             </Link>
           ))}
         </nav>

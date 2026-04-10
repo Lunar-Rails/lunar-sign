@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Send } from 'lucide-react'
 
 interface SendDocumentButtonProps {
   documentId: string
@@ -38,16 +39,17 @@ export default function SendDocumentButton({
   return (
     <div>
       {error && (
-        <div className="mb-2 rounded-md border border-red-200 bg-red-50 p-2">
-          <p className="text-xs text-red-800">{error}</p>
+        <div className="mb-2 rounded-[12px] border border-[rgba(255,141,151,0.3)] bg-[rgba(255,141,151,0.08)] p-2">
+          <p className="text-xs text-[var(--lr-danger)]">{error}</p>
         </div>
       )}
       <button
         onClick={handleSend}
         disabled={isLoading}
-        className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="lr-button lr-button-primary"
       >
-        {isLoading ? 'Sending...' : 'Send for Signing'}
+        <Send className="h-4 w-4" />
+        {isLoading ? 'Sending...' : 'Send for signing'}
       </button>
     </div>
   )

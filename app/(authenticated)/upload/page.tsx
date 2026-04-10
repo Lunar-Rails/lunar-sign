@@ -29,13 +29,19 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
       : []
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">Upload Document</h1>
-      <p className="mb-8 text-gray-600">
-        Upload a PDF document that requires signatures
-      </p>
+    <div className="mx-auto max-w-4xl space-y-6">
+      <section className="lr-panel px-6 py-6 sm:px-8">
+        <p className="lr-label">Upload lane</p>
+        <h1 className="font-display mt-3 text-[2.3rem] font-semibold tracking-[-0.04em] text-white">
+          Add a new signing document
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--lr-text-soft)]">
+          Drop in a PDF, assign it to one or more companies, and prepare the
+          document for signature requests inside the shared Lunar Sign shell.
+        </p>
+      </section>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
+      <div className="lr-panel p-6 sm:p-8">
         <FileUploadForm
           companies={rows}
           documentTypes={typeRows}

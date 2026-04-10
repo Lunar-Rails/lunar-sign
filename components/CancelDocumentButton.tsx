@@ -46,7 +46,7 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
       type="button"
       onClick={handleClick}
       disabled={isSubmitting}
-      className="inline-block rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+      className="lr-button lr-button-danger"
     >
       {isSubmitting ? 'Revoking…' : 'Revoke signing request'}
     </button>

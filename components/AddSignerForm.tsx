@@ -48,39 +48,54 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="text-sm font-medium text-gray-900">Add Signer</h3>
+      <div>
+        <p className="lr-label">Signature routing</p>
+        <h3 className="font-display mt-2 text-xl font-semibold text-white">Add signer</h3>
+      </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3">
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="rounded-[12px] border border-[rgba(255,141,151,0.3)] bg-[rgba(255,141,151,0.08)] p-3">
+          <p className="text-sm text-[var(--lr-danger)]">{error}</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Signer name"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          required
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Signer email"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          required
-        />
+        <div className="space-y-2">
+          <label className="lr-label block" htmlFor="signer-name">
+            Signer name
+          </label>
+          <input
+            id="signer-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Signer name"
+            className="lr-input"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="lr-label block" htmlFor="signer-email">
+            Signer email
+          </label>
+          <input
+            id="signer-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Signer email"
+            className="lr-input"
+            required
+          />
+        </div>
       </div>
 
       <button
         type="submit"
         disabled={isLoading}
-        className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="lr-button lr-button-primary"
       >
-        {isLoading ? 'Adding...' : 'Add Signer'}
+        {isLoading ? 'Adding...' : 'Add signer'}
       </button>
     </form>
   )

@@ -1,8 +1,12 @@
 import { redirect } from 'next/navigation'
+
 import { createClient } from '@/lib/supabase/server'
 import { Profile } from '@/lib/types'
-import UserDropdown from '@/components/UserDropdown'
+
+import AppShellNav from '@/components/AppShellNav'
 import CompanySidebar from '@/components/CompanySidebar'
+import LunarSignWordmark from '@/components/LunarSignWordmark'
+import UserDropdown from '@/components/UserDropdown'
 
 export default async function AuthenticatedLayout({
   children,
@@ -19,7 +23,6 @@ export default async function AuthenticatedLayout({
     redirect('/login')
   }
 
-  // Fetch user profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
@@ -33,50 +36,41 @@ export default async function AuthenticatedLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Navbar */}
-      <nav className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900">Lunar Sign</h1>
+    <div className="min-h-screen">
+      <header className="lr-header sticky top-0 z-40">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-4 px-6 py-3">
+          <div className="shrink-0">
+            <LunarSignWordmark href="/dashboard" size="sm" />
           </div>
 
-          {/* Nav Links */}
-          <div className="flex items-center gap-6">
-            <a
-              href="/dashboard"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Dashboard
-            </a>
-            <a
-              href="/upload"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Upload
-            </a>
-            {userProfile.role === 'admin' && (
-              <a
-                href="/admin"
-                className="text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Admin
-              </a>
-            )}
+          <div className="min-w-0 flex-1">
+            <AppShellNav showAdmin={userProfile.role === 'admin'} />
           </div>
 
-          {/* User Dropdown */}
-          <UserDropdown profile={userProfile} />
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden lg:inline-flex lr-chip text-[var(--lr-gold)]">
+              Audit-ready
+            </span>
+            <UserDropdown profile={userProfile} />
+          </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="flex flex-1 bg-gray-50">
+      <div className="mx-auto flex max-w-[1200px] gap-6 px-6 pb-8 pt-8 lg:items-start">
         <CompanySidebar />
-
-        {/* Main Content */}
-        <main className="flex-1 px-6 py-8">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
+
+      <footer className="mx-auto max-w-[1200px] px-6 pb-10 pt-2">
+        <div className="lr-footer">
+          <span>Lunar Sign · secure signing relay</span>
+          <div className="flex flex-wrap gap-4">
+            <span>Dark neon-glass shell</span>
+            <span>Compact controls</span>
+            <span>Audit-first detail views</span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

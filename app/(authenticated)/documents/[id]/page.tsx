@@ -1,24 +1,22 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { ArrowLeft, Download } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/server'
 
-import { Document, SignatureRequest, Company, DocumentType } from '@/lib/types'
+import { Company, Document, DocumentType, SignatureRequest } from '@/lib/types'
 import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 
 import AddSignerForm from '@/components/AddSignerForm'
-
+import { AuditTimeline } from '@/components/AuditTimeline'
+import { CancelDocumentButton } from '@/components/CancelDocumentButton'
+import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
+import DocumentPdfPreview from '@/components/DocumentPdfPreview'
+import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
+import SendDocumentButton from '@/components/SendDocumentButton'
 import SignersSection from '@/components/SignersSection'
 
-import { AuditTimeline } from '@/components/AuditTimeline'
-
-import SendDocumentButton from '@/components/SendDocumentButton'
-import { CancelDocumentButton } from '@/components/CancelDocumentButton'
-import DocumentPdfPreview from '@/components/DocumentPdfPreview'
-import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
-import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
-
 export const dynamic = 'force-dynamic'
-
 
 interface DocumentDetailPageProps {
   params: Promise<{ id: string }>
@@ -27,16 +25,20 @@ interface DocumentDetailPageProps {
 function getStatusBadgeStyles(status: string) {
   switch (status) {
     case 'draft':
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800'
+      return 'lr-status-chip lr-status-draft'
     case 'pending':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800'
+      return 'lr-status-chip lr-status-pending'
     case 'completed':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800'
+      return 'lr-status-chip lr-status-completed'
     case 'cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800'
+      return 'lr-status-chip lr-status-cancelled'
     default:
-      return ''
+      return 'lr-status-chip'
   }
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString()
 }
 
 export default async function DocumentDetailPage({
@@ -53,7 +55,6 @@ export default async function DocumentDetailPage({
     redirect('/login')
   }
 
-  // Fetch document
   const { data: document } = await supabase
     .from('documents')
     .select('*')
@@ -107,23 +108,19 @@ export default async function DocumentDetailPage({
       .from('document_document_types')
       .select('document_type_id, document_types(id, name)')
       .eq('document_id', id),
-    supabase
-      .from('document_types')
-      .select('name')
-      .order('name', { ascending: true }),
+    supabase.from('document_types').select('name').order('name', { ascending: true }),
   ])
 
   const allCompanies: Company[] = companies || []
-  const assignedCompanies = (assignedCompanyRows || [])
-    .flatMap((row) => {
-      const value = row.companies as
-        | Pick<Company, 'id' | 'name' | 'slug'>
-        | Pick<Company, 'id' | 'name' | 'slug'>[]
-        | null
-      if (!value) return []
-      if (Array.isArray(value)) return value
-      return [value]
-    })
+  const assignedCompanies = (assignedCompanyRows || []).flatMap((row) => {
+    const value = row.companies as
+      | Pick<Company, 'id' | 'name' | 'slug'>
+      | Pick<Company, 'id' | 'name' | 'slug'>[]
+      | null
+    if (!value) return []
+    if (Array.isArray(value)) return value
+    return [value]
+  })
   const assignedCompanyIds = assignedCompanies.map((company) => company.id)
   const assignedTypes = (assignedTypeRows || []).flatMap((row) => {
     const value = row.document_types as
@@ -139,61 +136,74 @@ export default async function DocumentDetailPage({
   const logs = mapSupabaseAuditRows(auditLogs)
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">{doc.title}</h1>
-          <p className="text-gray-600">{doc.description}</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className={getStatusBadgeStyles(doc.status)}>
-            {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-          </span>
-          {doc.status === 'draft' && signers.length > 0 && (
-            <SendDocumentButton documentId={doc.id} />
-          )}
-          {doc.status === 'pending' && (
-            <CancelDocumentButton documentId={doc.id} />
-          )}
-          {doc.status === 'completed' && (
-            <a
-              href={`/api/documents/${doc.id}/download`}
-              className="inline-block rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            >
-              Download PDF
-            </a>
-          )}
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1120px] space-y-6">
+      <Link href="/dashboard" className="lr-link-pill">
+        <ArrowLeft className="h-4 w-4" />
+        Back to dashboard
+      </Link>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left Column - Document Info and Signers */}
-        <div className="lg:col-span-2 space-y-6">
+      <section className="lr-panel px-6 py-6 sm:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="lr-label">Document detail</p>
+            <h1 className="font-display mt-3 text-[2.3rem] font-semibold tracking-[-0.04em] text-white">
+              {doc.title}
+            </h1>
+            {doc.description && (
+              <p className="mt-3 text-sm leading-6 text-[var(--lr-text-soft)]">
+                {doc.description}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            <span className={getStatusBadgeStyles(doc.status)}>
+              {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+            </span>
+            {doc.status === 'draft' && signers.length > 0 && (
+              <SendDocumentButton documentId={doc.id} />
+            )}
+            {doc.status === 'pending' && (
+              <CancelDocumentButton documentId={doc.id} />
+            )}
+            {doc.status === 'completed' && (
+              <a
+                href={`/api/documents/${doc.id}/download`}
+                className="lr-button lr-button-gold"
+              >
+                <Download className="h-4 w-4" />
+                Download PDF
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div className="space-y-6">
           <DocumentPdfPreview documentId={doc.id} />
 
-          {/* Document Metadata */}
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Document Details
+          <div className="lr-panel p-6">
+            <p className="lr-label">Metadata</p>
+            <h2 className="font-display mt-2 text-xl font-semibold text-white">
+              Document details
             </h2>
-            <dl className="space-y-4">
+            <dl className="mt-5 grid gap-5 md:grid-cols-2">
               <div>
-                <dt className="text-sm font-medium text-gray-600">Title</dt>
-                <dd className="mt-1 text-sm text-gray-900">{doc.title}</dd>
+                <dt className="lr-label">Title</dt>
+                <dd className="mt-2 text-sm text-[var(--lr-text-soft)]">{doc.title}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Status</dt>
-                <dd className="mt-1">
+                <dt className="lr-label">Status</dt>
+                <dd className="mt-2">
                   <span className={getStatusBadgeStyles(doc.status)}>
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                   </span>
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Type</dt>
-                <dd className="mt-1">
+                <dt className="lr-label">Type</dt>
+                <dd className="mt-2">
                   <DocumentTypeInlineEditor
                     documentId={doc.id}
                     initialTypeNames={assignedTypes.map((type) => type.name)}
@@ -202,17 +212,14 @@ export default async function DocumentDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Companies</dt>
-                <dd className="mt-1">
+                <dt className="lr-label">Companies</dt>
+                <dd className="mt-2">
                   {assignedCompanies.length === 0 ? (
-                    <span className="text-sm text-gray-500">Unassigned</span>
+                    <span className="text-sm text-[var(--lr-text-muted)]">Unassigned</span>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {assignedCompanies.map((company) => (
-                        <span
-                          key={company.id}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
-                        >
+                        <span key={company.id} className="lr-chip">
                           {company.name}
                         </span>
                       ))}
@@ -221,20 +228,16 @@ export default async function DocumentDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">
-                  Created At
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {new Date(doc.created_at).toLocaleString()}
+                <dt className="lr-label">Created at</dt>
+                <dd className="mt-2 text-sm text-[var(--lr-text-soft)]">
+                  {formatDateTime(doc.created_at)}
                 </dd>
               </div>
               {doc.completed_at && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Completed At
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(doc.completed_at).toLocaleString()}
+                  <dt className="lr-label">Completed at</dt>
+                  <dd className="mt-2 text-sm text-[var(--lr-text-soft)]">
+                    {formatDateTime(doc.completed_at)}
                   </dd>
                 </div>
               )}
@@ -247,23 +250,20 @@ export default async function DocumentDetailPage({
             selectedCompanyIds={assignedCompanyIds}
           />
 
-          {/* Signers Section */}
           <SignersSection
             documentId={doc.id}
             signers={signers}
             isEditable={doc.status === 'draft'}
           />
 
-          {/* Add Signer Form - Only show if draft */}
           {doc.status === 'draft' && (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="lr-panel p-6">
               <AddSignerForm documentId={doc.id} />
             </div>
           )}
         </div>
 
-        {/* Right Column - Audit Timeline */}
-        <div className="lg:col-span-1">
+        <div className="lg:sticky lg:top-24 lg:self-start">
           <AuditTimeline logs={logs} />
         </div>
       </div>

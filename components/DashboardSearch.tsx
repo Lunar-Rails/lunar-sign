@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Company, Document, DocumentType } from '@/lib/types'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { ArrowRight, Building2, Search, Tags } from 'lucide-react'
+
+import { Company, Document, DocumentType } from '@/lib/types'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 
 interface DashboardDocument extends Document {
@@ -15,27 +17,26 @@ interface DashboardSearchProps {
   documentTypes: Pick<DocumentType, 'id' | 'name'>[]
 }
 
-/** Fixed locale + options so SSR (Node) and the browser produce the same string — avoids hydration mismatch. */
 function formatCreatedAt(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
     year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    month: 'short',
+    day: 'numeric',
   })
 }
 
 function getStatusBadgeStyles(status: string) {
   switch (status) {
     case 'draft':
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800'
+      return 'lr-status-chip lr-status-draft'
     case 'pending':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800'
+      return 'lr-status-chip lr-status-pending'
     case 'completed':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800'
+      return 'lr-status-chip lr-status-completed'
     case 'cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800'
+      return 'lr-status-chip lr-status-cancelled'
     default:
-      return ''
+      return 'lr-status-chip'
   }
 }
 
@@ -48,8 +49,9 @@ export default function DashboardSearch({
 
   function handleTypeToggle(typeId: string) {
     setSelectedTypeIds((prev) => {
-      if (prev.includes(typeId))
+      if (prev.includes(typeId)) {
         return prev.filter((currentTypeId) => currentTypeId !== typeId)
+      }
       return [...prev, typeId]
     })
   }
@@ -68,25 +70,28 @@ export default function DashboardSearch({
 
   if (documents.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <p className="text-gray-500">No documents yet.</p>
-        <Link
-          href="/upload"
-          className="mt-2 inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-        >
-          Upload Your First Document
-        </Link>
+      <div className="py-10 text-center">
+        <div className="lr-grid-card mx-auto max-w-xl p-8">
+          <p className="lr-label">Empty orbit</p>
+          <h3 className="font-display mt-3 text-2xl font-semibold text-white">
+            No documents yet.
+          </h3>
+          <p className="mt-3 text-sm leading-6 text-[var(--lr-text-soft)]">
+            Upload the first PDF to start the signature workflow.
+          </p>
+          <Link href="/upload" className="lr-button lr-button-primary mt-5">
+            Upload your first document
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       {documentTypes.length > 0 && (
-        <div className="mb-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-            Filter by type
-          </p>
+        <div>
+          <p className="lr-label mb-2">Filter by document type</p>
           <div className="flex flex-wrap gap-2">
             {documentTypes.map((type) => {
               const isSelected = selectedTypeIds.includes(type.id)
@@ -95,11 +100,7 @@ export default function DashboardSearch({
                   key={type.id}
                   type="button"
                   onClick={() => handleTypeToggle(type.id)}
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    isSelected
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={isSelected ? 'lr-chip lr-chip-active' : 'lr-chip'}
                 >
                   {type.name}
                 </button>
@@ -109,90 +110,81 @@ export default function DashboardSearch({
         </div>
       )}
 
-      <input
-        type="text"
-        placeholder="Search documents by title..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="mb-4 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-      />
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--lr-text-muted)]" />
+        <input
+          type="text"
+          placeholder="Search documents by title..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="lr-input pl-10"
+        />
+      </div>
 
       {filteredDocuments.length === 0 ? (
-        <p className="py-8 text-center text-gray-500">
-          No documents matching &ldquo;{searchTerm}&rdquo;
+        <p className="py-8 text-center text-sm text-[var(--lr-text-muted)]">
+          No documents matching &ldquo;{searchTerm}&rdquo;.
         </p>
       ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Title
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Status
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Created
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Type
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Companies
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredDocuments.map((doc) => (
-              <tr key={doc.id} className="border-b border-gray-100">
-                <td className="py-4 text-sm text-gray-900">{doc.title}</td>
-                <td className="py-4 text-sm">
-                  <span className={getStatusBadgeStyles(doc.status)}>
-                    {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                  </span>
-                </td>
-                <td className="py-4 text-sm text-gray-600">
-                  {formatCreatedAt(doc.created_at)}
-                </td>
-                <td className="py-4 text-sm text-gray-600">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredDocuments.map((doc) => (
+            <article key={doc.id} className="lr-grid-card flex h-full flex-col p-5">
+              <div className="flex items-start justify-between gap-3">
+                <span className={getStatusBadgeStyles(doc.status)}>
+                  {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                </span>
+                <span className="lr-label text-right">{formatCreatedAt(doc.created_at)}</span>
+              </div>
+
+              <h3 className="font-display mt-4 text-lg font-semibold text-white">
+                {doc.title}
+              </h3>
+
+              <div className="mt-4 space-y-3 text-sm text-[var(--lr-text-soft)]">
+                <div>
+                  <p className="lr-label mb-2 flex items-center gap-1.5">
+                    <Tags className="h-3.5 w-3.5" />
+                    Types
+                  </p>
                   <DocumentTypeInlineEditor
                     documentId={doc.id}
                     initialTypeNames={doc.types.map((type) => type.name)}
                     availableTypeNames={documentTypes.map((type) => type.name)}
                     isCompact
                   />
-                </td>
-                <td className="py-4 text-sm text-gray-600">
+                </div>
+
+                <div>
+                  <p className="lr-label mb-2 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Companies
+                  </p>
                   {doc.companies.length === 0 ? (
-                    <span className="text-xs text-gray-500">Unassigned</span>
+                    <span className="text-xs text-[var(--lr-text-muted)]">Unassigned</span>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {doc.companies.map((company) => (
-                        <span
-                          key={company.id}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
-                        >
+                        <span key={company.id} className="lr-chip">
                           {company.name}
                         </span>
                       ))}
                     </div>
                   )}
-                </td>
-                <td className="py-4 text-sm">
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    View
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+
+              <div className="mt-auto pt-5">
+                <Link
+                  href={`/documents/${doc.id}`}
+                  className="lr-button lr-button-ghost w-full justify-between"
+                >
+                  View document
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </div>
   )

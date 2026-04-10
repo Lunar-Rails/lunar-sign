@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Building2 } from 'lucide-react'
+
 import { Company } from '@/lib/types'
 
 interface DocumentCompaniesEditorProps {
@@ -24,8 +26,9 @@ export default function DocumentCompaniesEditor({
 
   function handleToggle(companyId: string) {
     setNextSelectedCompanyIds((prev) => {
-      if (prev.includes(companyId))
+      if (prev.includes(companyId)) {
         return prev.filter((id) => id !== companyId)
+      }
       return [...prev, companyId]
     })
   }
@@ -42,8 +45,9 @@ export default function DocumentCompaniesEditor({
       })
 
       const payload = await response.json()
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(payload.error || 'Failed to save company assignments')
+      }
 
       router.refresh()
     } catch (requestError) {
@@ -58,31 +62,35 @@ export default function DocumentCompaniesEditor({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-gray-900">Company Assignment</h2>
-      <p className="mt-1 text-sm text-gray-600">
+    <div className="lr-panel p-6">
+      <p className="lr-label">Company routing</p>
+      <h2 className="font-display mt-2 text-xl font-semibold text-white">
+        Company assignment
+      </h2>
+      <p className="mt-3 text-sm leading-6 text-[var(--lr-text-soft)]">
         Select which companies this document belongs to.
       </p>
 
       {companies.length === 0 ? (
-        <p className="mt-4 text-sm text-gray-500">
+        <p className="mt-4 text-sm text-[var(--lr-text-muted)]">
           No companies available. Ask an admin to create companies first.
         </p>
       ) : (
-        <div className="mt-4 max-h-56 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
+        <div className="mt-5 max-h-56 space-y-2 overflow-y-auto rounded-[14px] border border-[rgba(193,178,255,0.12)] bg-[rgba(255,255,255,0.02)] p-3">
           {companies.map((company) => {
             const isChecked = nextSelectedCompanyIds.includes(company.id)
             return (
               <label
                 key={company.id}
-                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+                className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-[rgba(193,178,255,0.08)] bg-[rgba(124,92,252,0.03)] px-3 py-2 text-sm text-[var(--lr-text-soft)]"
               >
                 <input
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => handleToggle(company.id)}
-                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  className="lr-checkbox h-4 w-4 rounded border-[rgba(193,178,255,0.22)] bg-transparent"
                 />
+                <Building2 className="h-4 w-4 text-[var(--lr-accent-soft)]" />
                 <span>{company.name}</span>
               </label>
             )
@@ -90,16 +98,16 @@ export default function DocumentCompaniesEditor({
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={handleSave}
           disabled={isSaving || companies.length === 0}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="lr-button lr-button-primary"
         >
-          {isSaving ? 'Saving...' : 'Save Companies'}
+          {isSaving ? 'Saving...' : 'Save companies'}
         </button>
-        {error && <p className="text-sm text-red-700">{error}</p>}
+        {error && <p className="text-sm text-[var(--lr-danger)]">{error}</p>}
       </div>
     </div>
   )

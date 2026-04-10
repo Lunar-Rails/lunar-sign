@@ -2,6 +2,7 @@
 
 import { KeyboardEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+
 import { DocumentTypeNamesSchema } from '@/lib/schemas'
 
 interface DocumentTypeInlineEditorProps {
@@ -45,10 +46,7 @@ export default function DocumentTypeInlineEditor({
   const [error, setError] = useState<string | null>(null)
   const isSavingRef = useRef(false)
 
-  const parsedDraftTypeNames = useMemo(
-    () => parseTypeNames(draftValue),
-    [draftValue]
-  )
+  const parsedDraftTypeNames = useMemo(() => parseTypeNames(draftValue), [draftValue])
   const selectedTypeNamesLowercase = useMemo(
     () => new Set(parsedDraftTypeNames.map((typeName) => typeName.toLowerCase())),
     [parsedDraftTypeNames]
@@ -90,8 +88,9 @@ export default function DocumentTypeInlineEditor({
         body: JSON.stringify({ typeNames: validation.data.typeNames }),
       })
       const payload = await response.json()
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(payload.error || 'Failed to update document type')
+      }
 
       setTypeNames(validation.data.typeNames)
       setIsEditing(false)
@@ -151,7 +150,7 @@ export default function DocumentTypeInlineEditor({
 
   if (isEditing) {
     return (
-      <div className="space-y-1">
+      <div className="space-y-2">
         <input
           type="text"
           value={draftValue}
@@ -162,9 +161,7 @@ export default function DocumentTypeInlineEditor({
           }}
           autoFocus
           disabled={isSaving}
-          className={`rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50 ${
-            isCompact ? 'w-52 max-w-full' : 'w-full'
-          }`}
+          className={`lr-input py-2 text-xs ${isCompact ? 'w-52 max-w-full' : 'w-full'}`}
           placeholder="Type names separated by commas"
         />
         {availableTypeNames.length > 0 && (
@@ -179,11 +176,7 @@ export default function DocumentTypeInlineEditor({
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleToggleExistingType(typeName)}
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-                    isSelected
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={isSelected ? 'lr-chip lr-chip-active' : 'lr-chip'}
                 >
                   {typeName}
                 </button>
@@ -191,7 +184,7 @@ export default function DocumentTypeInlineEditor({
             })}
           </div>
         )}
-        {error && <p className="text-xs text-red-700">{error}</p>}
+        {error && <p className="text-xs text-[var(--lr-danger)]">{error}</p>}
       </div>
     )
   }
@@ -205,21 +198,20 @@ export default function DocumentTypeInlineEditor({
         title="Click to edit document type"
       >
         {typeNames.length === 0 ? (
-          <span className="text-xs text-gray-500 hover:text-gray-700">{emptyLabel}</span>
+          <span className="text-xs text-[var(--lr-text-muted)] hover:text-white">
+            {emptyLabel}
+          </span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {typeNames.map((typeName) => (
-              <span
-                key={typeName}
-                className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
-              >
+              <span key={typeName} className="lr-chip">
                 {typeName}
               </span>
             ))}
           </div>
         )}
       </button>
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {error && <p className="text-xs text-[var(--lr-danger)]">{error}</p>}
     </div>
   )
 }
