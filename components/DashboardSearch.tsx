@@ -4,6 +4,11 @@ import { useState, useMemo } from 'react'
 import { Company, Document, DocumentType } from '@/lib/types'
 import Link from 'next/link'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
+import { Input } from '@/components/ui/input'
+import { Badge, badgeVariants } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Search, FileText } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface DashboardDocument extends Document {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
@@ -15,7 +20,6 @@ interface DashboardSearchProps {
   documentTypes: Pick<DocumentType, 'id' | 'name'>[]
 }
 
-/** Fixed locale + options so SSR (Node) and the browser produce the same string — avoids hydration mismatch. */
 function formatCreatedAt(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -24,43 +28,34 @@ function formatCreatedAt(iso: string) {
   })
 }
 
-function getStatusBadgeStyles(status: string) {
+type StatusVariant = 'default' | 'warning' | 'success' | 'destructive' | 'secondary'
+
+function getStatusVariant(status: string): StatusVariant {
   switch (status) {
-    case 'draft':
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800'
-    case 'pending':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800'
-    case 'completed':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800'
-    case 'cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800'
-    default:
-      return ''
+    case 'draft': return 'secondary'
+    case 'pending': return 'warning'
+    case 'completed': return 'success'
+    case 'cancelled': return 'destructive'
+    default: return 'secondary'
   }
 }
 
-export default function DashboardSearch({
-  documents,
-  documentTypes,
-}: DashboardSearchProps) {
+export default function DashboardSearch({ documents, documentTypes }: DashboardSearchProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([])
 
   function handleTypeToggle(typeId: string) {
-    setSelectedTypeIds((prev) => {
-      if (prev.includes(typeId))
-        return prev.filter((currentTypeId) => currentTypeId !== typeId)
-      return [...prev, typeId]
-    })
+    setSelectedTypeIds((prev) =>
+      prev.includes(typeId) ? prev.filter((id) => id !== typeId) : [...prev, typeId]
+    )
   }
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      const matchesSearchTerm = searchTerm
+      const matchesSearch = searchTerm
         ? doc.title.toLowerCase().includes(searchTerm.toLowerCase())
         : true
-      if (!matchesSearchTerm) return false
-
+      if (!matchesSearch) return false
       if (selectedTypeIds.length === 0) return true
       return doc.types.some((type) => selectedTypeIds.includes(type.id))
     })
@@ -68,23 +63,22 @@ export default function DashboardSearch({
 
   if (documents.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <p className="text-gray-500">No documents yet.</p>
-        <Link
-          href="/upload"
-          className="mt-2 inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-        >
-          Upload Your First Document
-        </Link>
+      <div className="py-16 text-center">
+        <FileText className="mx-auto h-12 w-12 text-lr-muted" />
+        <h3 className="mt-4 font-display text-lr-lg text-lr-text">No documents yet</h3>
+        <p className="mt-1 text-lr-sm text-lr-muted">Upload your first document to get started.</p>
+        <Button asChild className="mt-4">
+          <Link href="/upload">Upload Your First Document</Link>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="space-y-4">
       {documentTypes.length > 0 && (
-        <div className="mb-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div>
+          <p className="mb-2 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
             Filter by type
           </p>
           <div className="flex flex-wrap gap-2">
@@ -95,11 +89,12 @@ export default function DashboardSearch({
                   key={type.id}
                   type="button"
                   onClick={() => handleTypeToggle(type.id)}
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  className={cn(
+                    'inline-flex items-center rounded-full px-3 py-1 text-lr-xs font-medium transition-colors duration-lr-fast',
                     isSelected
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                      ? 'bg-lr-accent text-white'
+                      : 'bg-transparent border border-lr-border text-lr-muted hover:border-lr-border-2 hover:text-lr-text-2'
+                  )}
                 >
                   {type.name}
                 </button>
@@ -109,90 +104,73 @@ export default function DashboardSearch({
         </div>
       )}
 
-      <input
-        type="text"
-        placeholder="Search documents by title..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="mb-4 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-      />
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lr-muted" />
+        <Input
+          type="text"
+          placeholder="Search documents by title…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
       {filteredDocuments.length === 0 ? (
-        <p className="py-8 text-center text-gray-500">
+        <p className="py-8 text-center text-lr-sm text-lr-muted">
           No documents matching &ldquo;{searchTerm}&rdquo;
         </p>
       ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Title
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Status
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Created
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Type
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Companies
-              </th>
-              <th className="py-3 text-left text-xs font-medium text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredDocuments.map((doc) => (
-              <tr key={doc.id} className="border-b border-gray-100">
-                <td className="py-4 text-sm text-gray-900">{doc.title}</td>
-                <td className="py-4 text-sm">
-                  <span className={getStatusBadgeStyles(doc.status)}>
-                    {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                  </span>
-                </td>
-                <td className="py-4 text-sm text-gray-600">
-                  {formatCreatedAt(doc.created_at)}
-                </td>
-                <td className="py-4 text-sm text-gray-600">
-                  <DocumentTypeInlineEditor
-                    documentId={doc.id}
-                    initialTypeNames={doc.types.map((type) => type.name)}
-                    availableTypeNames={documentTypes.map((type) => type.name)}
-                    isCompact
-                  />
-                </td>
-                <td className="py-4 text-sm text-gray-600">
-                  {doc.companies.length === 0 ? (
-                    <span className="text-xs text-gray-500">Unassigned</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {doc.companies.map((company) => (
-                        <span
-                          key={company.id}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
-                        >
-                          {company.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td className="py-4 text-sm">
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    View
-                  </Link>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-lr-sm">
+            <thead>
+              <tr className="border-b border-lr-border">
+                <th className="pb-3 text-left font-display text-lr-xs uppercase tracking-wider text-lr-muted">Title</th>
+                <th className="pb-3 text-left font-display text-lr-xs uppercase tracking-wider text-lr-muted">Status</th>
+                <th className="pb-3 text-left font-display text-lr-xs uppercase tracking-wider text-lr-muted">Created</th>
+                <th className="pb-3 text-left font-display text-lr-xs uppercase tracking-wider text-lr-muted">Type</th>
+                <th className="pb-3 text-left font-display text-lr-xs uppercase tracking-wider text-lr-muted">Companies</th>
+                <th className="pb-3 text-right font-display text-lr-xs uppercase tracking-wider text-lr-muted">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredDocuments.map((doc) => (
+                <tr key={doc.id} className="border-b border-lr-border hover:bg-lr-surface transition-colors">
+                  <td className="py-3 text-lr-text font-medium">{doc.title}</td>
+                  <td className="py-3">
+                    <Badge variant={getStatusVariant(doc.status)}>
+                      {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                    </Badge>
+                  </td>
+                  <td className="py-3 text-lr-muted">{formatCreatedAt(doc.created_at)}</td>
+                  <td className="py-3">
+                    <DocumentTypeInlineEditor
+                      documentId={doc.id}
+                      initialTypeNames={doc.types.map((t) => t.name)}
+                      availableTypeNames={documentTypes.map((t) => t.name)}
+                      isCompact
+                    />
+                  </td>
+                  <td className="py-3">
+                    {doc.companies.length === 0 ? (
+                      <span className="text-lr-xs text-lr-muted">Unassigned</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {doc.companies.map((company) => (
+                          <Badge key={company.id} variant="outline">{company.name}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3 text-right">
+                    <Button asChild variant="secondary" size="sm">
+                      <Link href={`/documents/${doc.id}`}>View</Link>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

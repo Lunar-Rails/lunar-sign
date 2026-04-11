@@ -18,24 +18,21 @@ function getActionLabel(action: string): string {
   return labels[action] || action.replace(/_/g, ' ')
 }
 
-function getDotClassName(action: string): string {
+function getDotClass(action: string): string {
   switch (action) {
     case 'document_uploaded':
-      return 'bg-blue-500'
     case 'document_sent':
-      return 'bg-sky-500'
+      return 'bg-lr-accent'
     case 'signer_added':
     case 'signer_removed':
-      return 'bg-violet-500'
+      return 'bg-lr-accent-soft'
     case 'document_signed':
     case 'document_completed':
-      return 'bg-green-500'
-    case 'document_viewed':
-      return 'bg-gray-400'
+      return 'bg-lr-cyan'
     case 'document_cancelled':
-      return 'bg-red-500'
+      return 'bg-lr-error'
     default:
-      return 'bg-gray-400'
+      return 'bg-lr-muted'
   }
 }
 
@@ -50,34 +47,32 @@ function getActorLine(log: AuditLogWithActor): string | null {
 
 export function AuditTimeline({ logs }: AuditTimelineProps) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Activity</h2>
+    <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
+      <h2 className="mb-4 font-display text-lr-xl font-semibold text-lr-text">Activity</h2>
 
       {logs.length === 0 ? (
-        <p className="text-sm text-gray-500">No activity yet.</p>
+        <p className="text-lr-sm text-lr-muted">No activity yet.</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-0">
           {logs.map((log, index) => {
             const actorLine = getActorLine(log)
             return (
               <div key={log.id} className="flex gap-3">
                 <div className="flex flex-col items-center">
-                  <div
-                    className={`h-2 w-2 shrink-0 rounded-full ${getDotClassName(log.action)}`}
-                  />
+                  <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${getDotClass(log.action)}`} />
                   {index < logs.length - 1 && (
-                    <div className="mt-1 h-6 w-0.5 bg-gray-200" />
+                    <div className="flex-1 w-0.5 bg-lr-border mt-1" />
                   )}
                 </div>
 
-                <div className="flex-1 pb-4">
-                  <p className="text-sm font-medium text-gray-900">
+                <div className="pb-4 flex-1">
+                  <p className="text-lr-sm font-medium text-lr-text">
                     {getActionLabel(log.action)}
                   </p>
                   {actorLine && (
-                    <p className="text-xs text-gray-600">{actorLine}</p>
+                    <p className="text-lr-xs text-lr-muted">{actorLine}</p>
                   )}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-lr-xs text-lr-muted">
                     {new Date(log.created_at).toLocaleString()}
                   </p>
                 </div>
@@ -89,4 +84,3 @@ export function AuditTimeline({ logs }: AuditTimelineProps) {
     </div>
   )
 }
-

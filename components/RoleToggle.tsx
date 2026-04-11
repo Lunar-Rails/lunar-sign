@@ -16,21 +16,16 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
 
   const handleRoleChange = async (newRole: UserRole) => {
     if (newRole === role) return
-
     setLoading(true)
 
     try {
       const response = await fetch(`/api/admin/users/${userId}/role`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to update role')
-      }
+      if (!response.ok) throw new Error('Failed to update role')
 
       setRole(newRole)
       router.refresh()
@@ -47,7 +42,7 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
       value={role}
       onChange={(e) => handleRoleChange(e.target.value as UserRole)}
       disabled={loading}
-      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+      className="h-8 rounded-lr border border-lr-border bg-lr-surface px-3 text-lr-xs font-medium text-lr-text transition-colors focus:border-lr-accent focus:outline-none focus:ring-1 focus:ring-lr-accent disabled:opacity-50 cursor-pointer capitalize"
     >
       <option value="member">Member</option>
       <option value="admin">Admin</option>

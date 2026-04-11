@@ -1,13 +1,16 @@
 import { getServiceClient } from '@/lib/supabase/service'
-
 import { Profile } from '@/lib/types'
-
 import RoleToggle from '@/components/RoleToggle'
 import { InviteUserForm } from '@/components/InviteUserForm'
+import { InvitationsTable, InvitationWithCompanies } from '@/components/InvitationsTable'
 import {
-  InvitationsTable,
-  InvitationWithCompanies,
-} from '@/components/InvitationsTable'
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,13 +23,9 @@ interface InvitationRow {
   created_at: string
   invitation_companies: {
     company_id: string
-    companies:
-      | { id: string; name: string; slug: string }
-      | { id: string; name: string; slug: string }[]
-      | null
+    companies: { id: string; name: string; slug: string } | { id: string; name: string; slug: string }[] | null
   }[] | null
 }
-
 
 export default async function AdminUsersPage() {
   const supabase = getServiceClient()
@@ -43,89 +42,73 @@ export default async function AdminUsersPage() {
 
   const { data: invitationRows } = await supabase
     .from('invitations')
-    .select(
-      'id, email, role, invited_by, status, created_at, invitation_companies(company_id, companies(id, name, slug))'
-    )
+    .select('id, email, role, invited_by, status, created_at, invitation_companies(company_id, companies(id, name, slug))')
     .order('created_at', { ascending: false })
 
   const users: Profile[] = profiles || []
   const invitationList: InvitationWithCompanies[] = (
     (invitationRows || []) as InvitationRow[]
-  ).map(
-    (invitation) => ({
-      id: invitation.id,
-      email: invitation.email,
-      role: invitation.role,
-      invited_by: invitation.invited_by,
-      status: invitation.status,
-      created_at: invitation.created_at,
-      companies: (invitation.invitation_companies || []).flatMap((row) => {
-        if (!row.companies) return []
-        if (Array.isArray(row.companies)) return row.companies
-        return [row.companies]
-      }),
-    })
-  )
+  ).map((invitation) => ({
+    id: invitation.id,
+    email: invitation.email,
+    role: invitation.role,
+    invited_by: invitation.invited_by,
+    status: invitation.status,
+    created_at: invitation.created_at,
+    companies: (invitation.invitation_companies || []).flatMap((row) => {
+      if (!row.companies) return []
+      if (Array.isArray(row.companies)) return row.companies
+      return [row.companies]
+    }),
+  }))
 
   return (
     <div className="space-y-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Manage Users</h1>
-        <p className="mt-2 text-gray-600">
-          View and manage user roles across the system.
-        </p>
+      <div>
+        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Manage Users</h1>
+        <p className="mt-1 text-lr-sm text-lr-muted">View and manage user roles across the system.</p>
       </div>
 
       <InviteUserForm companies={companies || []} />
       <InvitationsTable initialInvitations={invitationList} />
 
       {/* Users Table */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Role
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Created At
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-lr-border">
+          <h2 className="font-display text-lr-xl font-semibold text-lr-text">Users</h2>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Created At</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-4 text-center text-gray-600">
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-lr-muted py-8">
                   No users found
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-gray-200 hover:bg-gray-50"
-                >
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {user.full_name}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                  <td className="px-6 py-4 text-sm">
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium text-lr-text">{user.full_name}</TableCell>
+                  <TableCell className="text-lr-muted">{user.email}</TableCell>
+                  <TableCell>
                     <RoleToggle userId={user.id} currentRole={user.role} />
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
+                  </TableCell>
+                  <TableCell className="text-lr-muted">
                     {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   )

@@ -1,68 +1,52 @@
 import { redirect } from 'next/navigation'
-
 import { createClient } from '@/lib/supabase/server'
-
 import { Document, SignatureRequest, Company, DocumentType } from '@/lib/types'
 import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
-
 import AddSignerForm from '@/components/AddSignerForm'
-
 import SignersSection from '@/components/SignersSection'
-
 import { AuditTimeline } from '@/components/AuditTimeline'
-
 import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
 import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { Download } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
-
 
 interface DocumentDetailPageProps {
   params: Promise<{ id: string }>
 }
 
-function getStatusBadgeStyles(status: string) {
+type StatusVariant = 'default' | 'warning' | 'success' | 'destructive' | 'secondary'
+
+function docStatusVariant(status: string): StatusVariant {
   switch (status) {
-    case 'draft':
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800'
-    case 'pending':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800'
-    case 'completed':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800'
-    case 'cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800'
-    default:
-      return ''
+    case 'draft': return 'secondary'
+    case 'pending': return 'warning'
+    case 'completed': return 'success'
+    case 'cancelled': return 'destructive'
+    default: return 'secondary'
   }
 }
 
-export default async function DocumentDetailPage({
-  params,
-}: DocumentDetailPageProps) {
+export default async function DocumentDetailPage({ params }: DocumentDetailPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Fetch document
   const { data: document } = await supabase
     .from('documents')
     .select('*')
     .eq('id', id)
     .single()
 
-  if (!document) {
-    redirect('/dashboard')
-  }
+  if (!document) redirect('/dashboard')
 
   const doc: Document = document
 
@@ -76,80 +60,51 @@ export default async function DocumentDetailPage({
   ] = await Promise.all([
     supabase
       .from('signature_requests')
-      .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, signed_at, created_at'
-      )
+      .select('id, document_id, signer_name, signer_email, requested_by, status, signed_at, created_at')
       .eq('document_id', id)
       .order('created_at', { ascending: true }),
     supabase
       .from('audit_log')
-      .select(
-        `
-        id,
-        actor_id,
-        action,
-        entity_type,
-        entity_id,
-        metadata,
-        created_at,
-        profiles:actor_id(email, full_name)
-      `
-      )
+      .select('id, actor_id, action, entity_type, entity_id, metadata, created_at, profiles:actor_id(email, full_name)')
       .eq('entity_id', id)
       .eq('entity_type', 'document')
       .order('created_at', { ascending: false }),
     supabase.from('companies').select('*').order('name', { ascending: true }),
-    supabase
-      .from('document_companies')
-      .select('company_id, companies(id, name, slug)')
-      .eq('document_id', id),
-    supabase
-      .from('document_document_types')
-      .select('document_type_id, document_types(id, name)')
-      .eq('document_id', id),
-    supabase
-      .from('document_types')
-      .select('name')
-      .order('name', { ascending: true }),
+    supabase.from('document_companies').select('company_id, companies(id, name, slug)').eq('document_id', id),
+    supabase.from('document_document_types').select('document_type_id, document_types(id, name)').eq('document_id', id),
+    supabase.from('document_types').select('name').order('name', { ascending: true }),
   ])
 
   const allCompanies: Company[] = companies || []
-  const assignedCompanies = (assignedCompanyRows || [])
-    .flatMap((row) => {
-      const value = row.companies as
-        | Pick<Company, 'id' | 'name' | 'slug'>
-        | Pick<Company, 'id' | 'name' | 'slug'>[]
-        | null
-      if (!value) return []
-      if (Array.isArray(value)) return value
-      return [value]
-    })
-  const assignedCompanyIds = assignedCompanies.map((company) => company.id)
-  const assignedTypes = (assignedTypeRows || []).flatMap((row) => {
-    const value = row.document_types as
-      | Pick<DocumentType, 'id' | 'name'>
-      | Pick<DocumentType, 'id' | 'name'>[]
-      | null
+  const assignedCompanies = (assignedCompanyRows || []).flatMap((row) => {
+    const value = row.companies as Pick<Company, 'id' | 'name' | 'slug'> | Pick<Company, 'id' | 'name' | 'slug'>[] | null
     if (!value) return []
-    if (Array.isArray(value)) return value
-    return [value]
+    return Array.isArray(value) ? value : [value]
+  })
+  const assignedCompanyIds = assignedCompanies.map((c) => c.id)
+  const assignedTypes = (assignedTypeRows || []).flatMap((row) => {
+    const value = row.document_types as Pick<DocumentType, 'id' | 'name'> | Pick<DocumentType, 'id' | 'name'>[] | null
+    if (!value) return []
+    return Array.isArray(value) ? value : [value]
   })
   const allDocumentTypeNames = (allDocumentTypeRows || []).map((row) => row.name)
   const signers: SignatureRequest[] = signatureRequests || []
   const logs = mapSupabaseAuditRows(auditLogs)
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">{doc.title}</h1>
-          <p className="text-gray-600">{doc.description}</p>
+          <h1 className="font-display text-lr-3xl font-bold text-lr-text">{doc.title}</h1>
+          {doc.description && (
+            <p className="mt-1 text-lr-sm text-lr-muted">{doc.description}</p>
+          )}
         </div>
-        <div className="flex items-center gap-4">
-          <span className={getStatusBadgeStyles(doc.status)}>
+        <div className="flex items-center gap-3 shrink-0">
+          <Badge variant={docStatusVariant(doc.status)}>
             {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-          </span>
+          </Badge>
           {doc.status === 'draft' && signers.length > 0 && (
             <SendDocumentButton documentId={doc.id} />
           )}
@@ -157,42 +112,40 @@ export default async function DocumentDetailPage({
             <CancelDocumentButton documentId={doc.id} />
           )}
           {doc.status === 'completed' && (
-            <a
-              href={`/api/documents/${doc.id}/download`}
-              className="inline-block rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            >
-              Download PDF
-            </a>
+            <Button asChild variant="gold">
+              <Link href={`/api/documents/${doc.id}/download`}>
+                <Download className="h-4 w-4" />
+                Download PDF
+              </Link>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left Column - Document Info and Signers */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           <DocumentPdfPreview documentId={doc.id} />
 
           {/* Document Metadata */}
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Document Details
-            </h2>
+          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
+            <h2 className="mb-4 font-display text-lr-xl font-semibold text-lr-text">Document Details</h2>
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm font-medium text-gray-600">Title</dt>
-                <dd className="mt-1 text-sm text-gray-900">{doc.title}</dd>
+                <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Title</dt>
+                <dd className="mt-1 text-lr-sm text-lr-text">{doc.title}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Status</dt>
+                <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Status</dt>
                 <dd className="mt-1">
-                  <span className={getStatusBadgeStyles(doc.status)}>
+                  <Badge variant={docStatusVariant(doc.status)}>
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                  </span>
+                  </Badge>
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Type</dt>
+                <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Type</dt>
                 <dd className="mt-1">
                   <DocumentTypeInlineEditor
                     documentId={doc.id}
@@ -202,40 +155,27 @@ export default async function DocumentDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">Companies</dt>
+                <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Companies</dt>
                 <dd className="mt-1">
                   {assignedCompanies.length === 0 ? (
-                    <span className="text-sm text-gray-500">Unassigned</span>
+                    <span className="text-lr-xs text-lr-muted">Unassigned</span>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {assignedCompanies.map((company) => (
-                        <span
-                          key={company.id}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
-                        >
-                          {company.name}
-                        </span>
+                        <Badge key={company.id} variant="outline">{company.name}</Badge>
                       ))}
                     </div>
                   )}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-600">
-                  Created At
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {new Date(doc.created_at).toLocaleString()}
-                </dd>
+                <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Created At</dt>
+                <dd className="mt-1 text-lr-sm text-lr-text">{new Date(doc.created_at).toLocaleString()}</dd>
               </div>
               {doc.completed_at && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Completed At
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(doc.completed_at).toLocaleString()}
-                  </dd>
+                  <dt className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">Completed At</dt>
+                  <dd className="mt-1 text-lr-sm text-lr-text">{new Date(doc.completed_at).toLocaleString()}</dd>
                 </div>
               )}
             </dl>
@@ -247,16 +187,14 @@ export default async function DocumentDetailPage({
             selectedCompanyIds={assignedCompanyIds}
           />
 
-          {/* Signers Section */}
           <SignersSection
             documentId={doc.id}
             signers={signers}
             isEditable={doc.status === 'draft'}
           />
 
-          {/* Add Signer Form - Only show if draft */}
           {doc.status === 'draft' && (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
               <AddSignerForm documentId={doc.id} />
             </div>
           )}

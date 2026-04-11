@@ -1,9 +1,17 @@
 'use client'
 
-import * as Dialog from '@radix-ui/react-dialog'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Upload } from 'lucide-react'
 
 interface CompanyOption {
   slug: string
@@ -30,68 +38,64 @@ export function DashboardUploadDocumentButton({
     router.push(`/upload?company=${encodeURIComponent(slug)}`)
   }
 
-  const buttonClass =
-    'inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700'
-
   if (hasValidActiveCompany) {
     return (
-      <Link
-        href={`/upload?company=${encodeURIComponent(activeCompanySlug!)}`}
-        className={buttonClass}
-      >
-        Upload new document
-      </Link>
+      <Button asChild>
+        <Link href={`/upload?company=${encodeURIComponent(activeCompanySlug!)}`}>
+          <Upload className="h-4 w-4" />
+          Upload new document
+        </Link>
+      </Button>
     )
   }
 
   if (companies.length === 0) {
     return (
-      <Link href="/upload" className={buttonClass}>
-        Upload new document
-      </Link>
+      <Button asChild>
+        <Link href="/upload">
+          <Upload className="h-4 w-4" />
+          Upload new document
+        </Link>
+      </Button>
     )
   }
 
   return (
-    <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
-      <Dialog.Trigger asChild>
-        <button type="button" className={buttonClass}>
-          Upload new document
-        </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
-          <Dialog.Title className="text-lg font-semibold text-gray-900">
-            Choose a company
-          </Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-gray-600">
-            Select which company this upload belongs to. You can add more
-            companies on the upload form if needed.
-          </Dialog.Description>
-          <ul className="mt-4 max-h-64 space-y-1 overflow-y-auto">
+    <>
+      <Button onClick={() => setDialogOpen(true)}>
+        <Upload className="h-4 w-4" />
+        Upload new document
+      </Button>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose a company</DialogTitle>
+            <DialogDescription>
+              Select which company this upload belongs to. You can add more companies on the upload
+              form if needed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul className="mt-2 max-h-64 space-y-0.5 overflow-y-auto">
             {companies.map((company) => (
               <li key={company.slug}>
                 <button
                   type="button"
                   onClick={() => handlePickCompany(company.slug)}
-                  className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-100"
+                  className="w-full rounded-lr px-3 py-2 text-left text-lr-sm text-lr-text-2 hover:bg-lr-surface hover:text-lr-text transition-colors"
                 >
                   {company.name}
                 </button>
               </li>
             ))}
           </ul>
-          <Dialog.Close asChild>
-            <button
-              type="button"
-              className="mt-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </Dialog.Close>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+
+          <Button variant="secondary" onClick={() => setDialogOpen(false)} className="w-full mt-2">
+            Cancel
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

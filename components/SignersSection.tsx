@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SignatureRequest } from '@/lib/types'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { UserMinus, Users } from 'lucide-react'
 
 interface SignersSectionProps {
   documentId: string
@@ -10,24 +13,19 @@ interface SignersSectionProps {
   isEditable: boolean
 }
 
-function getStatusBadgeStyles(status: string) {
+type StatusVariant = 'warning' | 'success' | 'destructive' | 'secondary'
+
+function signerStatusVariant(status: string): StatusVariant {
   switch (status) {
-    case 'pending':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800'
-    case 'signed':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800'
+    case 'pending': return 'warning'
+    case 'signed': return 'success'
     case 'declined':
-    case 'cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800'
-    default:
-      return ''
+    case 'cancelled': return 'destructive'
+    default: return 'secondary'
   }
 }
 
-export default function SignersSection({
-  signers,
-  isEditable,
-}: SignersSectionProps) {
+export default function SignersSection({ signers, isEditable }: SignersSectionProps) {
   const router = useRouter()
   const [isRemoving, setIsRemoving] = useState<string | null>(null)
 
@@ -36,15 +34,11 @@ export default function SignersSection({
     try {
       const response = await fetch('/api/signature-requests', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request_id: requestId }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to remove signer')
-      }
+      if (!response.ok) throw new Error('Failed to remove signer')
 
       router.refresh()
     } catch (error) {
@@ -54,36 +48,39 @@ export default function SignersSection({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Signers</h2>
+    <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
+      <h2 className="mb-4 font-display text-lr-xl font-semibold text-lr-text">Signers</h2>
 
       {signers.length === 0 ? (
-        <p className="text-sm text-gray-500">No signers added yet.</p>
+        <div className="flex flex-col items-center py-6 text-center">
+          <Users className="h-8 w-8 text-lr-muted" />
+          <p className="mt-2 text-lr-sm text-lr-muted">No signers added yet.</p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {signers.map((signer) => (
             <div
               key={signer.id}
-              className="flex items-center justify-between rounded-md border border-gray-100 p-3"
+              className="flex items-center justify-between rounded-lr border border-lr-border bg-lr-glass px-4 py-3"
             >
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {signer.signer_name}
-                </p>
-                <p className="text-xs text-gray-500">{signer.signer_email}</p>
+                <p className="text-lr-sm font-medium text-lr-text">{signer.signer_name}</p>
+                <p className="text-lr-xs text-lr-muted">{signer.signer_email}</p>
               </div>
-              <span className={getStatusBadgeStyles(signer.status)}>
-                {signer.status.charAt(0).toUpperCase() +
-                  signer.status.slice(1)}
-              </span>
+              <Badge variant={signerStatusVariant(signer.status)}>
+                {signer.status.charAt(0).toUpperCase() + signer.status.slice(1)}
+              </Badge>
               {isEditable && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-3 text-lr-error hover:text-lr-error hover:bg-lr-error-dim"
                   onClick={() => handleRemoveSigner(signer.id)}
                   disabled={isRemoving === signer.id}
-                  className="ml-3 inline-flex items-center gap-2 rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isRemoving === signer.id ? 'Removing...' : 'Remove'}
-                </button>
+                  <UserMinus className="h-4 w-4" />
+                  {isRemoving === signer.id ? 'Removing…' : 'Remove'}
+                </Button>
               )}
             </div>
           ))}

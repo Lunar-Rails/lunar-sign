@@ -14,11 +14,13 @@ export default async function AdminCompaniesPage() {
   const rows: Company[] = companies || []
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">Companies</h1>
-      <p className="mb-8 text-gray-600">
-        Manage workspace-like company groups used to organize documents.
-      </p>
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div>
+        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Companies</h1>
+        <p className="mt-1 text-lr-sm text-lr-muted">
+          Manage workspace-like company groups used to organize documents.
+        </p>
+      </div>
 
       <CompanyManagementTable initialCompanies={rows} />
     </div>

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Profile } from '@/lib/types'
 import UserDropdown from '@/components/UserDropdown'
@@ -19,7 +20,6 @@ export default async function AuthenticatedLayout({
     redirect('/login')
   }
 
-  // Fetch user profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
@@ -34,49 +34,44 @@ export default async function AuthenticatedLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Navbar */}
-      <nav className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
+      {/* Header */}
+      <header className="sticky top-0 z-50 h-14 border-b border-lr-border bg-lr-bg/88 backdrop-blur-lr-header saturate-[1.2]">
+        <div className="flex h-full items-center justify-between px-6 lg:px-10">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900">Lunar Sign</h1>
-          </div>
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+            <span className="font-display text-lr-lg font-bold text-lr-accent">Lunar</span>
+            <span className="font-display text-lr-lg font-bold text-lr-gold">Sign</span>
+          </Link>
 
           {/* Nav Links */}
-          <div className="flex items-center gap-6">
-            <a
-              href="/dashboard"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Dashboard
-            </a>
-            <a
-              href="/upload"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Upload
-            </a>
+          <nav className="flex items-end h-14">
+            <NavLink href="/dashboard">Dashboard</NavLink>
+            <NavLink href="/upload">Upload</NavLink>
             {userProfile.role === 'admin' && (
-              <a
-                href="/admin"
-                className="text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Admin
-              </a>
+              <NavLink href="/admin">Admin</NavLink>
             )}
-          </div>
+          </nav>
 
           {/* User Dropdown */}
           <UserDropdown profile={userProfile} />
         </div>
-      </nav>
+      </header>
 
-      <div className="flex flex-1 bg-gray-50">
+      <div className="flex flex-1">
         <CompanySidebar />
-
-        {/* Main Content */}
-        <main className="flex-1 px-6 py-8">{children}</main>
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
       </div>
     </div>
+  )
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex h-[52px] items-center px-4 text-lr-sm font-medium text-lr-muted transition-colors duration-lr-fast hover:text-lr-text-2"
+    >
+      {children}
+    </a>
   )
 }

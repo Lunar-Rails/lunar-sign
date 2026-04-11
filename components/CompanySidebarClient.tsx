@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 interface CompanySidebarItem {
   id: string
@@ -15,13 +16,6 @@ interface CompanySidebarClientProps {
   totalDocumentCount: number
 }
 
-function getItemClasses(isActive: boolean) {
-  if (isActive)
-    return 'flex items-center justify-between rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white'
-
-  return 'flex items-center justify-between rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100'
-}
-
 export default function CompanySidebarClient({
   companies,
   totalDocumentCount,
@@ -32,43 +26,68 @@ export default function CompanySidebarClient({
   const isDashboard = pathname === '/dashboard'
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white lg:block">
+    <aside className="hidden w-[220px] shrink-0 border-r border-lr-border bg-lr-bg sticky top-14 h-[calc(100vh-56px)] overflow-y-auto lg:block">
       <div className="p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <p className="mb-3 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
           Companies
         </p>
 
-        <nav className="space-y-1">
-          <Link
+        <nav className="space-y-0.5">
+          <SidebarLink
             href="/dashboard"
-            className={getItemClasses(isDashboard && !activeCompany)}
+            isActive={isDashboard && !activeCompany}
+            count={totalDocumentCount}
           >
-            <span>All Documents</span>
-            <span className="text-xs">{totalDocumentCount}</span>
-          </Link>
+            All Documents
+          </SidebarLink>
 
-          <div className="my-3 border-t border-gray-200" />
+          <div className="my-3 h-px bg-lr-border" />
 
           {companies.length === 0 && (
-            <p className="px-2 py-1 text-xs text-gray-500">
+            <p className="px-3 py-1 text-lr-xs text-lr-muted">
               No companies configured
             </p>
           )}
 
           {companies.map((company) => (
-            <Link
+            <SidebarLink
               key={company.id}
               href={`/dashboard?company=${company.slug}`}
-              className={getItemClasses(
-                isDashboard && activeCompany === company.slug
-              )}
+              isActive={isDashboard && activeCompany === company.slug}
+              count={company.documentCount}
             >
-              <span className="truncate pr-2">{company.name}</span>
-              <span className="text-xs">{company.documentCount}</span>
-            </Link>
+              {company.name}
+            </SidebarLink>
           ))}
         </nav>
       </div>
     </aside>
+  )
+}
+
+function SidebarLink({
+  href,
+  isActive,
+  count,
+  children,
+}: {
+  href: string
+  isActive: boolean
+  count: number
+  children: React.ReactNode
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'flex items-center justify-between rounded-lr px-3 py-2 text-lr-sm transition-colors duration-lr-fast',
+        isActive
+          ? 'bg-lr-accent-dim text-lr-accent border-l-2 border-lr-accent pl-[10px]'
+          : 'text-lr-text-2 hover:bg-lr-surface hover:text-lr-text'
+      )}
+    >
+      <span className="truncate pr-2">{children}</span>
+      <span className="shrink-0 text-lr-xs text-lr-muted">{count}</span>
+    </Link>
   )
 }

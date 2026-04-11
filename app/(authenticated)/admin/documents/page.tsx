@@ -1,6 +1,15 @@
 import { getServiceClient } from '@/lib/supabase/service'
-
 import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +19,7 @@ interface AdminDocumentRow {
   status: string
   created_at: string
   uploaded_by: string
-  profiles?:
-    | { email: string; full_name: string }
-    | { email: string; full_name: string }[]
-    | null
+  profiles?: { email: string; full_name: string } | { email: string; full_name: string }[] | null
 }
 
 function profileFromDoc(doc: AdminDocumentRow) {
@@ -22,113 +28,81 @@ function profileFromDoc(doc: AdminDocumentRow) {
   return Array.isArray(p) ? p[0] : p
 }
 
+type StatusVariant = 'secondary' | 'warning' | 'success' | 'destructive'
+
+function docStatusVariant(status: string): StatusVariant {
+  switch (status) {
+    case 'draft': return 'secondary'
+    case 'pending': return 'warning'
+    case 'completed': return 'success'
+    default: return 'destructive'
+  }
+}
+
 export default async function AdminDocumentsPage() {
   const supabase = getServiceClient()
 
   const { data: documentsData } = await supabase
     .from('documents')
-    .select(
-      `
-      id,
-      title,
-      status,
-      created_at,
-      uploaded_by,
-      profiles:uploaded_by(email, full_name)
-    `
-    )
+    .select('id, title, status, created_at, uploaded_by, profiles:uploaded_by(email, full_name)')
     .order('created_at', { ascending: false })
 
   const documents = (documentsData ?? []) as AdminDocumentRow[]
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">All Documents</h1>
-        <p className="mt-2 text-gray-600">
-          View all documents across the system.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-lr-3xl font-bold text-lr-text">All Documents</h1>
+        <p className="mt-1 text-lr-sm text-lr-muted">View all documents across the system.</p>
       </div>
 
-      {/* Documents Table */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Title
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Owner
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Created At
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created At</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {documents.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-600">
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-lr-muted py-8">
                   No documents found
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               documents.map((doc) => {
                 const profile = profileFromDoc(doc)
                 return (
-                  <tr
-                    key={doc.id}
-                    className="border-b border-gray-200 hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {doc.title}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      <div>{profile?.full_name}</div>
-                      <div className="text-xs text-gray-500">
-                        {profile?.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          doc.status === 'draft'
-                            ? 'bg-gray-100 text-gray-800'
-                            : doc.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : doc.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {doc.status.charAt(0).toUpperCase() +
-                          doc.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                  <TableRow key={doc.id}>
+                    <TableCell className="font-medium text-lr-text">{doc.title}</TableCell>
+                    <TableCell>
+                      <div className="text-lr-sm text-lr-text-2">{profile?.full_name}</div>
+                      <div className="text-lr-xs text-lr-muted">{profile?.email}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={docStatusVariant(doc.status)}>
+                        {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-lr-muted">
                       {new Date(doc.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <Link
-                        href={`/admin/documents/${doc.id}`}
-                        className="text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild variant="secondary" size="sm">
+                        <Link href={`/admin/documents/${doc.id}`}>View</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 )
               })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
