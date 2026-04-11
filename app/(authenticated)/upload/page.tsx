@@ -30,12 +30,14 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">Upload Document</h1>
-      <p className="mb-8 text-gray-600">
-        Upload a PDF document that requires signatures
-      </p>
+      <div className="mb-8">
+        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Upload Document</h1>
+        <p className="mt-1 text-lr-sm text-lr-muted">
+          Upload a PDF document that requires signatures.
+        </p>
+      </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
+      <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-8 shadow-lr-card">
         <FileUploadForm
           companies={rows}
           documentTypes={typeRows}

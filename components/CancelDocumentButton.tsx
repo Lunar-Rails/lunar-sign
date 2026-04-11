@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { XCircle } from 'lucide-react'
 
 interface CancelDocumentButtonProps {
   documentId: string
@@ -21,14 +23,10 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
 
     setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/documents/${documentId}/cancel`, {
-        method: 'POST',
-      })
+      const response = await fetch(`/api/documents/${documentId}/cancel`, { method: 'POST' })
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string
-        } | null
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
         throw new Error(body?.error || 'Failed to revoke')
       }
 
@@ -42,13 +40,14 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="destructive"
       onClick={handleClick}
       disabled={isSubmitting}
-      className="inline-block rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
     >
+      <XCircle className="h-4 w-4" />
       {isSubmitting ? 'Revoking…' : 'Revoke signing request'}
-    </button>
+    </Button>
   )
 }

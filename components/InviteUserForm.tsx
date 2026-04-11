@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Company, UserRole } from '@/lib/types'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { AlertCircle, CheckCircle } from 'lucide-react'
 
 interface InviteUserFormProps {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
@@ -37,11 +41,7 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
       const response = await fetch('/api/admin/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          role,
-          companyIds: selectedCompanyIds,
-        }),
+        body: JSON.stringify({ email: email.trim(), role, companyIds: selectedCompanyIds }),
       })
 
       const payload = await response.json()
@@ -54,9 +54,7 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
       router.refresh()
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Failed to create invitation'
+        requestError instanceof Error ? requestError.message : 'Failed to create invitation'
       )
     } finally {
       setIsSaving(false)
@@ -64,47 +62,33 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-    >
-      <h2 className="text-lg font-semibold text-gray-900">Invite user</h2>
-      <p className="mt-1 text-sm text-gray-600">
+    <form onSubmit={handleSubmit} className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
+      <h2 className="font-display text-lr-xl font-semibold text-lr-text">Invite user</h2>
+      <p className="mt-1 text-lr-sm text-lr-muted">
         Add an email, workspace role, and optional company access.
       </p>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div>
-          <label
-            htmlFor="invite-email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-          <input
+          <Label htmlFor="invite-email">Email *</Label>
+          <Input
             id="invite-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="user@company.com"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
             disabled={isSaving}
             required
           />
         </div>
 
         <div>
-          <label
-            htmlFor="invite-role"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Workspace role
-          </label>
+          <Label htmlFor="invite-role">Workspace role</Label>
           <select
             id="invite-role"
             value={role}
             onChange={(e) => setRole(e.target.value as UserRole)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="flex h-9 w-full rounded-lr border border-lr-border bg-lr-surface px-3 text-lr-base text-lr-text font-sans transition-colors focus-visible:outline-none focus-visible:border-lr-accent focus-visible:ring-1 focus-visible:ring-lr-accent disabled:opacity-50"
             disabled={isSaving}
           >
             <option value="member">Member</option>
@@ -114,44 +98,45 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
       </div>
 
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700">
-          Company access
-        </label>
+        <Label>Company access</Label>
         {companies.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">No companies available yet.</p>
+          <p className="mt-2 text-lr-sm text-lr-muted">No companies available yet.</p>
         ) : (
-          <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
+          <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
             {companies.map((company) => (
-              <label
-                key={company.id}
-                className="flex items-center gap-2 text-sm text-gray-700"
-              >
+              <label key={company.id} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selectedCompanyIds.includes(company.id)}
                   onChange={() => handleCompanyToggle(company.id)}
-                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  className="h-4 w-4 rounded border-lr-border accent-lr-accent"
                   disabled={isSaving}
                 />
-                <span>{company.name}</span>
+                <span className="text-lr-sm text-lr-text-2">{company.name}</span>
               </label>
             ))}
           </div>
         )}
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={isSaving || !email.trim()}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSaving ? 'Saving...' : 'Send Invite'}
-        </button>
-        {successMessage && <p className="text-sm text-emerald-700">{successMessage}</p>}
+      <div className="mt-5 flex items-center gap-3">
+        <Button type="submit" disabled={isSaving || !email.trim()}>
+          {isSaving ? 'Saving…' : 'Send Invite'}
+        </Button>
+        {successMessage && (
+          <span className="flex items-center gap-1.5 text-lr-sm text-lr-success">
+            <CheckCircle className="h-4 w-4" />
+            {successMessage}
+          </span>
+        )}
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="mt-3 flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-4 py-3">
+          <AlertCircle className="h-4 w-4 shrink-0 text-lr-error" />
+          <p className="text-lr-sm text-lr-error">{error}</p>
+        </div>
+      )}
     </form>
   )
 }

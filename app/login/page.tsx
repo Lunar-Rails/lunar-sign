@@ -1,18 +1,13 @@
 import { redirect } from 'next/navigation'
-
 import { createClient } from '@/lib/supabase/server'
-
 import GoogleSignInButton from './google-sign-in-button'
 
 export const dynamic = 'force-dynamic'
 
-
 export default async function LoginPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
     const { data: profile } = await supabase
@@ -25,17 +20,21 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+    <div className="flex min-h-screen items-center justify-center bg-lr-bg px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Lunar Sign</h1>
-          <p className="mb-8 text-sm text-gray-600">
-            Secure document signing portal
-          </p>
+        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-8 shadow-lr-card backdrop-blur-lr-card">
+          {/* Logo */}
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-baseline gap-1">
+              <span className="font-display text-lr-3xl font-bold text-lr-accent">Lunar</span>
+              <span className="font-display text-lr-3xl font-bold text-lr-gold">Sign</span>
+            </div>
+            <p className="mt-2 text-lr-sm text-lr-muted">Secure document signing portal</p>
+          </div>
 
           <GoogleSignInButton />
 
-          <p className="mt-6 text-center text-xs text-gray-500">
+          <p className="mt-6 text-center text-lr-xs text-lr-muted">
             Sign in with your Google account to continue
           </p>
         </div>

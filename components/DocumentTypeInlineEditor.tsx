@@ -3,6 +3,7 @@
 import { KeyboardEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentTypeNamesSchema } from '@/lib/schemas'
+import { cn } from '@/lib/utils'
 
 interface DocumentTypeInlineEditorProps {
   documentId: string
@@ -25,9 +26,9 @@ function parseTypeNames(value: string) {
 
 function typeNamesAreEqual(a: string[], b: string[]) {
   if (a.length !== b.length) return false
-  const aNormalized = a.map((value) => value.toLowerCase()).sort()
-  const bNormalized = b.map((value) => value.toLowerCase()).sort()
-  return aNormalized.every((value, index) => value === bNormalized[index])
+  const aNormalized = a.map((v) => v.toLowerCase()).sort()
+  const bNormalized = b.map((v) => v.toLowerCase()).sort()
+  return aNormalized.every((v, i) => v === bNormalized[i])
 }
 
 export default function DocumentTypeInlineEditor({
@@ -45,12 +46,9 @@ export default function DocumentTypeInlineEditor({
   const [error, setError] = useState<string | null>(null)
   const isSavingRef = useRef(false)
 
-  const parsedDraftTypeNames = useMemo(
-    () => parseTypeNames(draftValue),
-    [draftValue]
-  )
+  const parsedDraftTypeNames = useMemo(() => parseTypeNames(draftValue), [draftValue])
   const selectedTypeNamesLowercase = useMemo(
-    () => new Set(parsedDraftTypeNames.map((typeName) => typeName.toLowerCase())),
+    () => new Set(parsedDraftTypeNames.map((n) => n.toLowerCase())),
     [parsedDraftTypeNames]
   )
 
@@ -64,13 +62,10 @@ export default function DocumentTypeInlineEditor({
     if (isSavingRef.current) return
 
     const parsedTypeNames = parseTypeNames(draftValue)
-    const validation = DocumentTypeNamesSchema.safeParse({
-      typeNames: parsedTypeNames,
-    })
+    const validation = DocumentTypeNamesSchema.safeParse({ typeNames: parsedTypeNames })
     if (!validation.success) {
       const fieldErrors = validation.error.flatten().fieldErrors
-      const errorMessage = Object.values(fieldErrors)[0]?.[0] || 'Validation error'
-      setError(errorMessage)
+      setError(Object.values(fieldErrors)[0]?.[0] || 'Validation error')
       return
     }
 
@@ -90,18 +85,13 @@ export default function DocumentTypeInlineEditor({
         body: JSON.stringify({ typeNames: validation.data.typeNames }),
       })
       const payload = await response.json()
-      if (!response.ok)
-        throw new Error(payload.error || 'Failed to update document type')
+      if (!response.ok) throw new Error(payload.error || 'Failed to update document type')
 
       setTypeNames(validation.data.typeNames)
       setIsEditing(false)
       router.refresh()
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Failed to update document type'
-      )
+      setError(requestError instanceof Error ? requestError.message : 'Failed to update document type')
     } finally {
       setIsSaving(false)
       isSavingRef.current = false
@@ -117,73 +107,58 @@ export default function DocumentTypeInlineEditor({
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      void handleSave()
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      handleCancel()
-    }
+    if (event.key === 'Enter') { event.preventDefault(); void handleSave(); return }
+    if (event.key === 'Escape') { event.preventDefault(); handleCancel() }
   }
 
   function handleToggleExistingType(typeName: string) {
     const normalizedTypeName = normalizeTypeName(typeName)
     if (!normalizedTypeName) return
 
-    const alreadySelected = selectedTypeNamesLowercase.has(
-      normalizedTypeName.toLowerCase()
-    )
+    const alreadySelected = selectedTypeNamesLowercase.has(normalizedTypeName.toLowerCase())
     if (alreadySelected) {
       const nextTypeNames = parsedDraftTypeNames.filter(
-        (name) =>
-          name.localeCompare(normalizedTypeName, undefined, {
-            sensitivity: 'base',
-          }) !== 0
+        (name) => name.localeCompare(normalizedTypeName, undefined, { sensitivity: 'base' }) !== 0
       )
       setDraftValue(nextTypeNames.join(', '))
       return
     }
-
     setDraftValue([...parsedDraftTypeNames, normalizedTypeName].join(', '))
   }
 
   if (isEditing) {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <input
           type="text"
           value={draftValue}
-          onChange={(event) => setDraftValue(event.target.value)}
+          onChange={(e) => setDraftValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={() => {
-            void handleSave()
-          }}
+          onBlur={() => void handleSave()}
           autoFocus
           disabled={isSaving}
-          className={`rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+          className={cn(
+            'rounded-lr border border-lr-border bg-lr-surface px-2 py-1 text-lr-xs text-lr-text focus:outline-none focus:border-lr-accent focus:ring-1 focus:ring-lr-accent disabled:opacity-50',
             isCompact ? 'w-52 max-w-full' : 'w-full'
-          }`}
+          )}
           placeholder="Type names separated by commas"
         />
         {availableTypeNames.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {availableTypeNames.map((typeName) => {
-              const isSelected = selectedTypeNamesLowercase.has(
-                typeName.toLowerCase()
-              )
+              const isSelected = selectedTypeNamesLowercase.has(typeName.toLowerCase())
               return (
                 <button
                   key={typeName}
                   type="button"
-                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleToggleExistingType(typeName)}
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-lr-xs font-medium transition-colors',
                     isSelected
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                      ? 'bg-lr-accent text-white'
+                      : 'bg-lr-surface border border-lr-border text-lr-muted hover:text-lr-text-2'
+                  )}
                 >
                   {typeName}
                 </button>
@@ -191,7 +166,7 @@ export default function DocumentTypeInlineEditor({
             })}
           </div>
         )}
-        {error && <p className="text-xs text-red-700">{error}</p>}
+        {error && <p className="text-lr-xs text-lr-error">{error}</p>}
       </div>
     )
   }
@@ -205,13 +180,13 @@ export default function DocumentTypeInlineEditor({
         title="Click to edit document type"
       >
         {typeNames.length === 0 ? (
-          <span className="text-xs text-gray-500 hover:text-gray-700">{emptyLabel}</span>
+          <span className="text-lr-xs text-lr-muted hover:text-lr-text-2 transition-colors">{emptyLabel}</span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {typeNames.map((typeName) => (
               <span
                 key={typeName}
-                className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                className="inline-flex items-center rounded-full bg-lr-accent-dim px-2 py-0.5 text-lr-xs font-medium text-lr-accent hover:bg-lr-accent/15 transition-colors"
               >
                 {typeName}
               </span>
@@ -219,7 +194,7 @@ export default function DocumentTypeInlineEditor({
           </div>
         )}
       </button>
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {error && <p className="text-lr-xs text-lr-error">{error}</p>}
     </div>
   )
 }

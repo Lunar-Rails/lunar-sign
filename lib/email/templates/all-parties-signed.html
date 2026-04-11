@@ -1,40 +1,23 @@
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+  <!-- Greeting -->
   <tr>
-    <td style="font-size: 16px; color: #1a202c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6;">
-      <p style="margin: 0 0 16px;">Hello {{recipientName}},</p>
-      <p style="margin: 0 0 16px;">All parties have now signed <strong>{{documentTitle}}</strong>.</p>
+    <td style="font-size: 15px; color: #e8e6f0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding-bottom: 20px;">
+      <p style="margin: 0 0 14px;">Hello <strong style="color: #e8e6f0;">{{signerName}}</strong>,</p>
+      <p style="margin: 0;">All parties have now signed <strong style="color: #e8e6f0;">{{documentTitle}}</strong>. Thank you for your signature.</p>
     </td>
   </tr>
+
+  <!-- Completion notice -->
   <tr>
-    <td style="padding: 0 0 16px;">
-      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="info-box" style="background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 0 6px 6px 0;">
+    <td style="padding-bottom: 8px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="info-box" style="background-color: #1a1a30; border-radius: 10px; border-left: 3px solid #3ccbda;">
         <tr>
-          <td style="padding: 16px; font-size: 15px; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6;">
-            <strong style="color: #1a202c;">Status:</strong> Complete<br />
-            <strong style="color: #1a202c;">Document:</strong> {{documentTitle}}
+          <td style="padding: 16px 20px; font-size: 14px; color: #b8b4c8; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6;">
+            <span style="font-size: 14px; font-weight: 600; color: #3ccbda; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;">&#10003;&nbsp; Signing complete</span><br />
+            <span style="font-size: 13px; color: #7e7a92; margin-top: 4px; display: block;">The document has been executed by all parties.</span>
           </td>
         </tr>
       </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="font-size: 16px; color: #1a202c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6;">
-      <p style="margin: 0 0 24px;">You can now download the fully signed document:</p>
-    </td>
-  </tr>
-  <tr>
-    <td class="button-td" align="center" style="text-align: center; padding: 0 0 8px;">
-      <!--[if mso]>
-      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{downloadUrl}}" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="10%" strokeweight="0" fillcolor="#22c55e">
-        <w:anchorlock/>
-        <center style="color:#ffffff;font-family:sans-serif;font-size:16px;font-weight:bold;">Download Signed Document</center>
-      </v:roundrect>
-      <![endif]-->
-      <!--[if !mso]><!-->
-      <a href="{{downloadUrl}}" class="button-a" target="_blank" style="display: inline-block; background-color: #22c55e; color: #ffffff; font-size: 16px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; text-decoration: none; padding: 12px 32px; border-radius: 6px; text-align: center;">
-        Download Signed Document
-      </a>
-      <!--<![endif]-->
     </td>
   </tr>
 </table>

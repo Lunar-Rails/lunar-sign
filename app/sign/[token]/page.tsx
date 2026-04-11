@@ -115,19 +115,16 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
   if (outcome.kind === 'revoked') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-lr-bg px-4">
+        <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-8 text-center shadow-lr-card">
+          <h1 className="font-display text-lr-xl font-semibold text-lr-text">
             Signing request cancelled
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            <span className="font-medium text-gray-800">
-              {outcome.documentTitle}
-            </span>
+          <p className="mt-2 text-lr-sm text-lr-muted">
+            <span className="font-medium text-lr-text">{outcome.documentTitle}</span>
           </p>
-          <p className="mt-4 text-sm text-gray-600">
-            This signing request has been cancelled by the document owner. You
-            can close this page.
+          <p className="mt-4 text-lr-sm text-lr-muted">
+            This signing request has been cancelled by the document owner. You can close this page.
           </p>
         </div>
       </div>

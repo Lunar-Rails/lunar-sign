@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { AlertCircle, Send } from 'lucide-react'
 
 interface SendDocumentButtonProps {
   documentId: string
 }
 
-export default function SendDocumentButton({
-  documentId,
-}: SendDocumentButtonProps) {
+export default function SendDocumentButton({ documentId }: SendDocumentButtonProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,9 +19,7 @@ export default function SendDocumentButton({
     setIsLoading(true)
 
     try {
-      const response = await fetch(`/api/documents/${documentId}/send`, {
-        method: 'POST',
-      })
+      const response = await fetch(`/api/documents/${documentId}/send`, { method: 'POST' })
 
       if (!response.ok) {
         const data = await response.json()
@@ -36,19 +34,17 @@ export default function SendDocumentButton({
   }
 
   return (
-    <div>
+    <div className="space-y-2">
       {error && (
-        <div className="mb-2 rounded-md border border-red-200 bg-red-50 p-2">
-          <p className="text-xs text-red-800">{error}</p>
+        <div className="flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-3 py-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-lr-error" />
+          <p className="text-lr-xs text-lr-error">{error}</p>
         </div>
       )}
-      <button
-        onClick={handleSend}
-        disabled={isLoading}
-        className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isLoading ? 'Sending...' : 'Send for Signing'}
-      </button>
+      <Button onClick={handleSend} disabled={isLoading}>
+        <Send className="h-4 w-4" />
+        {isLoading ? 'Sending…' : 'Send for Signing'}
+      </Button>
     </div>
   )
 }

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { AlertCircle } from 'lucide-react'
 
 interface AddSignerFormProps {
   documentId: string
@@ -22,9 +25,7 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
     try {
       const response = await fetch('/api/signature-requests', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           document_id: documentId,
           signer_name: name,
@@ -48,40 +49,35 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="text-sm font-medium text-gray-900">Add Signer</h3>
+      <h3 className="font-display text-lr-sm font-semibold text-lr-text">Add Signer</h3>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3">
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-4 py-3">
+          <AlertCircle className="h-4 w-4 shrink-0 text-lr-error" />
+          <p className="text-lr-sm text-lr-error">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <input
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Signer name"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           required
         />
-        <input
+        <Input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Signer email"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           required
         />
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isLoading ? 'Adding...' : 'Add Signer'}
-      </button>
+      <Button type="submit" disabled={isLoading} size="sm">
+        {isLoading ? 'Adding…' : 'Add Signer'}
+      </Button>
     </form>
   )
 }
