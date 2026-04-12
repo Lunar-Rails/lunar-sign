@@ -2,41 +2,22 @@
   <!-- Greeting -->
   <tr>
     <td style="font-size: 15px; color: #e8e6f0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding-bottom: 20px;">
-      <p style="margin: 0 0 14px;">Hello <strong style="color: #e8e6f0;">{{recipientName}}</strong>,</p>
-      <p style="margin: 0;">All parties have now signed <strong style="color: #e8e6f0;">{{documentTitle}}</strong>. You can download the fully executed copy below.</p>
+      <p style="margin: 0 0 14px;">Hello <strong style="color: #e8e6f0;">{{signerName}}</strong>,</p>
+      <p style="margin: 0;">All parties have now signed <strong style="color: #e8e6f0;">{{documentTitle}}</strong>. Thank you for your signature.</p>
     </td>
   </tr>
 
-  <!-- Status info box -->
+  <!-- Completion notice -->
   <tr>
-    <td style="padding-bottom: 24px;">
+    <td style="padding-bottom: 8px;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="info-box" style="background-color: #1a1a30; border-radius: 10px; border-left: 3px solid #3ccbda;">
         <tr>
-          <td style="padding: 16px 20px; font-size: 14px; color: #b8b4c8; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.8;">
-            <span style="font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif; font-size: 11px; font-weight: 600; color: #7e7a92; text-transform: uppercase; letter-spacing: 0.08em;">Status</span><br />
-            <span style="font-size: 14px; font-weight: 600; color: #3ccbda; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;">Complete</span><br /><br />
-            <span style="font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif; font-size: 11px; font-weight: 600; color: #7e7a92; text-transform: uppercase; letter-spacing: 0.08em;">Document</span><br />
-            <span style="font-size: 15px; font-weight: 600; color: #e8e6f0; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;">{{documentTitle}}</span>
+          <td style="padding: 16px 20px; font-size: 14px; color: #b8b4c8; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6;">
+            <span style="font-size: 14px; font-weight: 600; color: #3ccbda; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;">&#10003;&nbsp; Signing complete</span><br />
+            <span style="font-size: 13px; color: #7e7a92; margin-top: 4px; display: block;">The document has been executed by all parties.</span>
           </td>
         </tr>
       </table>
-    </td>
-  </tr>
-
-  <!-- CTA button -->
-  <tr>
-    <td class="button-td" align="center" style="text-align: center; padding-bottom: 8px;">
-      <!--[if mso]>
-      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{downloadUrl}}" style="height:44px;v-text-anchor:middle;width:260px;" arcsize="23%" strokeweight="0" fillcolor="#3ccbda">
-        <w:anchorlock/>
-        <center style="color:#0d0f1a;font-family:'Segoe UI',sans-serif;font-size:15px;font-weight:600;">Download Signed Document</center>
-      </v:roundrect>
-      <![endif]-->
-      <!--[if !mso]><!-->
-      <a href="{{downloadUrl}}" class="button-a" target="_blank" style="display: inline-block; background-color: #3ccbda; color: #0d0f1a; font-size: 15px; font-weight: 600; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif; text-decoration: none; padding: 12px 32px; border-radius: 10px; text-align: center; letter-spacing: -0.1px;">
-        Download Signed Document
-      </a>
-      <!--<![endif]-->
     </td>
   </tr>
 </table>

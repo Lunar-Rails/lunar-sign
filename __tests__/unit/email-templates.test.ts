@@ -90,7 +90,7 @@ describe('documentCompleteSignerEmail', () => {
     expect(subject).toContain('Fully Signed')
     expect(html).toContain('Alice')
     expect(html).toContain('Contract')
-    expect(html).toContain('Thank you for signing')
+    expect(html).toContain('Thank you for your signature')
   })
 })
 

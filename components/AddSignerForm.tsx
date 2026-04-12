@@ -62,7 +62,7 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Name"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 h-8 text-lr-sm"
           required
         />
         <Input
@@ -70,7 +70,7 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 h-8 text-lr-sm"
           required
         />
         <Button type="submit" disabled={isLoading} size="sm" className="shrink-0">

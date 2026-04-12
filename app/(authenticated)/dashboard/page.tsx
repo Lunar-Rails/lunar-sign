@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { Company, Document, DocumentType } from '@/lib/types'
 import DashboardSearch from '@/components/DashboardSearch'
 import { DashboardUploadDocumentButton } from '@/components/DashboardUploadDocumentButton'
-import { Card, CardContent } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,10 +15,10 @@ interface DashboardDocument extends Document {
 }
 
 const statCards = [
-  { label: 'Total Documents', key: 'total' },
-  { label: 'Draft', key: 'draft' },
-  { label: 'Pending', key: 'pending' },
-  { label: 'Completed', key: 'completed' },
+  { label: 'Total', key: 'total', color: 'text-lr-text' },
+  { label: 'Draft', key: 'draft', color: 'text-lr-muted' },
+  { label: 'Pending', key: 'pending', color: 'text-lr-warning' },
+  { label: 'Completed', key: 'completed', color: 'text-lr-cyan' },
 ] as const
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -125,11 +124,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const pageTitle = activeCompany ? activeCompany.name : 'All Documents'
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">{pageTitle}</h1>
+        <h1 className="text-page-title">{pageTitle}</h1>
         {companySlug && !activeCompany && (
-          <p className="mt-2 text-lr-sm text-lr-error">
+          <p className="text-caption mt-1 text-lr-error">
             Company not found. Showing no documents.
           </p>
         )}
@@ -137,22 +136,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {statCards.map(({ label, key }) => (
-          <Card key={key} className="p-5">
-            <p className="font-display text-lr-xs uppercase tracking-wider text-lr-muted">{label}</p>
-            <p className="mt-2 font-display text-lr-3xl font-bold text-lr-text">{stats[key]}</p>
-          </Card>
+        {statCards.map(({ label, key, color }) => (
+          <div
+            key={key}
+            className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card"
+          >
+            <p className="text-section-label">{label}</p>
+            <p className={`mt-2 font-display text-lr-3xl font-bold ${color}`}>{stats[key]}</p>
+          </div>
         ))}
       </div>
 
       {/* Documents Panel */}
       <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card">
-        <div className="flex flex-col gap-3 border-b border-lr-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-display text-lr-xl font-semibold text-lr-text">Documents</h2>
-          <DashboardUploadDocumentButton
-            activeCompanySlug={activeCompany?.slug ?? null}
-            companies={companyOptions}
-          />
+        <div className="border-b border-lr-border px-6 py-4">
+          <p className="text-kicker">Documents</p>
+          <h2 className="text-card-title mt-0.5">{pageTitle}</h2>
         </div>
         <div className="px-6 py-4">
           <DashboardSearch
@@ -161,6 +160,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           />
         </div>
       </div>
+
+      <DashboardUploadDocumentButton
+        activeCompanySlug={activeCompany?.slug ?? null}
+        companies={companyOptions}
+      />
     </div>
   )
 }

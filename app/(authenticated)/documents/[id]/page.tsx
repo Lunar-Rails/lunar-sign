@@ -6,15 +6,13 @@ import { Document, SignatureRequest, Company, DocumentType, DocumentStatus } fro
 import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 
 import SignersSection from '@/components/SignersSection'
-import { AuditTimeline } from '@/components/AuditTimeline'
 import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
-import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
-import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
+import { DocumentSidebarSetter } from '@/components/DocumentSidebarSetter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Download, FileText, Info } from 'lucide-react'
+import { ArrowLeft, Download, Info } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,13 +45,13 @@ function WorkflowBanner({
     case 'draft':
       if (signerCount === 0) {
         return (
-          <div className="flex items-start gap-2.5 rounded-lr-lg border border-lr-accent/20 bg-lr-accent-dim px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-lr border border-lr-accent/20 bg-lr-accent-dim px-4 py-3">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-lr-accent" />
             <div>
               <p className="text-lr-sm font-medium text-lr-text">
                 Add signers below to get started
               </p>
-              <p className="mt-0.5 text-lr-xs text-lr-muted">
+              <p className="text-caption mt-0.5">
                 You need at least one signer before sending the document.
               </p>
             </div>
@@ -61,14 +59,14 @@ function WorkflowBanner({
         )
       }
       return (
-        <div className="flex items-start gap-2.5 rounded-lr-lg border border-lr-cyan/20 bg-lr-cyan-dim px-4 py-3">
+        <div className="flex items-start gap-2.5 rounded-lr border border-lr-cyan/20 bg-lr-cyan-dim px-4 py-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-lr-cyan" />
           <div>
             <p className="text-lr-sm font-medium text-lr-text">
               Ready to send &mdash; {signerCount}{' '}
               {signerCount === 1 ? 'signer' : 'signers'} will be notified
             </p>
-            <p className="mt-0.5 text-lr-xs text-lr-muted">
+            <p className="text-caption mt-0.5">
               Hit &ldquo;Send for Signing&rdquo; when you&apos;re ready.
             </p>
           </div>
@@ -76,7 +74,7 @@ function WorkflowBanner({
       )
     case 'pending':
       return (
-        <div className="flex items-start gap-2.5 rounded-lr-lg border border-lr-warning/20 bg-lr-warning-dim px-4 py-3">
+        <div className="flex items-start gap-2.5 rounded-lr border border-lr-warning/20 bg-lr-warning-dim px-4 py-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-lr-warning" />
           <p className="text-lr-sm font-medium text-lr-text">
             Waiting for signatures &mdash; {signedCount} of {signerCount} signed
@@ -85,7 +83,7 @@ function WorkflowBanner({
       )
     case 'completed':
       return (
-        <div className="flex items-start gap-2.5 rounded-lr-lg border border-lr-success/20 bg-lr-success-dim px-4 py-3">
+        <div className="flex items-start gap-2.5 rounded-lr border border-lr-success/20 bg-lr-success-dim px-4 py-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-lr-success" />
           <p className="text-lr-sm font-medium text-lr-text">
             All signatures collected
@@ -94,7 +92,7 @@ function WorkflowBanner({
       )
     case 'cancelled':
       return (
-        <div className="flex items-start gap-2.5 rounded-lr-lg border border-lr-error/20 bg-lr-error-dim px-4 py-3">
+        <div className="flex items-start gap-2.5 rounded-lr border border-lr-error/20 bg-lr-error-dim px-4 py-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-lr-error" />
           <p className="text-lr-sm font-medium text-lr-text">
             This document was cancelled
@@ -161,156 +159,143 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
   const allDocumentTypeNames = (allDocumentTypeRows || []).map((row) => row.name)
   const signers: SignatureRequest[] = signatureRequests || []
   const logs = mapSupabaseAuditRows(auditLogs)
-
   const signedCount = signers.filter((s) => s.status === 'signed').length
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-56px)] flex-col overflow-hidden lg:-m-8">
-      {/* Compact top bar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-lr-border bg-lr-surface px-4 py-2.5 lg:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" asChild className="h-8 w-8 shrink-0">
-            <Link href="/dashboard" title="Back to dashboard">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate font-display text-lr-lg font-semibold text-lr-text">
-                {doc.title}
-              </h1>
-              <Badge variant={docStatusVariant(doc.status)}>
-                {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-              </Badge>
+    <>
+      {/* Feed data into the sidebar context */}
+      <DocumentSidebarSetter
+        data={{
+          documentId: doc.id,
+          documentStatus: doc.status,
+          assignedTypes,
+          allDocumentTypeNames,
+          assignedCompanies,
+          allCompanies,
+          assignedCompanyIds,
+          createdAt: doc.created_at,
+          completedAt: doc.completed_at,
+          auditLogs: logs,
+        }}
+      />
+
+      <div className="space-y-4">
+        {/* Top bar: back + title + actions */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="h-8 w-8 shrink-0">
+              <Link href="/dashboard" title="Back to dashboard">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-card-title truncate">{doc.title}</h1>
+                <Badge variant={docStatusVariant(doc.status)}>
+                  {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                </Badge>
+              </div>
+              {doc.description && (
+                <p className="text-caption truncate mt-0.5">{doc.description}</p>
+              )}
             </div>
-            {doc.description && (
-              <p className="truncate text-lr-xs text-lr-muted">{doc.description}</p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {doc.status === 'draft' && signers.length > 0 && (
+              <SendDocumentButton documentId={doc.id} />
+            )}
+            {doc.status === 'pending' && (
+              <CancelDocumentButton documentId={doc.id} />
+            )}
+            {doc.status === 'completed' && (
+              <Button asChild variant="gold">
+                <Link href={`/api/documents/${doc.id}/download`}>
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </Link>
+              </Button>
             )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {doc.status === 'draft' && signers.length > 0 && (
-            <SendDocumentButton documentId={doc.id} />
-          )}
-          {doc.status === 'pending' && (
-            <CancelDocumentButton documentId={doc.id} />
-          )}
-          {doc.status === 'completed' && (
-            <Button asChild variant="gold">
-              <Link href={`/api/documents/${doc.id}/download`}>
-                <Download className="h-4 w-4" />
-                Download PDF
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+        {/* Workflow Banner */}
+        <WorkflowBanner
+          status={doc.status}
+          signerCount={signers.length}
+          signedCount={signedCount}
+        />
 
-      {/* Split panel body */}
-      <div className="flex min-h-0 flex-1">
-        {/* Left: PDF preview */}
-        <div className="hidden border-r border-lr-border lg:flex lg:w-3/5">
-          <div className="flex-1 p-4">
-            <DocumentPdfPreview documentId={doc.id} />
-          </div>
-        </div>
-
-        {/* Right: operational panel */}
-        <div className="flex w-full flex-col overflow-y-auto lg:w-2/5">
-          <div className="space-y-4 p-4">
-            {/* Workflow guidance */}
-            <WorkflowBanner
-              status={doc.status}
-              signerCount={signers.length}
-              signedCount={signedCount}
-            />
-
-            {/* Metadata row */}
-            <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card">
-              <div className="border-b border-lr-border px-4 py-3">
-                <h2 className="font-display text-lr-sm font-semibold text-lr-text">Details</h2>
-              </div>
-              <div className="divide-y divide-lr-border/50 px-4">
-                <div className="flex items-start gap-3 py-2.5">
-                  <span className="w-20 shrink-0 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
-                    Type
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <DocumentTypeInlineEditor
-                      documentId={doc.id}
-                      initialTypeNames={assignedTypes.map((type) => type.name)}
-                      availableTypeNames={allDocumentTypeNames}
-                      isCompact
-                    />
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 py-2.5">
-                  <span className="w-20 shrink-0 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
-                    Companies
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <DocumentCompaniesEditor
-                      documentId={doc.id}
-                      companies={allCompanies}
-                      selectedCompanyIds={assignedCompanyIds}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 py-2.5">
-                  <span className="w-20 shrink-0 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
-                    Created
-                  </span>
-                  <span className="text-lr-xs text-lr-text-2">
-                    {new Date(doc.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
-                {doc.completed_at && (
-                  <div className="flex items-center gap-3 py-2.5">
-                    <span className="w-20 shrink-0 font-display text-lr-xs uppercase tracking-wider text-lr-muted">
-                      Completed
-                    </span>
-                    <span className="text-lr-xs text-lr-text-2">
-                      {new Date(doc.completed_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Signers */}
+        {/* Signers + PDF: side-by-side on xl, stacked below */}
+        <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
+          {/* Signers Section — primary interaction */}
+          <div className="xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0">
             <SignersSection
               documentId={doc.id}
               signers={signers}
               documentStatus={doc.status}
             />
+          </div>
 
-            {/* Mobile-only PDF preview */}
-            <div className="lg:hidden">
-              <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
-                <div className="mb-3 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-lr-muted" />
-                  <h2 className="font-display text-lr-sm font-semibold text-lr-text">Preview</h2>
-                </div>
-                <div className="h-[480px]">
-                  <DocumentPdfPreview documentId={doc.id} />
-                </div>
-              </div>
+          {/* PDF Preview — reference context */}
+          <div className="flex-1 min-w-0 rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
+            <div className="border-b border-lr-border px-4 py-3">
+              <h2 className="text-card-title">Document Preview</h2>
             </div>
+            <div className="h-[640px] xl:h-[720px] p-4">
+              <DocumentPdfPreview documentId={doc.id} />
+            </div>
+          </div>
+        </div>
 
-            {/* Activity */}
-            <AuditTimeline logs={logs} />
+        {/* Mobile-only: details + activity inline (sidebar hidden on mobile) */}
+        <div className="lg:hidden space-y-4">
+          <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card p-4">
+            <h2 className="text-card-title mb-3">Details</h2>
+            <div className="space-y-2">
+              <MobileDetailRow label="Type">
+                <span className="text-caption">
+                  {assignedTypes.length > 0
+                    ? assignedTypes.map((t) => t.name).join(', ')
+                    : <span className="text-lr-muted">None</span>}
+                </span>
+              </MobileDetailRow>
+              <MobileDetailRow label="Companies">
+                <span className="text-caption">
+                  {assignedCompanies.length > 0
+                    ? assignedCompanies.map((c) => c.name).join(', ')
+                    : <span className="text-lr-muted">None</span>}
+                </span>
+              </MobileDetailRow>
+              <MobileDetailRow label="Created">
+                <span className="text-caption">
+                  {new Date(doc.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                  })}
+                </span>
+              </MobileDetailRow>
+              {doc.completed_at && (
+                <MobileDetailRow label="Completed">
+                  <span className="text-caption">
+                    {new Date(doc.completed_at).toLocaleDateString('en-US', {
+                      year: 'numeric', month: 'short', day: 'numeric',
+                    })}
+                  </span>
+                </MobileDetailRow>
+              )}
+            </div>
           </div>
         </div>
       </div>
+    </>
+  )
+}
+
+function MobileDetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-20 shrink-0 text-section-label pt-0.5">{label}</span>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

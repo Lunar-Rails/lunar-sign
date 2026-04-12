@@ -138,21 +138,21 @@ export default function DocumentPdfPreview({
   return (
     <div className="flex h-full flex-col">
       {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lr border border-lr-error/30 bg-lr-error-dim px-4 py-3 text-caption text-lr-error">
           {errorMessage}
         </div>
       )}
 
       {!errorMessage && isLoading && (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600">
-          Loading PDF preview...
+        <div className="flex flex-1 items-center justify-center rounded-lr border border-lr-border bg-lr-surface text-caption text-lr-muted animate-pulse">
+          Loading PDF preview…
         </div>
       )}
 
       {!errorMessage && !isLoading && pdfData && (
         <div
           ref={viewerContainerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white"
+          className="flex-1 overflow-y-auto overflow-x-hidden rounded-lr border border-lr-border bg-lr-bg"
         >
           <PdfViewer
             pdfData={pdfData}

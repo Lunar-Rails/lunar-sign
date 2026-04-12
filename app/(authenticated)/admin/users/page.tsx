@@ -65,8 +65,9 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Manage Users</h1>
-        <p className="mt-1 text-lr-sm text-lr-muted">View and manage user roles across the system.</p>
+        <p className="text-kicker mb-1">Admin</p>
+        <h1 className="text-page-title">Manage Users</h1>
+        <p className="text-body mt-1">View and manage user roles across the system.</p>
       </div>
 
       <InviteUserForm companies={companies || []} />
@@ -75,7 +76,7 @@ export default async function AdminUsersPage() {
       {/* Users Table */}
       <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
         <div className="px-5 py-4 border-b border-lr-border">
-          <h2 className="font-display text-lr-xl font-semibold text-lr-text">Users</h2>
+          <h2 className="text-card-title">Users</h2>
         </div>
         <Table>
           <TableHeader>

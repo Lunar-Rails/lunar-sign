@@ -6,6 +6,13 @@ import { Company, UserRole } from '@/lib/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 
 interface InviteUserFormProps {
@@ -63,8 +70,8 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
-      <h2 className="font-display text-lr-xl font-semibold text-lr-text">Invite user</h2>
-      <p className="mt-1 text-lr-sm text-lr-muted">
+      <h2 className="text-card-title">Invite user</h2>
+      <p className="text-body mt-1">
         Add an email, workspace role, and optional company access.
       </p>
 
@@ -84,16 +91,19 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
 
         <div>
           <Label htmlFor="invite-role">Workspace role</Label>
-          <select
-            id="invite-role"
+          <Select
             value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className="flex h-9 w-full rounded-lr border border-lr-border bg-lr-surface px-3 text-lr-base text-lr-text font-sans transition-colors focus-visible:outline-none focus-visible:border-lr-accent focus-visible:ring-1 focus-visible:ring-lr-accent disabled:opacity-50"
+            onValueChange={(v) => setRole(v as UserRole)}
             disabled={isSaving}
           >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
+            <SelectTrigger id="invite-role">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

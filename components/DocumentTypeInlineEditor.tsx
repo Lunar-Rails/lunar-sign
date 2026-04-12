@@ -3,6 +3,7 @@
 import { KeyboardEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentTypeNamesSchema } from '@/lib/schemas'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 interface DocumentTypeInlineEditorProps {
@@ -129,7 +130,7 @@ export default function DocumentTypeInlineEditor({
   if (isEditing) {
     return (
       <div className="space-y-1.5">
-        <input
+        <Input
           type="text"
           value={draftValue}
           onChange={(e) => setDraftValue(e.target.value)}
@@ -138,7 +139,7 @@ export default function DocumentTypeInlineEditor({
           autoFocus
           disabled={isSaving}
           className={cn(
-            'rounded-lr border border-lr-border bg-lr-surface px-2 py-1 text-lr-xs text-lr-text focus:outline-none focus:border-lr-accent focus:ring-1 focus:ring-lr-accent disabled:opacity-50',
+            'h-7 px-2 text-lr-sm',
             isCompact ? 'w-52 max-w-full' : 'w-full'
           )}
           placeholder="Type names separated by commas"
