@@ -16,10 +16,10 @@ export default function GlobalError({
         <div className="flex min-h-screen items-center justify-center bg-lr-bg px-4">
           <div className="w-full max-w-sm text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-lr-error" />
-            <h2 className="mt-4 font-display text-lr-2xl font-semibold text-lr-text">
+            <h2 className="mt-4 text-page-title">
               Something went wrong
             </h2>
-            <p className="mt-2 text-lr-sm text-lr-muted">
+            <p className="text-body mt-2">
               An unexpected error occurred. Please try again or contact support if the problem
               persists.
             </p>

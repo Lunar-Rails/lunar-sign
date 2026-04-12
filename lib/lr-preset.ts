@@ -71,6 +71,10 @@ const lrPreset = {
         "lr-3xl": ["2rem", { lineHeight: "1.2" }],        // 32px — hero headings
       },
 
+      maxWidth: {
+        "lr-app": "1280px",
+      },
+
       borderRadius: {
         lr: "10px",
         "lr-lg": "14px",

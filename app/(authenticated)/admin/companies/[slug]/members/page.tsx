@@ -72,14 +72,15 @@ export default async function AdminCompanyMembersPage({
   )
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">
-        Company Members
-      </h1>
-      <p className="mb-8 text-gray-600">
-        Manage who can access contracts in{' '}
-        <span className="font-medium text-gray-900">{company.name}</span>.
-      </p>
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div>
+        <p className="text-kicker mb-1">{company.name}</p>
+        <h1 className="text-page-title">Company Members</h1>
+        <p className="text-body mt-1">
+          Manage who can access documents in{' '}
+          <span className="font-medium text-lr-text">{company.name}</span>.
+        </p>
+      </div>
 
       <CompanyMemberManagement
         companyId={company.id}

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { Company } from '@/lib/types'
 import CompanySidebarClient from '@/components/CompanySidebarClient'
 
@@ -11,18 +12,20 @@ interface CompanySidebarItem {
 
 export default async function CompanySidebar() {
   const supabase = await createClient()
+  const serviceClient = getServiceClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) return null
 
-  const [{ data: companies }, { data: documents }] = await Promise.all([
+  const [{ data: companies }, { data: documents }, { count: userCount }] = await Promise.all([
     supabase.from('companies').select('*').order('name', { ascending: true }),
-    supabase.from('documents').select('id'),
+    supabase.from('documents').select('id, status'),
+    serviceClient.from('profiles').select('*', { count: 'exact', head: true }),
   ])
 
-  const docs = documents || []
+  const docs = (documents || []) as { id: string; status: string }[]
   const baseCompanies: Company[] = companies || []
   const documentIds = docs.map((doc) => doc.id)
 
@@ -46,10 +49,18 @@ export default async function CompanySidebar() {
     documentCount: countByCompanyId.get(company.id) || 0,
   }))
 
+  const statusCounts = {
+    draft: docs.filter((d) => d.status === 'draft').length,
+    pending: docs.filter((d) => d.status === 'pending').length,
+    completed: docs.filter((d) => d.status === 'completed').length,
+  }
+
   return (
     <CompanySidebarClient
       companies={sidebarCompanies}
       totalDocumentCount={docs.length}
+      statusCounts={statusCounts}
+      adminStats={{ userCount: userCount ?? 0, companyCount: sidebarCompanies.length }}
     />
   )
 }

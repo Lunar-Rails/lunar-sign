@@ -26,8 +26,9 @@ export default async function AdminAuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Audit Log</h1>
-        <p className="mt-1 text-lr-sm text-lr-muted">View all system activities and changes.</p>
+        <p className="text-kicker mb-1">Admin</p>
+        <h1 className="text-page-title">Audit Log</h1>
+        <p className="text-body mt-1">View all system activities and changes.</p>
       </div>
 
       <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
@@ -83,7 +84,7 @@ export default async function AdminAuditLogPage() {
         </Table>
       </div>
 
-      <p className="text-lr-xs text-lr-muted">
+      <p className="text-caption">
         Showing latest 500 entries. For older logs, check your audit log database.
       </p>
     </div>

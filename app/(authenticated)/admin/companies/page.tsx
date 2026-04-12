@@ -16,8 +16,9 @@ export default async function AdminCompaniesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Companies</h1>
-        <p className="mt-1 text-lr-sm text-lr-muted">
+        <p className="text-kicker mb-1">Admin</p>
+        <h1 className="text-page-title">Companies</h1>
+        <p className="text-body mt-1">
           Manage workspace-like company groups used to organize documents.
         </p>
       </div>

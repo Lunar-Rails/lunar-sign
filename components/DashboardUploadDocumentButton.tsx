@@ -23,6 +23,9 @@ interface DashboardUploadDocumentButtonProps {
   companies: CompanyOption[]
 }
 
+const fabClass =
+  'fixed bottom-6 right-6 z-50 inline-flex h-12 items-center gap-2.5 rounded-full bg-gradient-to-br from-lr-accent to-lr-accent-hover px-5 text-white shadow-lr-glow-accent transition-opacity duration-lr-fast hover:opacity-90 font-display font-semibold'
+
 export function DashboardUploadDocumentButton({
   activeCompanySlug,
   companies,
@@ -40,32 +43,31 @@ export function DashboardUploadDocumentButton({
 
   if (hasValidActiveCompany) {
     return (
-      <Button asChild>
-        <Link href={`/upload?company=${encodeURIComponent(activeCompanySlug!)}`}>
-          <Upload className="h-4 w-4" />
-          Upload new document
-        </Link>
-      </Button>
+      <Link
+        href={`/upload?company=${encodeURIComponent(activeCompanySlug!)}`}
+        className={fabClass}
+      >
+        <Upload size={18} />
+        Upload document
+      </Link>
     )
   }
 
   if (companies.length === 0) {
     return (
-      <Button asChild>
-        <Link href="/upload">
-          <Upload className="h-4 w-4" />
-          Upload new document
-        </Link>
-      </Button>
+      <Link href="/upload" className={fabClass}>
+        <Upload size={18} />
+        Upload document
+      </Link>
     )
   }
 
   return (
     <>
-      <Button onClick={() => setDialogOpen(true)}>
-        <Upload className="h-4 w-4" />
-        Upload new document
-      </Button>
+      <button type="button" onClick={() => setDialogOpen(true)} className={fabClass}>
+        <Upload size={18} />
+        Upload document
+      </button>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
@@ -83,7 +85,7 @@ export function DashboardUploadDocumentButton({
                 <button
                   type="button"
                   onClick={() => handlePickCompany(company.slug)}
-                  className="w-full rounded-lr px-3 py-2 text-left text-lr-sm text-lr-text-2 hover:bg-lr-surface hover:text-lr-text transition-colors"
+                  className="w-full rounded-lr px-3 py-2 text-left text-body hover:bg-lr-surface hover:text-lr-text transition-colors"
                 >
                   {company.name}
                 </button>

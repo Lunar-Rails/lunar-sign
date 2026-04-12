@@ -52,8 +52,9 @@ export default async function AdminDocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">All Documents</h1>
-        <p className="mt-1 text-lr-sm text-lr-muted">View all documents across the system.</p>
+        <p className="text-kicker mb-1">Admin</p>
+        <h1 className="text-page-title">All Documents</h1>
+        <p className="text-body mt-1">View all documents across the system.</p>
       </div>
 
       <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">

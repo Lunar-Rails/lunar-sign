@@ -29,10 +29,11 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
       : []
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl py-4">
       <div className="mb-8">
-        <h1 className="font-display text-lr-3xl font-bold text-lr-text">Upload Document</h1>
-        <p className="mt-1 text-lr-sm text-lr-muted">
+        <p className="text-kicker mb-1">New Document</p>
+        <h1 className="text-page-title">Upload Document</h1>
+        <p className="text-body mt-2">
           Upload a PDF document that requires signatures.
         </p>
       </div>
