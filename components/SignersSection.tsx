@@ -2,15 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { SignatureRequest } from '@/lib/types'
+import { DocumentStatus, SignatureRequest } from '@/lib/types'
+import AddSignerForm from '@/components/AddSignerForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { UserMinus, Users } from 'lucide-react'
 
 interface SignersSectionProps {
   documentId: string
   signers: SignatureRequest[]
-  isEditable: boolean
+  documentStatus: DocumentStatus
 }
 
 type StatusVariant = 'warning' | 'success' | 'destructive' | 'secondary'
@@ -25,9 +27,17 @@ function signerStatusVariant(status: string): StatusVariant {
   }
 }
 
-export default function SignersSection({ signers, isEditable }: SignersSectionProps) {
+export default function SignersSection({
+  documentId,
+  signers,
+  documentStatus,
+}: SignersSectionProps) {
   const router = useRouter()
   const [isRemoving, setIsRemoving] = useState<string | null>(null)
+  const isEditable = documentStatus === 'draft'
+
+  const signedCount = signers.filter((s) => s.status === 'signed').length
+  const totalCount = signers.length
 
   const handleRemoveSigner = async (requestId: string) => {
     setIsRemoving(requestId)
@@ -39,7 +49,6 @@ export default function SignersSection({ signers, isEditable }: SignersSectionPr
       })
 
       if (!response.ok) throw new Error('Failed to remove signer')
-
       router.refresh()
     } catch (error) {
       console.error('Error removing signer:', error)
@@ -48,42 +57,71 @@ export default function SignersSection({ signers, isEditable }: SignersSectionPr
   }
 
   return (
-    <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
-      <h2 className="mb-4 font-display text-lr-xl font-semibold text-lr-text">Signers</h2>
+    <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card">
+      <div className="flex items-center justify-between border-b border-lr-border px-4 py-3">
+        <h2 className="font-display text-lr-sm font-semibold text-lr-text">Signers</h2>
+        {totalCount > 0 && documentStatus === 'pending' && (
+          <span className="text-lr-xs text-lr-muted">
+            {signedCount} of {totalCount} signed
+          </span>
+        )}
+      </div>
 
-      {signers.length === 0 ? (
-        <div className="flex flex-col items-center py-6 text-center">
-          <Users className="h-8 w-8 text-lr-muted" />
-          <p className="mt-2 text-lr-sm text-lr-muted">No signers added yet.</p>
+      {documentStatus === 'pending' && totalCount > 0 && (
+        <div className="border-b border-lr-border px-4 py-2">
+          <Progress value={(signedCount / totalCount) * 100} className="h-1.5" />
         </div>
-      ) : (
-        <div className="space-y-2">
-          {signers.map((signer) => (
-            <div
-              key={signer.id}
-              className="flex items-center justify-between rounded-lr border border-lr-border bg-lr-glass px-4 py-3"
-            >
-              <div className="flex-1">
-                <p className="text-lr-sm font-medium text-lr-text">{signer.signer_name}</p>
-                <p className="text-lr-xs text-lr-muted">{signer.signer_email}</p>
+      )}
+
+      <div className="px-4 py-3">
+        {signers.length === 0 ? (
+          <div className="flex flex-col items-center py-4 text-center">
+            <Users className="h-6 w-6 text-lr-muted" />
+            <p className="mt-2 text-lr-sm text-lr-muted">
+              {isEditable ? 'Add at least one signer to continue' : 'No signers'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {signers.map((signer) => (
+              <div
+                key={signer.id}
+                className="flex items-center justify-between rounded-lr border border-lr-border bg-lr-glass px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lr-sm font-medium text-lr-text">
+                    {signer.signer_name}
+                  </p>
+                  <p className="truncate text-lr-xs text-lr-muted">
+                    {signer.signer_email}
+                  </p>
+                </div>
+                <div className="ml-3 flex shrink-0 items-center gap-2">
+                  <Badge variant={signerStatusVariant(signer.status)}>
+                    {signer.status.charAt(0).toUpperCase() + signer.status.slice(1)}
+                  </Badge>
+                  {isEditable && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-lr-muted hover:text-lr-error hover:bg-lr-error-dim"
+                      onClick={() => handleRemoveSigner(signer.id)}
+                      disabled={isRemoving === signer.id}
+                      title="Remove signer"
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              <Badge variant={signerStatusVariant(signer.status)}>
-                {signer.status.charAt(0).toUpperCase() + signer.status.slice(1)}
-              </Badge>
-              {isEditable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-3 text-lr-error hover:text-lr-error hover:bg-lr-error-dim"
-                  onClick={() => handleRemoveSigner(signer.id)}
-                  disabled={isRemoving === signer.id}
-                >
-                  <UserMinus className="h-4 w-4" />
-                  {isRemoving === signer.id ? 'Removing…' : 'Remove'}
-                </Button>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isEditable && (
+        <div className="border-t border-lr-border px-4 py-3">
+          <AddSignerForm documentId={documentId} />
         </div>
       )}
     </div>

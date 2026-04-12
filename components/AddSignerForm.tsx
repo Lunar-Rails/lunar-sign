@@ -48,36 +48,35 @@ export default function AddSignerForm({ documentId }: AddSignerFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="font-display text-lr-sm font-semibold text-lr-text">Add Signer</h3>
-
+    <form onSubmit={handleSubmit} className="space-y-2">
       {error && (
-        <div className="flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-4 py-3">
-          <AlertCircle className="h-4 w-4 shrink-0 text-lr-error" />
-          <p className="text-lr-sm text-lr-error">{error}</p>
+        <div className="flex items-center gap-2 rounded-lr bg-lr-error-dim px-3 py-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-lr-error" />
+          <p className="text-lr-xs text-lr-error">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="flex gap-2">
         <Input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Signer name"
+          placeholder="Name"
+          className="min-w-0 flex-1"
           required
         />
         <Input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Signer email"
+          placeholder="Email"
+          className="min-w-0 flex-1"
           required
         />
+        <Button type="submit" disabled={isLoading} size="sm" className="shrink-0">
+          {isLoading ? '…' : 'Add'}
+        </Button>
       </div>
-
-      <Button type="submit" disabled={isLoading} size="sm">
-        {isLoading ? 'Adding…' : 'Add Signer'}
-      </Button>
     </form>
   )
 }

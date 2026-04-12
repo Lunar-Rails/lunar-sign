@@ -136,9 +136,7 @@ export default function DocumentPdfPreview({
   const isLoading = isFetching || isPdfLoading
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Document Preview</h2>
-
+    <div className="flex h-full flex-col">
       {errorMessage && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errorMessage}
@@ -146,7 +144,7 @@ export default function DocumentPdfPreview({
       )}
 
       {!errorMessage && isLoading && (
-        <div className="flex h-[640px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600">
           Loading PDF preview...
         </div>
       )}
@@ -154,7 +152,7 @@ export default function DocumentPdfPreview({
       {!errorMessage && !isLoading && pdfData && (
         <div
           ref={viewerContainerRef}
-          className="h-[640px] overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white"
+          className="flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white"
         >
           <PdfViewer
             pdfData={pdfData}

@@ -47,38 +47,40 @@ function getActorLine(log: AuditLogWithActor): string | null {
 
 export function AuditTimeline({ logs }: AuditTimelineProps) {
   return (
-    <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
-      <h2 className="mb-4 font-display text-lr-xl font-semibold text-lr-text">Activity</h2>
+    <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card">
+      <div className="border-b border-lr-border px-4 py-3">
+        <h2 className="font-display text-lr-sm font-semibold text-lr-text">Activity</h2>
+      </div>
 
       {logs.length === 0 ? (
-        <p className="text-lr-sm text-lr-muted">No activity yet.</p>
+        <p className="px-4 py-4 text-lr-sm text-lr-muted">No activity yet.</p>
       ) : (
-        <div className="space-y-0">
-          {logs.map((log, index) => {
-            const actorLine = getActorLine(log)
-            return (
-              <div key={log.id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${getDotClass(log.action)}`} />
-                  {index < logs.length - 1 && (
-                    <div className="flex-1 w-0.5 bg-lr-border mt-1" />
-                  )}
-                </div>
+        <div className="max-h-72 overflow-y-auto px-4 py-3">
+          <div className="space-y-0">
+            {logs.map((log, index) => {
+              const actorLine = getActorLine(log)
+              return (
+                <div key={log.id} className="flex gap-2.5">
+                  <div className="flex flex-col items-center pt-1.5">
+                    <div className={`h-2 w-2 shrink-0 rounded-full ${getDotClass(log.action)}`} />
+                    {index < logs.length - 1 && (
+                      <div className="mt-1 flex-1 w-px bg-lr-border" />
+                    )}
+                  </div>
 
-                <div className="pb-4 flex-1">
-                  <p className="text-lr-sm font-medium text-lr-text">
-                    {getActionLabel(log.action)}
-                  </p>
-                  {actorLine && (
-                    <p className="text-lr-xs text-lr-muted">{actorLine}</p>
-                  )}
-                  <p className="text-lr-xs text-lr-muted">
-                    {new Date(log.created_at).toLocaleString()}
-                  </p>
+                  <div className="min-w-0 flex-1 pb-3">
+                    <p className="text-lr-xs font-medium text-lr-text">
+                      {getActionLabel(log.action)}
+                    </p>
+                    <p className="text-lr-xs text-lr-muted">
+                      {actorLine && <>{actorLine} &middot; </>}
+                      {new Date(log.created_at).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
