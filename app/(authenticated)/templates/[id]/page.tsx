@@ -137,7 +137,11 @@ export default async function TemplateDetailPage({ params }: TemplateDetailPageP
           </div>
 
           <div className="flex-1 min-w-0">
-            <TemplatePdfPreviewByTemplateId templateId={id} title="PDF preview" />
+            <TemplatePdfPreviewByTemplateId
+              templateId={id}
+              title="PDF preview"
+              fieldMetadata={meta}
+            />
           </div>
         </div>
 

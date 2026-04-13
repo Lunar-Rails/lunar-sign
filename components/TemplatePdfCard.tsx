@@ -16,6 +16,8 @@ import type {
 } from '@drvillo/react-browser-e-signing'
 
 import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import { hydrateForSigner } from '@/lib/field-metadata'
+import type { StoredField } from '@/lib/types'
 
 const noopAdd = () => {
   /* placement disabled */
@@ -141,6 +143,8 @@ export function TemplatePdfCard({
 
 export interface TemplatePdfPreviewByTemplateIdProps {
   templateId: string
+  /** When set, field boxes are drawn on the PDF (same as edit view, read-only). */
+  fieldMetadata?: StoredField[] | null
   title?: string
   className?: string
 }
@@ -150,6 +154,7 @@ export interface TemplatePdfPreviewByTemplateIdProps {
  */
 export function TemplatePdfPreviewByTemplateId({
   templateId,
+  fieldMetadata,
   title = 'PDF preview',
   className,
 }: TemplatePdfPreviewByTemplateIdProps) {
@@ -182,6 +187,12 @@ export function TemplatePdfPreviewByTemplateId({
       dateText: '',
     }),
     []
+  )
+
+  const fieldPlacements = useMemo(
+    () =>
+      fieldMetadata && fieldMetadata.length > 0 ? hydrateForSigner(fieldMetadata) : [],
+    [fieldMetadata]
   )
 
   const pdfDataForViewer = useMemo(() => {
@@ -228,7 +239,7 @@ export function TemplatePdfPreviewByTemplateId({
       setPageDimension={setPageDimension}
       currentPageIndex={currentPageIndex}
       onPageChange={(i) => scrollToPage(i)}
-      fields={[]}
+      fields={fieldPlacements}
       selectedFieldType={null}
       onAddField={noopAdd}
       onUpdateField={() => {}}
