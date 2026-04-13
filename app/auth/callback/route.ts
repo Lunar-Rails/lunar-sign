@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     )
 
   const redirectResponse = NextResponse.redirect(
-    new URL('/dashboard', request.url)
+    new URL('/documents', request.url)
   )
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {

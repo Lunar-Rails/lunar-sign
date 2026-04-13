@@ -24,7 +24,7 @@ export default async function AdminLayout({
 
   const userProfile: Profile | null = profile
 
-  if (!userProfile || userProfile.role !== 'admin') redirect('/dashboard')
+  if (!userProfile || userProfile.role !== 'admin') redirect('/documents')
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-56px)]">

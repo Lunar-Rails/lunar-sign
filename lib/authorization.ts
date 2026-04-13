@@ -67,3 +67,41 @@ export async function canAccessDocument({
 
   return (memberships || []).length > 0
 }
+
+export async function canAccessTemplate({
+  supabase,
+  userId,
+  templateId,
+}: {
+  supabase: SupabaseClient
+  userId: string
+  templateId: string
+}) {
+  if (await isAdmin(supabase, userId)) return true
+
+  const { data: ownedTemplate } = await supabase
+    .from('templates')
+    .select('id')
+    .eq('id', templateId)
+    .eq('created_by', userId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (ownedTemplate) return true
+
+  const { data: links } = await supabase
+    .from('template_companies')
+    .select('company_id')
+    .eq('template_id', templateId)
+
+  const companyIds = (links || []).map((row) => row.company_id)
+  if (!companyIds.length) return false
+
+  const { data: memberships } = await supabase
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', userId)
+    .in('company_id', companyIds)
+
+  return (memberships || []).length > 0
+}

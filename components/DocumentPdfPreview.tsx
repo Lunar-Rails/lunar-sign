@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  FieldOverlay,
   PdfPageNavigator,
   PdfViewer,
   configure,
@@ -10,10 +11,14 @@ import {
 import { getPdfWorkerSrc } from '@drvillo/react-browser-e-signing/worker'
 import '@drvillo/react-browser-e-signing/styles.css'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import type { StoredField } from '@/lib/types'
+import { hydrateForSigner } from '@/lib/field-metadata'
 
 interface DocumentPdfPreviewProps {
   documentId: string
+  fieldMetadata?: StoredField[] | null
 }
 
 let isPdfWorkerConfigured = false
@@ -24,8 +29,19 @@ function ensurePdfWorkerConfiguration() {
   isPdfWorkerConfigured = true
 }
 
+const noopAdd = () => {}
+const noopRemove = () => {}
+
+const emptyPreview = {
+  signatureDataUrl: null,
+  fullName: '',
+  title: '',
+  dateText: '',
+}
+
 export default function DocumentPdfPreview({
   documentId,
+  fieldMetadata,
 }: DocumentPdfPreviewProps) {
   const [pdfInput, setPdfInput] = useState<ArrayBuffer | null>(null)
   const [isFetching, setIsFetching] = useState(true)
@@ -47,6 +63,11 @@ export default function DocumentPdfPreview({
     containerRef: viewerContainerRef,
     numPages,
   })
+
+  const fieldPlacements = useMemo(
+    () => (fieldMetadata && fieldMetadata.length > 0 ? hydrateForSigner(fieldMetadata) : []),
+    [fieldMetadata]
+  )
 
   useEffect(() => {
     ensurePdfWorkerConfiguration()
@@ -172,6 +193,22 @@ export default function DocumentPdfPreview({
                 onPageChange={scrollToPage}
               />
             )}
+            renderOverlay={
+              fieldPlacements.length > 0
+                ? (pageIndex) => (
+                    <FieldOverlay
+                      pageIndex={pageIndex}
+                      fields={fieldPlacements}
+                      selectedFieldType={null}
+                      onAddField={noopAdd}
+                      onUpdateField={() => {}}
+                      onRemoveField={noopRemove}
+                      preview={emptyPreview}
+                      readOnly
+                    />
+                  )
+                : undefined
+            }
             className="h-full"
           />
         </div>

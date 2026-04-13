@@ -8,6 +8,7 @@ import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 import SignersSection from '@/components/SignersSection'
 import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
+import { DeleteDocumentButton } from '@/components/DeleteDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
 import { DocumentSidebarSetter } from '@/components/DocumentSidebarSetter'
 import { Badge } from '@/components/ui/badge'
@@ -113,11 +114,23 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
     .from('documents')
     .select('*')
     .eq('id', id)
-    .single()
+    .is('deleted_at', null)
+    .maybeSingle()
 
-  if (!document) redirect('/dashboard')
+  if (!document) redirect('/documents')
 
   const doc: Document = document
+
+  let sourceTemplate: { id: string; title: string } | null = null
+  if (doc.template_id) {
+    const { data: tmpl } = await supabase
+      .from('templates')
+      .select('id, title')
+      .eq('id', doc.template_id)
+      .is('deleted_at', null)
+      .maybeSingle()
+    sourceTemplate = tmpl
+  }
 
   const [
     { data: signatureRequests },
@@ -163,7 +176,6 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
 
   return (
     <>
-      {/* Feed data into the sidebar context */}
       <DocumentSidebarSetter
         data={{
           documentId: doc.id,
@@ -180,20 +192,27 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
       />
 
       <div className="space-y-4">
-        {/* Top bar: back + title + actions */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button variant="ghost" size="icon" asChild className="h-8 w-8 shrink-0">
-              <Link href="/dashboard" title="Back to dashboard">
+              <Link href="/documents" title="Back to documents">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-card-title truncate">{doc.title}</h1>
                 <Badge variant={docStatusVariant(doc.status)}>
                   {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                 </Badge>
+                {sourceTemplate && (
+                  <Link
+                    href={`/templates/${sourceTemplate.id}`}
+                    className="inline-flex items-center rounded-full border border-lr-border bg-transparent px-2.5 py-0.5 text-lr-xs font-medium text-lr-muted hover:text-lr-text shrink-0"
+                  >
+                    From template: {sourceTemplate.title}
+                  </Link>
+                )}
               </div>
               {doc.description && (
                 <p className="text-caption truncate mt-0.5">{doc.description}</p>
@@ -201,7 +220,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {doc.status === 'draft' && signers.length > 0 && (
               <SendDocumentButton documentId={doc.id} />
             )}
@@ -216,19 +235,19 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
                 </Link>
               </Button>
             )}
+            {doc.status === 'draft' && (
+              <DeleteDocumentButton documentId={doc.id} documentTitle={doc.title} />
+            )}
           </div>
         </div>
 
-        {/* Workflow Banner */}
         <WorkflowBanner
           status={doc.status}
           signerCount={signers.length}
           signedCount={signedCount}
         />
 
-        {/* Signers + PDF: side-by-side on xl, stacked below */}
         <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
-          {/* Signers Section — primary interaction */}
           <div className="xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0">
             <SignersSection
               documentId={doc.id}
@@ -237,18 +256,16 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
             />
           </div>
 
-          {/* PDF Preview — reference context */}
           <div className="flex-1 min-w-0 rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
             <div className="border-b border-lr-border px-4 py-3">
               <h2 className="text-card-title">Document Preview</h2>
             </div>
             <div className="h-[640px] xl:h-[720px] p-4">
-              <DocumentPdfPreview documentId={doc.id} />
+              <DocumentPdfPreview documentId={doc.id} fieldMetadata={doc.field_metadata} />
             </div>
           </div>
         </div>
 
-        {/* Mobile-only: details + activity inline (sidebar hidden on mobile) */}
         <div className="lg:hidden space-y-4">
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card p-4">
             <h2 className="text-card-title mb-3">Details</h2>

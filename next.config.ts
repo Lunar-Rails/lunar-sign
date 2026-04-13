@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Pin Turbopack to this app so CSS/PostCSS (Tailwind) does not resolve a parent lockfile and read the wrong `package.json`. */
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: projectRoot,
+  },
   async redirects() {
     return [
       {

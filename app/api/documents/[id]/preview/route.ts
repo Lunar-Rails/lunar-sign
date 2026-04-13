@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { canAccessDocument } from '@/lib/authorization'
 
 export async function GET(
@@ -34,7 +35,8 @@ export async function GET(
     if (!hasDocumentAccess)
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { data: pdfBlob, error: downloadError } = await supabase.storage
+    const service = getServiceClient()
+    const { data: pdfBlob, error: downloadError } = await service.storage
       .from('documents')
       .download(document.file_path)
 

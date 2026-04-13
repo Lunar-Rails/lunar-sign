@@ -16,7 +16,7 @@ export default async function LoginPage() {
       .eq('id', user.id)
       .single()
 
-    if (profile) redirect('/dashboard')
+    if (profile) redirect('/documents')
   }
 
   return (

@@ -25,13 +25,14 @@ export function SidebarNav({ overviewItem, groups = [] }: SidebarNavProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeCompany = searchParams.get('company')
-  const isDashboard = pathname === '/dashboard'
+  const isDocumentsIndex = pathname === '/documents'
 
   function isActive(item: SidebarNavItem): boolean {
-    if (item.href === '/dashboard') return isDashboard && !activeCompany
+    if (item.href === '/documents') return isDocumentsIndex && !activeCompany
     const url = new URL(item.href, 'http://x')
+    if (url.pathname !== '/documents') return false
     const company = url.searchParams.get('company')
-    return isDashboard && activeCompany === company
+    return isDocumentsIndex && activeCompany === company
   }
 
   return (

@@ -17,8 +17,6 @@
  *   4. Add `class="dark"` to your <html> element for dark mode (default).
  */
 
-import type { Config } from "tailwindcss"
-
 const lrPreset = {
   theme: {
     extend: {
@@ -132,6 +130,6 @@ const lrPreset = {
       },
     },
   },
-} satisfies Partial<Config>
+}
 
 export default lrPreset

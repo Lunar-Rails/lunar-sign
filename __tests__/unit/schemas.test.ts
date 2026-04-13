@@ -4,11 +4,15 @@ import {
   AddSignerSchema,
   CompanyCreateSchema,
   CompanyUpdateSchema,
+  DocumentFromTemplateSchema,
   CreateInvitationSchema,
   DocumentCompanyIdsSchema,
   DocumentTypeNamesSchema,
   DocumentUploadSchema,
+  FieldMetadataSchema,
   SendDocumentSchema,
+  StoredFieldSchema,
+  TemplateUpdateBodySchema,
 } from '@/lib/schemas'
 
 const validUuid = '550e8400-e29b-41d4-a716-446655440000'
@@ -157,6 +161,71 @@ describe('CreateInvitationSchema', () => {
         email: 'u@example.com',
         role: 'member',
         companyIds: ['bad'],
+      }).success
+    ).toBe(false)
+  })
+})
+
+const fieldBase = {
+  id: 'f1',
+  type: 'text' as const,
+  pageIndex: 0,
+  xPercent: 10,
+  yPercent: 20,
+  widthPercent: 25,
+  heightPercent: 5,
+  forSigner: true,
+}
+
+describe('StoredFieldSchema', () => {
+  it('accepts valid field with optional label', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, label: 'Co' }).success).toBe(true)
+    expect(StoredFieldSchema.safeParse(fieldBase).success).toBe(true)
+  })
+  it('rejects missing forSigner', () => {
+    const { forSigner: _f, ...rest } = fieldBase
+    void _f
+    expect(StoredFieldSchema.safeParse(rest).success).toBe(false)
+  })
+  it('rejects invalid type', () => {
+    expect(
+      StoredFieldSchema.safeParse({ ...fieldBase, type: 'nope' }).success
+    ).toBe(false)
+  })
+})
+
+describe('FieldMetadataSchema', () => {
+  it('accepts array of fields', () => {
+    expect(FieldMetadataSchema.safeParse([fieldBase]).success).toBe(true)
+  })
+})
+
+describe('TemplateUpdateBodySchema', () => {
+  it('accepts partial title', () => {
+    expect(TemplateUpdateBodySchema.safeParse({ title: 'T' }).success).toBe(true)
+  })
+  it('accepts field_metadata array', () => {
+    expect(
+      TemplateUpdateBodySchema.safeParse({ field_metadata: [fieldBase] }).success
+    ).toBe(true)
+  })
+})
+
+describe('DocumentFromTemplateSchema', () => {
+  it('accepts signers and field_values', () => {
+    expect(
+      DocumentFromTemplateSchema.safeParse({
+        title: 'Doc',
+        signers: [{ signer_name: 'A', signer_email: 'a@b.co' }],
+        field_values: { f1: 'x' },
+      }).success
+    ).toBe(true)
+  })
+  it('rejects empty signers', () => {
+    expect(
+      DocumentFromTemplateSchema.safeParse({
+        title: 'Doc',
+        signers: [],
       }).success
     ).toBe(false)
   })

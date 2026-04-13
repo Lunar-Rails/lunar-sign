@@ -15,6 +15,7 @@ export function ensureESigningConfigured() {
 
   configure({
     pdfWorkerSrc: getPdfWorkerSrc(),
+    fontMode: 'bundled',
   })
 
   window.__lunarSignESigningConfigured__ = true

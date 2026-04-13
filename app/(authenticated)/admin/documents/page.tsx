@@ -45,6 +45,7 @@ export default async function AdminDocumentsPage() {
   const { data: documentsData } = await supabase
     .from('documents')
     .select('id, title, status, created_at, uploaded_by, profiles:uploaded_by(email, full_name)')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   const documents = (documentsData ?? []) as AdminDocumentRow[]

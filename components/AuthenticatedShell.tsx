@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Profile } from '@/lib/types'
 import UserDropdown from '@/components/UserDropdown'
 import { DocumentSidebarProvider } from '@/lib/document-sidebar-context'
+import { TemplateSidebarProvider } from '@/lib/template-sidebar-context'
 
 export function AuthenticatedShell({
   profile,
@@ -20,17 +21,29 @@ export function AuthenticatedShell({
 
   return (
     <DocumentSidebarProvider>
+    <TemplateSidebarProvider>
     <div className="flex min-h-screen flex-col bg-lr-bg">
       {/* Header */}
       <header className="sticky top-0 z-50 h-14 border-b border-lr-border bg-lr-bg/88 backdrop-blur-lr-header saturate-[1.2]">
         <div className="flex h-full items-center justify-between px-6 lg:px-10 max-w-lr-app mx-auto w-full">
-          <Link href="/dashboard" className="flex items-center gap-1 shrink-0">
+          <Link href="/documents" className="flex items-center gap-1 shrink-0">
             <span className="font-display text-lr-lg font-bold text-lr-accent">Lunar</span>
             <span className="font-display text-lr-lg font-bold text-lr-gold">Sign</span>
           </Link>
 
           <nav className="flex items-end h-14">
-            <NavLink href="/dashboard" active={pathname === '/dashboard'}>Dashboard</NavLink>
+            <NavLink
+              href="/documents"
+              active={pathname === '/documents' || pathname.startsWith('/documents/')}
+            >
+              Documents
+            </NavLink>
+            <NavLink
+              href="/templates"
+              active={pathname === '/templates' || pathname.startsWith('/templates/')}
+            >
+              Templates
+            </NavLink>
             <NavLink href="/upload" active={pathname === '/upload'}>Upload</NavLink>
             {profile.role === 'admin' && (
               <NavLink href="/admin" active={pathname.startsWith('/admin')}>Admin</NavLink>
@@ -51,6 +64,7 @@ export function AuthenticatedShell({
         </div>
       </div>
     </div>
+    </TemplateSidebarProvider>
     </DocumentSidebarProvider>
   )
 }

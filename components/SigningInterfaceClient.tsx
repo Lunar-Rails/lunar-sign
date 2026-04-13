@@ -8,13 +8,14 @@ interface SigningInterfaceClientProps {
   signerEmail: string
   documentTitle: string
   pdfBase64: string
+  initialFieldsJson?: string | null
 }
 
 const SigningInterface = dynamic(() => import('@/components/SigningInterface'), {
   ssr: false,
   loading: () => (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center justify-center px-4 py-10">
-      <p className="text-sm text-gray-600">Loading signing experience...</p>
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center justify-center bg-lr-bg px-4 py-10">
+      <p className="text-body">Loading signing experience...</p>
     </div>
   ),
 })

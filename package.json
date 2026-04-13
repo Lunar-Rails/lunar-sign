@@ -16,7 +16,7 @@
     "db:migrate:status": "node --env-file=.env.local --import tsx scripts/migrate.ts status"
   },
   "dependencies": {
-    "@drvillo/react-browser-e-signing": "^0.3.0",
+    "@drvillo/react-browser-e-signing": "^0.5.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",

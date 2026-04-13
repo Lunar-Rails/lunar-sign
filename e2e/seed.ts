@@ -4,10 +4,13 @@ import { createClient } from '@supabase/supabase-js'
 
 const DOC_SIGN = 'e2e00001-0000-4000-8000-000000000001'
 const DOC_DL = 'e2e00002-0000-4000-8000-000000000002'
+const DOC_TMPL = 'e2e00005-0000-4000-8000-000000000005'
 const REQ_SIGN = 'e2e00003-0000-4000-8000-000000000003'
 const REQ_DL = 'e2e00004-0000-4000-8000-000000000004'
+const REQ_TMPL = 'e2e00006-0000-4000-8000-000000000006'
 const SIGN_TOKEN = 'e1e0e0e0-e0e0-40e0-80e0-e0e0e0e0e0e1'
 const DOWNLOAD_TOKEN = 'e1e0e0e0-e0e0-40e0-80e0-e0e0e0e0e0e2'
+const TMPL_SIGN_TOKEN = 'e1e0e0e0-e0e0-40e0-80e0-e0e0e0e0e0e5'
 
 function loadEnvLocal() {
   const p = join(process.cwd(), '.env.local')
@@ -63,12 +66,39 @@ export default async function globalSetup() {
 
     const uploadedBy = profiles[0].id
 
-    await supabase.from('signature_requests').delete().in('id', [REQ_SIGN, REQ_DL])
-    await supabase.from('documents').delete().in('id', [DOC_SIGN, DOC_DL])
+    await supabase.from('signature_requests').delete().in('id', [REQ_SIGN, REQ_DL, REQ_TMPL])
+    await supabase.from('documents').delete().in('id', [DOC_SIGN, DOC_DL, DOC_TMPL])
 
     const origSignPath = `e2e/${DOC_SIGN}/original.pdf`
     const origDlPath = `e2e/${DOC_DL}/original.pdf`
+    const origTmplPath = `e2e/${DOC_TMPL}/original.pdf`
     const signedPath = `e2e/${DOC_DL}/signed.pdf`
+
+    const fieldMetadata = [
+      {
+        id: 'f1',
+        type: 'text',
+        pageIndex: 0,
+        xPercent: 10,
+        yPercent: 10,
+        widthPercent: 25,
+        heightPercent: 5,
+        label: 'Company',
+        value: 'Acme Corp',
+        forSigner: false,
+      },
+      {
+        id: 'f2',
+        type: 'signature',
+        pageIndex: 0,
+        xPercent: 10,
+        yPercent: 60,
+        widthPercent: 25,
+        heightPercent: 5,
+        label: 'Signature',
+        forSigner: true,
+      },
+    ] as const
 
     const { error: up1 } = await supabase.storage
       .from('documents')
@@ -79,6 +109,11 @@ export default async function globalSetup() {
       .from('documents')
       .upload(origDlPath, pdf, { contentType: 'application/pdf', upsert: true })
     if (up2) throw up2
+
+    const { error: upT } = await supabase.storage
+      .from('documents')
+      .upload(origTmplPath, pdf, { contentType: 'application/pdf', upsert: true })
+    if (upT) throw upT
 
     const { error: up3 } = await supabase.storage
       .from('signed-documents')
@@ -107,6 +142,17 @@ export default async function globalSetup() {
     })
     if (d2) throw d2
 
+    const { error: dT } = await supabase.from('documents').insert({
+      id: DOC_TMPL,
+      title: '[E2E] Template signing',
+      description: null,
+      file_path: origTmplPath,
+      uploaded_by: uploadedBy,
+      status: 'pending',
+      field_metadata: JSON.parse(JSON.stringify(fieldMetadata)) as object[],
+    })
+    if (dT) throw dT
+
     const { error: s1 } = await supabase.from('signature_requests').insert({
       id: REQ_SIGN,
       document_id: DOC_SIGN,
@@ -129,10 +175,22 @@ export default async function globalSetup() {
     })
     if (s2) throw s2
 
+    const { error: sT } = await supabase.from('signature_requests').insert({
+      id: REQ_TMPL,
+      document_id: DOC_TMPL,
+      signer_name: 'E2E Template Signer',
+      signer_email: 'e2e-tmpl@example.com',
+      requested_by: uploadedBy,
+      status: 'pending',
+      token: TMPL_SIGN_TOKEN,
+    })
+    if (sT) throw sT
+
     writeFixtures({
       ready: true,
       signToken: SIGN_TOKEN,
       downloadToken: DOWNLOAD_TOKEN,
+      templateSignToken: TMPL_SIGN_TOKEN,
     })
     console.log('[e2e] Seed OK — fixtures written')
   } catch (e) {

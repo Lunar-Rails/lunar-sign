@@ -1,4 +1,3 @@
-import type { Config } from "tailwindcss"
 import lrPreset from "./lib/lr-preset"
 
 export default {
@@ -17,4 +16,4 @@ export default {
     "./lib/**/*.{ts,tsx}",
   ],
   darkMode: "class",
-} satisfies Config
+}

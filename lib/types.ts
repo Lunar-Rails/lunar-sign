@@ -14,6 +14,29 @@ export interface Profile {
   created_at: string
 }
 
+/** Matches `@drvillo/react-browser-e-signing` FieldType — persisted in JSONB. */
+export type StoredFieldType =
+  | 'signature'
+  | 'fullName'
+  | 'title'
+  | 'date'
+  | 'text'
+
+/** One field in `templates.field_metadata` or `documents.field_metadata`. */
+export interface StoredField {
+  id: string
+  type: StoredFieldType
+  pageIndex: number
+  xPercent: number
+  yPercent: number
+  widthPercent: number
+  heightPercent: number
+  label?: string
+  value?: string
+  /** When false, document creator fills before send; when true, signer fills at sign time. */
+  forSigner: boolean
+}
+
 export interface Document {
   id: string
   title: string
@@ -24,6 +47,28 @@ export interface Document {
   latest_signed_pdf_path: string | null
   created_at: string
   completed_at: string | null
+  template_id?: string | null
+  field_metadata?: StoredField[] | null
+  deleted_at?: string | null
+}
+
+export interface Template {
+  id: string
+  title: string
+  description: string | null
+  document_type_id: string | null
+  file_path: string
+  field_metadata: StoredField[]
+  created_by: string
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface TemplateCompany {
+  template_id: string
+  company_id: string
+  created_at: string
 }
 
 export interface DocumentType {

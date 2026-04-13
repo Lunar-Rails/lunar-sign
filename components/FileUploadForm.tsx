@@ -169,7 +169,7 @@ export default function FileUploadForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g., Contract Agreement"
+          placeholder="e.g., Service Agreement"
         />
       </div>
 

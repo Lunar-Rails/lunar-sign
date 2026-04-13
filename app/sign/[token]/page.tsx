@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 
 import { getServiceClient } from '@/lib/supabase/service'
 
@@ -6,7 +6,7 @@ import { logAudit } from '@/lib/audit'
 
 import SigningInterfaceClient from '@/components/SigningInterfaceClient'
 
-import type { SignatureRequestWithToken, Document } from '@/lib/types'
+import type { SignatureRequestWithToken, Document, StoredField } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +16,7 @@ interface SigningPageProps {
 
 type SigningOutcome =
   | { kind: 'not_found' }
+  | { kind: 'deleted' }
   | { kind: 'revoked'; documentTitle: string }
   | { kind: 'already_signed' }
   | {
@@ -53,8 +54,8 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
       const document = documentRaw as Document | null
 
-      if (!document) {
-        outcome = { kind: 'not_found' }
+      if (!document || document.deleted_at) {
+        outcome = document?.deleted_at ? { kind: 'deleted' } : { kind: 'not_found' }
       } else {
         const isRevoked =
           document.status === 'cancelled' ||
@@ -109,6 +110,10 @@ export default async function SigningPage({ params }: SigningPageProps) {
     redirect(`/sign/${token}/not-found`)
   }
 
+  if (outcome.kind === 'deleted') {
+    notFound()
+  }
+
   if (outcome.kind === 'already_signed') {
     redirect(`/sign/${token}/already-signed`)
   }
@@ -131,6 +136,12 @@ export default async function SigningPage({ params }: SigningPageProps) {
     )
   }
 
+  const meta = outcome.document.field_metadata
+  const initialFieldsJson =
+    Array.isArray(meta) && (meta as StoredField[]).length > 0
+      ? JSON.stringify(meta)
+      : null
+
   return (
     <SigningInterfaceClient
       token={token}
@@ -138,6 +149,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
       signerEmail={outcome.signatureRequest.signer_email}
       documentTitle={outcome.document.title}
       pdfBase64={outcome.pdfBase64}
+      initialFieldsJson={initialFieldsJson}
     />
   )
 }
