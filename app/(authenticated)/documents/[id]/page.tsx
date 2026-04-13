@@ -142,7 +142,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
   ] = await Promise.all([
     supabase
       .from('signature_requests')
-      .select('id, document_id, signer_name, signer_email, requested_by, status, signed_at, created_at')
+      .select('id, document_id, signer_name, signer_email, requested_by, status, signed_at, created_at, signer_index')
       .eq('document_id', id)
       .order('created_at', { ascending: true }),
     supabase

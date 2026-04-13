@@ -9,10 +9,13 @@ import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
   storedFieldsFromPlacements,
+  resolveSignerIndex,
+  normalizeStoredFields,
 } from '@/lib/field-metadata'
 import { DocumentUploadSchema, DocumentCompanyIdsSchema } from '@/lib/schemas'
 import type { Company, DocumentType, StoredField } from '@/lib/types'
 
+import { SignerSlotSummary } from '@/components/SignerSlotSummary'
 import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
 import { Button } from '@/components/ui/button'
@@ -47,6 +50,7 @@ export interface TemplateFieldEditorProps {
   initialDescription?: string | null
   initialDocumentTypeId?: string | null
   initialStoredFields?: StoredField[]
+  initialSignerCount?: number
 }
 
 export function TemplateFieldEditor({
@@ -59,14 +63,16 @@ export function TemplateFieldEditor({
   initialDescription = '',
   initialDocumentTypeId = null,
   initialStoredFields = [],
+  initialSignerCount = 1,
 }: TemplateFieldEditorProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
 
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription ?? '')
-  const [documentTypeId, setDocumentTypeId] = useState<string | null>(
-    initialDocumentTypeId
+  const [documentTypeId, setDocumentTypeId] = useState<string | null>(initialDocumentTypeId)
+  const [signerCount, setSignerCount] = useState<1 | 2>(
+    initialSignerCount >= 2 ? 2 : 1
   )
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>(() => {
     const allowed = new Set(companies.map((c) => c.id))
@@ -76,7 +82,7 @@ export function TemplateFieldEditor({
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>('signature')
-  const [forSignerById, setForSignerById] = useState<Record<string, boolean>>({})
+  const [signerIndexById, setSignerIndexById] = useState<Record<string, number | null>>({})
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -106,12 +112,7 @@ export function TemplateFieldEditor({
   })
 
   const fieldPreview = useMemo(
-    () => ({
-      signatureDataUrl: null,
-      fullName: '',
-      title: '',
-      dateText: '',
-    }),
+    () => ({ signatureDataUrl: null, fullName: '', title: '', dateText: '' }),
     []
   )
 
@@ -120,9 +121,7 @@ export function TemplateFieldEditor({
     return pdfData.slice(0)
   }, [pdfData])
 
-  useEffect(() => {
-    ensureESigningConfigured()
-  }, [])
+  useEffect(() => { ensureESigningConfigured() }, [])
 
   useEffect(() => {
     if (mode !== 'edit' || !templateId) return
@@ -142,26 +141,25 @@ export function TemplateFieldEditor({
         if (!cancelled) setPdfLoadError('Could not load template PDF')
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [mode, templateId])
 
   useEffect(() => {
     if (mode !== 'edit' || hydratedRef.current || !initialStoredFields.length) return
     hydratedRef.current = true
-    const { fields: nextFields, forSignerById: map } = placementsFromStored(initialStoredFields)
+    const { fields: nextFields, signerIndexById: map } = placementsFromStored(initialStoredFields)
     setFields(nextFields)
-    setForSignerById(map)
+    setSignerIndexById(map)
   }, [mode, initialStoredFields, setFields])
 
+  // Keep signerIndexById in sync with placed fields (new fields default to null = creator)
   useEffect(() => {
-    setForSignerById((prev) => {
+    setSignerIndexById((prev) => {
       const next = { ...prev }
       let changed = false
       for (const f of fields) {
-        if (next[f.id] === undefined) {
-          next[f.id] = false
+        if (!(f.id in next)) {
+          next[f.id] = null
           changed = true
         }
       }
@@ -174,6 +172,27 @@ export function TemplateFieldEditor({
       return changed ? next : prev
     })
   }, [fields])
+
+  function handleSignerCountChange(next: 1 | 2) {
+    if (next === signerCount) return
+    if (next === 1) {
+      const hasS2Fields = Object.values(signerIndexById).some((idx) => idx === 1)
+      if (hasS2Fields) {
+        const confirmed = window.confirm(
+          'Changing to 1 signer will reset all Signer 2 fields to Signer 1. Continue?'
+        )
+        if (!confirmed) return
+        setSignerIndexById((prev) => {
+          const updated: Record<string, number | null> = {}
+          for (const [id, idx] of Object.entries(prev)) {
+            updated[id] = idx === 1 ? 0 : idx
+          }
+          return updated
+        })
+      }
+    }
+    setSignerCount(next)
+  }
 
   function handleCompanyToggle(companyId: string) {
     setSelectedCompanyIds((prev) =>
@@ -208,6 +227,15 @@ export function TemplateFieldEditor({
     } else if (selected) setError('Only PDF files are supported')
   }
 
+  // Derive StoredField[] for the summary panel from current placements + signerIndexById
+  const summaryFields: StoredField[] = useMemo(
+    () =>
+      normalizeStoredFields(
+        storedFieldsFromPlacements({ fields, signerIndexById })
+      ),
+    [fields, signerIndexById]
+  )
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -235,7 +263,7 @@ export function TemplateFieldEditor({
       return
     }
 
-    const fieldMetadata = storedFieldsFromPlacements({ fields, forSignerById })
+    const fieldMetadata = storedFieldsFromPlacements({ fields, signerIndexById })
     if (fieldMetadata.length === 0) {
       setError('Place at least one field on the document')
       return
@@ -249,6 +277,7 @@ export function TemplateFieldEditor({
         formData.append('description', titleValidation.data.description ?? '')
         formData.append('file', file)
         formData.append('field_metadata', JSON.stringify(fieldMetadata))
+        formData.append('signer_count', String(signerCount))
         if (documentTypeId) formData.append('document_type_id', documentTypeId)
         companyValidation.data.companyIds.forEach((id) => formData.append('companyIds', id))
 
@@ -271,6 +300,7 @@ export function TemplateFieldEditor({
             document_type_id: documentTypeId,
             field_metadata: fieldMetadata,
             companyIds: companyValidation.data.companyIds,
+            signer_count: signerCount,
           }),
         })
         const data = await res.json().catch(() => ({}))
@@ -359,6 +389,39 @@ export function TemplateFieldEditor({
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <Label>Number of signers</Label>
+              <div className="mt-1.5 inline-flex items-center rounded-lr border border-lr-border bg-lr-bg p-0.5 gap-0.5">
+                {([1, 2] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => handleSignerCountChange(n)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-lr-xs font-display font-medium transition-all duration-150',
+                      signerCount === n
+                        ? 'bg-lr-surface-2 text-lr-text border border-lr-border shadow-sm'
+                        : 'text-lr-muted hover:text-lr-text hover:bg-lr-surface border border-transparent'
+                    )}
+                  >
+                    {n === 1 ? (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
+                        1 signer
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
+                        <span className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-lr-cyan" />
+                        2 signers
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {companies.length > 0 && (
               <div>
                 <Label>Companies</Label>
@@ -394,14 +457,22 @@ export function TemplateFieldEditor({
           )}
 
           {showPdfViewer && (
+            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
+              <h3 className="font-display text-lr-md font-semibold text-lr-text">Signer assignments</h3>
+              <SignerSlotSummary fields={summaryFields} signerCount={signerCount} />
+            </div>
+          )}
+
+          {showPdfViewer && (
             <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
               <h3 className="font-display text-lr-md font-semibold text-lr-text">Placed fields</h3>
               <TemplateFieldList
                 fields={fields}
-                forSignerById={forSignerById}
+                signerIndexById={signerIndexById}
+                signerCount={signerCount}
                 onLabelChange={({ fieldId, label }) => updateField(fieldId, { label })}
-                onForSignerChange={({ fieldId, forSigner }) =>
-                  setForSignerById((prev) => ({ ...prev, [fieldId]: forSigner }))
+                onSignerIndexChange={({ fieldId, signerIndex }) =>
+                  setSignerIndexById((prev) => ({ ...prev, [fieldId]: signerIndex }))
                 }
                 onRemoveField={removeField}
               />

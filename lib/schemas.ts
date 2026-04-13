@@ -67,6 +67,8 @@ export const StoredFieldSchema = z.object({
   label: z.string().optional(),
   value: z.string().optional(),
   forSigner: z.boolean(),
+  /** null = creator field, 0 = Signer 1, 1 = Signer 2 */
+  signerIndex: z.number().int().min(0).max(1).nullable().optional(),
 })
 
 export const FieldMetadataSchema = z.array(StoredFieldSchema)
@@ -88,6 +90,7 @@ export const TemplateUpdateBodySchema = z.object({
   document_type_id: z.string().uuid().nullable().optional(),
   field_metadata: FieldMetadataSchema.optional(),
   companyIds: z.array(z.string().uuid()).optional(),
+  signer_count: z.number().int().min(1).max(2).optional(),
 })
 
 export type DocumentUploadInput = z.infer<typeof DocumentUploadSchema>

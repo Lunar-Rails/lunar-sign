@@ -24,6 +24,7 @@ import {
   applySignerValuesToPlacements,
   hydrateForSigner,
   parseFieldMetadataJson,
+  resolveSignerIndex,
 } from '@/lib/field-metadata'
 import { useNarrowSigningLayout } from '@/hooks/useSigningState'
 
@@ -37,6 +38,8 @@ interface SigningInterfaceProps {
   pdfBase64: string
   /** When set, fields are fixed (template-based document). */
   initialFieldsJson?: string | null
+  /** Which signer slot this user belongs to. null = legacy single-signer behavior. */
+  signerIndex?: number | null
 }
 
 export default function SigningInterface({
@@ -46,6 +49,7 @@ export default function SigningInterface({
   documentTitle,
   pdfBase64,
   initialFieldsJson,
+  signerIndex,
 }: SigningInterfaceProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
@@ -61,10 +65,12 @@ export default function SigningInterface({
 
   const templateMode = Boolean(templateStored && templateStored.length > 0)
 
+  const currentSignerIndex = signerIndex ?? null
+
   const placementOptions = useMemo(() => {
     if (!templateStored?.length) return {}
-    return { initialFields: hydrateForSigner(templateStored) }
-  }, [templateStored])
+    return { initialFields: hydrateForSigner(templateStored, currentSignerIndex) }
+  }, [templateStored, currentSignerIndex])
 
   const { fields, addField, updateField, removeField, clearFields } =
     useFieldPlacement(placementOptions)
@@ -187,7 +193,9 @@ export default function SigningInterface({
 
     if (templateMode && templateStored) {
       for (const s of templateStored) {
-        if (s.forSigner && s.type === 'text') {
+        const idx = resolveSignerIndex(s)
+        const isMyField = currentSignerIndex != null ? idx === currentSignerIndex : idx !== null
+        if (isMyField && s.type === 'text') {
           const f = fields.find((x) => x.id === s.id)
           if (!f?.value?.trim()) {
             setErrorMessage(`Please fill "${s.label?.trim() || 'Text field'}"`)
@@ -205,6 +213,7 @@ export default function SigningInterface({
           ? applySignerValuesToPlacements({
               fields,
               stored: templateStored,
+              currentSignerIndex,
               displayName,
               signerTitle: signerInfo.title,
               signatureDataUrl: activeSignatureDataUrl,
@@ -363,6 +372,7 @@ export default function SigningInterface({
             onSubmit={handleSubmit}
             primaryNavButtonClass={primaryNavButtonClass}
             secondaryNavButtonClass={secondaryNavButtonClass}
+            signerIndex={currentSignerIndex}
           />
         ) : (
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -390,6 +400,7 @@ export default function SigningInterface({
               loading={loading}
               completed={completed}
               onSubmit={handleSubmit}
+              signerIndex={currentSignerIndex}
             />
           </div>
         )}

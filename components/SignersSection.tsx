@@ -7,6 +7,7 @@ import AddSignerForm from '@/components/AddSignerForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
 import { UserMinus, Users } from 'lucide-react'
 
 interface SignersSectionProps {
@@ -25,6 +26,26 @@ function signerStatusVariant(status: string): StatusVariant {
     case 'cancelled': return 'destructive'
     default: return 'secondary'
   }
+}
+
+const SLOT_BADGE_STYLES: Record<number, string> = {
+  0: 'bg-lr-accent/10 text-lr-accent border-lr-accent/30',
+  1: 'bg-lr-cyan/10 text-lr-cyan border-lr-cyan/30',
+}
+
+function SignerSlotBadge({ signerIndex }: { signerIndex: number | null }) {
+  if (signerIndex === null) return null
+  const label = signerIndex === 0 ? 'S1' : `S${signerIndex + 1}`
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-1.5 py-0.5 font-display text-micro font-semibold',
+        SLOT_BADGE_STYLES[signerIndex] ?? 'bg-lr-surface text-lr-muted border-lr-border'
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 export default function SignersSection({
@@ -89,9 +110,12 @@ export default function SignersSection({
                 className="flex items-center justify-between rounded-lr border border-lr-border bg-lr-glass px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-lr-sm font-medium text-lr-text">
-                    {signer.signer_name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <SignerSlotBadge signerIndex={signer.signer_index ?? null} />
+                    <p className="truncate text-lr-sm font-medium text-lr-text">
+                      {signer.signer_name}
+                    </p>
+                  </div>
                   <p className="truncate text-lr-xs text-lr-muted">
                     {signer.signer_email}
                   </p>

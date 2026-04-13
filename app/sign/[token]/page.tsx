@@ -24,6 +24,7 @@ type SigningOutcome =
       signatureRequest: SignatureRequestWithToken
       document: Document
       pdfBase64: string
+      signerIndex: number | null
     }
 
 export default async function SigningPage({ params }: SigningPageProps) {
@@ -35,7 +36,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, signer_index'
       )
       .eq('token', token)
       .single()
@@ -96,6 +97,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
               signatureRequest,
               document,
               pdfBase64,
+              signerIndex: (signatureRequest as unknown as { signer_index?: number | null }).signer_index ?? null,
             }
           }
         }
@@ -150,6 +152,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
       documentTitle={outcome.document.title}
       pdfBase64={outcome.pdfBase64}
       initialFieldsJson={initialFieldsJson}
+      signerIndex={outcome.signerIndex}
     />
   )
 }

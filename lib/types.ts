@@ -33,8 +33,18 @@ export interface StoredField {
   heightPercent: number
   label?: string
   value?: string
-  /** When false, document creator fills before send; when true, signer fills at sign time. */
+  /**
+   * @deprecated Use signerIndex instead.
+   * When false, document creator fills before send; when true, signer fills at sign time.
+   */
   forSigner: boolean
+  /**
+   * Which signer slot fills this field at signing time.
+   * null = document creator fills before sending.
+   * 0 = Signer 1 fills at sign time.
+   * 1 = Signer 2 fills at sign time.
+   */
+  signerIndex?: number | null
 }
 
 export interface Document {
@@ -59,6 +69,8 @@ export interface Template {
   document_type_id: string | null
   file_path: string
   field_metadata: StoredField[]
+  /** Number of distinct signer slots required (1 or 2). Defaults to 1. */
+  signer_count: number
   created_by: string
   created_at: string
   updated_at: string
@@ -116,6 +128,8 @@ export interface SignatureRequest {
   status: SignatureRequestStatus
   signed_at: string | null
   created_at: string
+  /** Which signer slot this request belongs to (0 = Signer 1, 1 = Signer 2). Null for legacy. */
+  signer_index: number | null
 }
 
 export interface SignatureRequestWithToken extends SignatureRequest {

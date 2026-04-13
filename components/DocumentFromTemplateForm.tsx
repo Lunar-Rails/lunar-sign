@@ -8,10 +8,12 @@ import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
 import {
   hydrateForDocumentCreator,
   mergeCreatorFieldValues,
+  normalizeStoredFields,
+  resolveSignerIndex,
   validateCreatorFieldsComplete,
 } from '@/lib/field-metadata'
 import { AddSignerSchema, DocumentUploadSchema } from '@/lib/schemas'
-import type { StoredField } from '@/lib/types'
+import type { StoredField, StoredFieldType } from '@/lib/types'
 
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
 import { Button } from '@/components/ui/button'
@@ -19,12 +21,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { AlertCircle, Plus, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export interface DocumentFromTemplateFormProps {
   templateId: string
   defaultTitle: string
   defaultDescription?: string | null
   storedFields: StoredField[]
+  signerCount?: 1 | 2
 }
 
 interface SignerRow {
@@ -32,37 +36,66 @@ interface SignerRow {
   signer_email: string
 }
 
+const TYPE_LABELS: Record<StoredFieldType, string> = {
+  signature: 'Signature',
+  fullName: 'Full Name',
+  title: 'Title',
+  date: 'Date',
+  text: 'Text',
+}
+
+const SLOT_STYLES = [
+  {
+    border: 'border-t-lr-accent',
+    dot: 'bg-lr-accent',
+    pill: 'border-lr-accent/40 text-lr-accent bg-lr-accent/5',
+    label: 'Signer 1',
+  },
+  {
+    border: 'border-t-lr-cyan',
+    dot: 'bg-lr-cyan',
+    pill: 'border-lr-cyan/40 text-lr-cyan bg-lr-cyan/5',
+    label: 'Signer 2',
+  },
+]
+
 export function DocumentFromTemplateForm({
   templateId,
   defaultTitle,
   defaultDescription = '',
   storedFields,
+  signerCount,
 }: DocumentFromTemplateFormProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
 
+  const normalized = useMemo(() => normalizeStoredFields(storedFields), [storedFields])
+
   const [title, setTitle] = useState(defaultTitle)
   const [description, setDescription] = useState(defaultDescription ?? '')
-  const [signers, setSigners] = useState<SignerRow[]>([
-    { signer_name: '', signer_email: '' },
-  ])
+  const isSlotMode = (signerCount ?? 0) > 0
+
+  // Slot mode: fixed N signer rows keyed by slot index
+  const [signerSlots, setSignerSlots] = useState<SignerRow[]>(() =>
+    Array.from({ length: signerCount ?? 1 }, () => ({ signer_name: '', signer_email: '' }))
+  )
+
+  // Legacy mode: dynamic signers list
+  const [signers, setSigners] = useState<SignerRow[]>([{ signer_name: '', signer_email: '' }])
+
   const [sendNow, setSendNow] = useState(true)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const initialPlacements = useMemo(
-    () => hydrateForDocumentCreator(storedFields),
-    [storedFields]
+    () => hydrateForDocumentCreator(normalized),
+    [normalized]
   )
 
-  const { fields, updateField } = useFieldPlacement({
-    initialFields: initialPlacements,
-  })
-
+  const { fields, updateField } = useFieldPlacement({ initialFields: initialPlacements })
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
 
-  const pdfInput = pdfBytes
   const {
     pdfData,
     numPages,
@@ -72,7 +105,7 @@ export function DocumentFromTemplateForm({
     handleDocumentLoadSuccess,
     isLoading,
     errorMessage: pdfErrorMessage,
-  } = usePdfDocument(pdfInput)
+  } = usePdfDocument(pdfBytes)
 
   const { currentPageIndex, scrollToPage } = usePdfPageVisibility({
     containerRef: viewerContainerRef,
@@ -80,12 +113,7 @@ export function DocumentFromTemplateForm({
   })
 
   const fieldPreview = useMemo(
-    () => ({
-      signatureDataUrl: null,
-      fullName: '',
-      title: '',
-      dateText: '',
-    }),
+    () => ({ signatureDataUrl: null, fullName: '', title: '', dateText: '' }),
     []
   )
 
@@ -94,9 +122,7 @@ export function DocumentFromTemplateForm({
     return pdfData.slice(0)
   }, [pdfData])
 
-  useEffect(() => {
-    ensureESigningConfigured()
-  }, [])
+  useEffect(() => { ensureESigningConfigured() }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -115,38 +141,37 @@ export function DocumentFromTemplateForm({
         if (!cancelled) setPdfLoadError('Could not load template PDF')
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [templateId])
 
-  const creatorFields = storedFields.filter((f) => !f.forSigner)
-  const signerFields = storedFields.filter((f) => f.forSigner)
+  const creatorFields = normalized.filter((f) => resolveSignerIndex(f) === null)
+
+  // Fields for each slot index (for summaries)
+  function signerSlotFields(slotIndex: number) {
+    return normalized.filter((f) => resolveSignerIndex(f) === slotIndex)
+  }
 
   const canSubmit = useMemo(() => {
-    const docVal = DocumentUploadSchema.safeParse({
-      title,
-      description: description || null,
-    })
+    const docVal = DocumentUploadSchema.safeParse({ title, description: description || null })
     if (!docVal.success) return false
 
-    const parsedSigners = signers.map((s) => AddSignerSchema.safeParse(s))
+    const activeSigners = isSlotMode ? signerSlots : signers
+    const parsedSigners = activeSigners.map((s) => AddSignerSchema.safeParse(s))
     if (parsedSigners.some((r) => !r.success)) return false
-    const validSigners = parsedSigners.flatMap((r) => (r.success ? [r.data] : []))
-    if (validSigners.length === 0) return false
+    if (parsedSigners.length === 0) return false
 
     const field_values: Record<string, string> = {}
-    for (const f of storedFields) {
-      if (f.forSigner) continue
+    for (const f of creatorFields) {
       const placement = fields.find((p) => p.id === f.id)
       field_values[f.id] = placement?.value?.trim() ?? ''
     }
-    const merged = mergeCreatorFieldValues({
-      templateFields: storedFields,
-      fieldValues: field_values,
-    })
+    const merged = mergeCreatorFieldValues({ templateFields: normalized, fieldValues: field_values })
     return validateCreatorFieldsComplete(merged).valid
-  }, [description, fields, signers, storedFields, title])
+  }, [description, fields, signerSlots, signers, normalized, title, isSlotMode, creatorFields])
+
+  function updateSlot(index: number, patch: Partial<SignerRow>) {
+    setSignerSlots((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)))
+  }
 
   function handleAddSigner() {
     setSigners((s) => [...s, { signer_name: '', signer_email: '' }])
@@ -159,17 +184,15 @@ export function DocumentFromTemplateForm({
     e.preventDefault()
     setError(null)
 
-    const docVal = DocumentUploadSchema.safeParse({
-      title,
-      description: description || null,
-    })
+    const docVal = DocumentUploadSchema.safeParse({ title, description: description || null })
     if (!docVal.success) {
       const err = docVal.error.flatten().fieldErrors
       setError(Object.values(err)[0]?.[0] || 'Validation error')
       return
     }
 
-    const parsedSigners = signers.map((s) => AddSignerSchema.safeParse(s))
+    const activeSigners = isSlotMode ? signerSlots : signers
+    const parsedSigners = activeSigners.map((s) => AddSignerSchema.safeParse(s))
     const badSigner = parsedSigners.find((r) => !r.success)
     if (badSigner && !badSigner.success) {
       const fe = badSigner.error.flatten().fieldErrors
@@ -188,10 +211,7 @@ export function DocumentFromTemplateForm({
       field_values[f.id] = placement?.value?.trim() ?? ''
     }
 
-    const merged = mergeCreatorFieldValues({
-      templateFields: storedFields,
-      fieldValues: field_values,
-    })
+    const merged = mergeCreatorFieldValues({ templateFields: normalized, fieldValues: field_values })
     const { valid, missingLabels } = validateCreatorFieldsComplete(merged)
     if (!valid) {
       setError(`Missing: ${missingLabels.join(', ')}`)
@@ -247,11 +267,9 @@ export function DocumentFromTemplateForm({
             </div>
           </div>
 
-          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
-            <h3 className="font-display text-lr-md font-semibold text-lr-text">Your fields</h3>
-            {creatorFields.length === 0 ? (
-              <p className="text-lr-sm text-lr-muted">No creator fields on this template.</p>
-            ) : (
+          {creatorFields.length > 0 && (
+            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
+              <h3 className="font-display text-lr-md font-semibold text-lr-text">Your fields</h3>
               <ul className="space-y-3">
                 {creatorFields.map((f) => (
                   <li key={f.id}>
@@ -267,70 +285,122 @@ export function DocumentFromTemplateForm({
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-
-          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
-            <h3 className="font-display text-lr-md font-semibold text-lr-text">Signer fields</h3>
-            <p className="text-lr-xs text-lr-muted">Filled by signers when they open the signing link.</p>
-            {signerFields.length === 0 ? (
-              <p className="text-lr-sm text-lr-muted">None.</p>
-            ) : (
-              <ul className="list-inside list-disc text-lr-sm text-lr-muted">
-                {signerFields.map((f) => (
-                  <li key={f.id}>{f.label?.trim() || f.type}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-display text-lr-md font-semibold text-lr-text">Signers *</h3>
-              <Button type="button" variant="secondary" size="sm" onClick={handleAddSigner}>
-                <Plus className="mr-1 h-4 w-4" />
-                Add
-              </Button>
             </div>
+          )}
+
+          {/* Slot-based signers (from templates with explicit signer_count) */}
+          {isSlotMode ? (
             <div className="space-y-3">
-              {signers.map((row, index) => (
-                <div key={index} className="flex flex-col gap-2 rounded-lr border border-lr-border p-3 sm:flex-row sm:items-end">
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-lr-xs">Name</Label>
-                    <Input
-                      value={row.signer_name}
-                      onChange={(e) =>
-                        setSigners((s) =>
-                          s.map((x, i) => (i === index ? { ...x, signer_name: e.target.value } : x))
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-lr-xs">Email</Label>
-                    <Input
-                      type="email"
-                      value={row.signer_email}
-                      onChange={(e) =>
-                        setSigners((s) =>
-                          s.map((x, i) => (i === index ? { ...x, signer_email: e.target.value } : x))
-                        )
-                      }
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={signers.length <= 1}
-                    onClick={() => handleRemoveSigner(index)}
-                    aria-label="Remove signer"
+              {signerSlots.map((slot, slotIdx) => {
+                const style = SLOT_STYLES[slotIdx] ?? SLOT_STYLES[0]
+                const slotFields = signerSlotFields(slotIdx)
+                return (
+                  <div
+                    key={slotIdx}
+                    className={cn(
+                      'rounded-lr-lg border border-lr-border border-t-4 bg-lr-surface p-4 shadow-lr-card space-y-3',
+                      style.border
+                    )}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2">
+                      <span className={cn('h-2 w-2 shrink-0 rounded-full', style.dot)} />
+                      <h3 className="font-display text-lr-md font-semibold text-lr-text">
+                        {style.label}
+                      </h3>
+                    </div>
+
+                    {slotFields.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {slotFields.map((f) => (
+                          <span
+                            key={f.id}
+                            className={cn(
+                              'inline-flex items-center rounded-full border px-2 py-0.5 text-lr-xs font-medium',
+                              style.pill
+                            )}
+                          >
+                            {f.label?.trim() || TYPE_LABELS[f.type]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-lr-xs">Name *</Label>
+                        <Input
+                          value={slot.signer_name}
+                          onChange={(e) => updateSlot(slotIdx, { signer_name: e.target.value })}
+                          placeholder="Full name"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-lr-xs">Email *</Label>
+                        <Input
+                          type="email"
+                          value={slot.signer_email}
+                          onChange={(e) => updateSlot(slotIdx, { signer_email: e.target.value })}
+                          placeholder="email@example.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+          ) : (
+            /* Legacy dynamic signers for templates without signer_count */
+            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-display text-lr-md font-semibold text-lr-text">Signers *</h3>
+                <Button type="button" variant="secondary" size="sm" onClick={handleAddSigner}>
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {signers.map((row, index) => (
+                  <div key={index} className="flex flex-col gap-2 rounded-lr border border-lr-border p-3 sm:flex-row sm:items-end">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-lr-xs">Name</Label>
+                      <Input
+                        value={row.signer_name}
+                        onChange={(e) =>
+                          setSigners((s) =>
+                            s.map((x, i) => (i === index ? { ...x, signer_name: e.target.value } : x))
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-lr-xs">Email</Label>
+                      <Input
+                        type="email"
+                        value={row.signer_email}
+                        onChange={(e) =>
+                          setSigners((s) =>
+                            s.map((x, i) => (i === index ? { ...x, signer_email: e.target.value } : x))
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={signers.length <= 1}
+                      onClick={() => handleRemoveSigner(index)}
+                      aria-label="Remove signer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lr-lg border border-lr-border bg-lr-surface px-4 py-3">
             <label className="flex cursor-pointer items-center gap-2 text-lr-sm text-lr-text">
               <input
                 type="checkbox"
@@ -368,13 +438,9 @@ export function DocumentFromTemplateForm({
             onPageChange={(i) => scrollToPage(i)}
             fields={fields}
             selectedFieldType={null}
-            onAddField={() => {
-              /* no-op */
-            }}
+            onAddField={() => { /* no-op */ }}
             onUpdateField={updateField}
-            onRemoveField={() => {
-              /* no-op */
-            }}
+            onRemoveField={() => { /* no-op */ }}
             preview={fieldPreview}
             readOnly
             isLoading={isLoading}

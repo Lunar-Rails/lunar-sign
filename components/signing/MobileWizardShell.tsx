@@ -40,6 +40,7 @@ export interface MobileWizardShellProps {
   onSubmit: (e: React.FormEvent) => void
   primaryNavButtonClass: string
   secondaryNavButtonClass: string
+  signerIndex?: number | null
 }
 
 const STEPS = [
@@ -73,6 +74,7 @@ export function MobileWizardShell({
   onSubmit,
   primaryNavButtonClass,
   secondaryNavButtonClass,
+  signerIndex,
 }: MobileWizardShellProps) {
   return (
     <>
@@ -111,7 +113,12 @@ export function MobileWizardShell({
             <TemplateCreatorFieldsSummary stored={templateStored} fields={fields} />
           )}
           {templateMode && templateStored && (
-            <SignerFieldsPanel stored={templateStored} fields={fields} updateField={updateField} />
+            <SignerFieldsPanel
+              stored={templateStored}
+              fields={fields}
+              updateField={updateField}
+              signerIndex={signerIndex ?? null}
+            />
           )}
           <button
             type="button"

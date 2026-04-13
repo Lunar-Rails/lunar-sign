@@ -70,6 +70,7 @@ export default async function EditTemplatePage({ params }: EditTemplatePageProps
         initialDescription={template.description}
         initialDocumentTypeId={template.document_type_id}
         initialStoredFields={meta}
+        initialSignerCount={(template as Record<string, unknown>).signer_count as number | undefined}
       />
     </div>
   )

@@ -192,6 +192,29 @@ describe('StoredFieldSchema', () => {
       StoredFieldSchema.safeParse({ ...fieldBase, type: 'nope' }).success
     ).toBe(false)
   })
+
+  // signerIndex tests
+  it('accepts signerIndex: 0 (Signer 1)', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: 0 }).success).toBe(true)
+  })
+  it('accepts signerIndex: 1 (Signer 2)', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: 1 }).success).toBe(true)
+  })
+  it('accepts signerIndex: null (creator field)', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: null }).success).toBe(true)
+  })
+  it('accepts field without signerIndex (backwards compat)', () => {
+    expect(StoredFieldSchema.safeParse(fieldBase).success).toBe(true)
+  })
+  it('rejects signerIndex: 2 (max is 1)', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: 2 }).success).toBe(false)
+  })
+  it('rejects signerIndex: -1 (min is 0)', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: -1 }).success).toBe(false)
+  })
+  it('rejects non-integer signerIndex', () => {
+    expect(StoredFieldSchema.safeParse({ ...fieldBase, signerIndex: 0.5 }).success).toBe(false)
+  })
 })
 
 describe('FieldMetadataSchema', () => {
@@ -208,6 +231,18 @@ describe('TemplateUpdateBodySchema', () => {
     expect(
       TemplateUpdateBodySchema.safeParse({ field_metadata: [fieldBase] }).success
     ).toBe(true)
+  })
+  it('accepts signer_count: 1', () => {
+    expect(TemplateUpdateBodySchema.safeParse({ signer_count: 1 }).success).toBe(true)
+  })
+  it('accepts signer_count: 2', () => {
+    expect(TemplateUpdateBodySchema.safeParse({ signer_count: 2 }).success).toBe(true)
+  })
+  it('rejects signer_count: 3', () => {
+    expect(TemplateUpdateBodySchema.safeParse({ signer_count: 3 }).success).toBe(false)
+  })
+  it('rejects signer_count: 0', () => {
+    expect(TemplateUpdateBodySchema.safeParse({ signer_count: 0 }).success).toBe(false)
   })
 })
 

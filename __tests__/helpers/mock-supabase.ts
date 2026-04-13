@@ -38,16 +38,29 @@ export function createQueuedSupabaseMock(options: {
       eq: () => self,
       neq: () => self,
       in: () => self,
+      is: () => self,
       ilike: () => self,
       or: () => self,
       order: () => self,
       limit: () => self,
+      not: () => self,
       maybeSingle: () => thenableResult(next()),
       single: () => thenableResult(next()),
       then: (onFulfilled: never, onRejected: never) =>
         thenableResult(next()).then(onFulfilled, onRejected),
     }
     return self
+  }
+
+  function updateChain() {
+    const chain = {
+      eq: () => chain,
+      in: () => chain,
+      is: () => chain,
+      then: (onFulfilled: never, onRejected: never) =>
+        thenableResult(next()).then(onFulfilled, onRejected),
+    }
+    return chain
   }
 
   function updateOrDeleteChain() {

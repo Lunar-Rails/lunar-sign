@@ -34,6 +34,7 @@ export interface SigningControlsSidebarProps {
   completed: boolean
   onSubmit: (e: React.FormEvent) => void
   fieldPaletteExtra?: ReactNode
+  signerIndex?: number | null
 }
 
 export function SigningControlsSidebar({
@@ -57,6 +58,7 @@ export function SigningControlsSidebar({
   completed,
   onSubmit,
   fieldPaletteExtra,
+  signerIndex,
 }: SigningControlsSidebarProps) {
   return (
     <aside
@@ -72,7 +74,12 @@ export function SigningControlsSidebar({
       )}
 
       {templateMode && templateStored && (
-        <SignerFieldsPanel stored={templateStored} fields={fields} updateField={updateField} />
+        <SignerFieldsPanel
+          stored={templateStored}
+          fields={fields}
+          updateField={updateField}
+          signerIndex={signerIndex ?? null}
+        />
       )}
 
       {showFieldPalette && (

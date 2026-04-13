@@ -9,6 +9,7 @@ interface SigningInterfaceClientProps {
   documentTitle: string
   pdfBase64: string
   initialFieldsJson?: string | null
+  signerIndex?: number | null
 }
 
 const SigningInterface = dynamic(() => import('@/components/SigningInterface'), {

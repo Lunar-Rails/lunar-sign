@@ -131,6 +131,8 @@ export async function POST(request: NextRequest) {
     const companyIdsInput = formData
       .getAll('companyIds')
       .filter((v): v is string => typeof v === 'string')
+    const signerCountRaw = formData.get('signer_count') as string | null
+    const signerCount = signerCountRaw ? Math.min(2, Math.max(1, parseInt(signerCountRaw, 10) || 1)) : 1
 
     const titleValidation = DocumentUploadSchema.safeParse({
       title,
@@ -235,6 +237,7 @@ export async function POST(request: NextRequest) {
         document_type_id: documentTypeId,
         file_path: filePath,
         field_metadata: fieldMetadata,
+        signer_count: signerCount,
         created_by: user.id,
       })
       .select()

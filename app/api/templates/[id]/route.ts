@@ -92,6 +92,8 @@ export async function PUT(
       updates.document_type_id = patch.document_type_id
     if (patch.field_metadata !== undefined)
       updates.field_metadata = patch.field_metadata
+    if (patch.signer_count !== undefined)
+      updates.signer_count = patch.signer_count
 
     if (Object.keys(updates).length > 1) {
       const { error: upErr } = await supabase

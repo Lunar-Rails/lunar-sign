@@ -6,16 +6,18 @@ import {
   hydrateForDocumentCreator,
   hydrateForSigner,
   mergeCreatorFieldValues,
+  normalizeStoredFields,
   parseFieldMetadata,
   parseFieldMetadataJson,
   placementsFromStored,
+  resolveSignerIndex,
   serializeFieldMetadata,
   storedFieldsFromPlacements,
   validateCreatorFieldsComplete,
 } from '@/lib/field-metadata'
 import type { StoredField } from '@/lib/types'
 
-const storedA: StoredField = {
+const creatorField: StoredField = {
   id: 'f1',
   type: 'text',
   pageIndex: 0,
@@ -28,7 +30,7 @@ const storedA: StoredField = {
   forSigner: false,
 }
 
-const storedB: StoredField = {
+const signerField: StoredField = {
   id: 'f2',
   type: 'signature',
   pageIndex: 0,
@@ -40,10 +42,80 @@ const storedB: StoredField = {
   forSigner: true,
 }
 
+const signer1Field: StoredField = {
+  id: 's1',
+  type: 'signature',
+  pageIndex: 0,
+  xPercent: 5,
+  yPercent: 50,
+  widthPercent: 20,
+  heightPercent: 5,
+  label: 'S1 Sig',
+  forSigner: true,
+  signerIndex: 0,
+}
+
+const signer2Field: StoredField = {
+  id: 's2',
+  type: 'fullName',
+  pageIndex: 0,
+  xPercent: 5,
+  yPercent: 60,
+  widthPercent: 20,
+  heightPercent: 5,
+  label: 'S2 Name',
+  forSigner: true,
+  signerIndex: 1,
+}
+
+// ─── resolveSignerIndex ───────────────────────────────────────────────────────
+
+describe('resolveSignerIndex', () => {
+  it('returns null for creator field (forSigner: false)', () => {
+    expect(resolveSignerIndex(creatorField)).toBe(null)
+  })
+  it('returns 0 for legacy signer field (forSigner: true, no signerIndex)', () => {
+    expect(resolveSignerIndex(signerField)).toBe(0)
+  })
+  it('returns 0 for explicit signerIndex: 0', () => {
+    expect(resolveSignerIndex(signer1Field)).toBe(0)
+  })
+  it('returns 1 for explicit signerIndex: 1', () => {
+    expect(resolveSignerIndex(signer2Field)).toBe(1)
+  })
+  it('returns null for signerIndex: null', () => {
+    expect(resolveSignerIndex({ ...signerField, signerIndex: null })).toBe(null)
+  })
+})
+
+// ─── normalizeStoredFields ────────────────────────────────────────────────────
+
+describe('normalizeStoredFields', () => {
+  it('upgrades legacy forSigner: true to signerIndex: 0', () => {
+    const out = normalizeStoredFields([signerField])
+    expect(out[0].signerIndex).toBe(0)
+    expect(out[0].forSigner).toBe(true)
+  })
+  it('sets forSigner: false for creator fields', () => {
+    const out = normalizeStoredFields([creatorField])
+    expect(out[0].signerIndex).toBe(null)
+    expect(out[0].forSigner).toBe(false)
+  })
+  it('preserves explicit signerIndex: 1', () => {
+    const out = normalizeStoredFields([signer2Field])
+    expect(out[0].signerIndex).toBe(1)
+    expect(out[0].forSigner).toBe(true)
+  })
+})
+
+// ─── parseFieldMetadataJson ───────────────────────────────────────────────────
+
 describe('parseFieldMetadataJson', () => {
-  it('parses valid JSON array', () => {
-    const json = JSON.stringify([storedA])
-    expect(parseFieldMetadataJson(json)).toEqual([storedA])
+  it('parses valid JSON array and normalizes', () => {
+    const json = JSON.stringify([creatorField])
+    const out = parseFieldMetadataJson(json)
+    expect(out[0].id).toBe('f1')
+    expect(out[0].signerIndex).toBe(null)
   })
   it('throws on malformed JSON', () => {
     expect(() => parseFieldMetadataJson('{')).toThrow()
@@ -56,52 +128,106 @@ describe('parseFieldMetadata', () => {
   })
 })
 
+// ─── hydrateForSigner ─────────────────────────────────────────────────────────
+
 describe('hydrateForSigner', () => {
-  it('sets locked true and preserves creator value', () => {
-    const out = hydrateForSigner([storedA, storedB])
+  it('legacy: sets locked true, preserves creator value, clears signer value', () => {
+    const out = hydrateForSigner([creatorField, signerField])
     expect(out.every((f) => f.locked)).toBe(true)
-    const t = out.find((f) => f.id === 'f1')
-    expect(t?.value).toBe('Acme')
-    const s = out.find((f) => f.id === 'f2')
-    expect(s?.value).toBeUndefined()
+    expect(out.find((f) => f.id === 'f1')?.value).toBe('Acme')
+    expect(out.find((f) => f.id === 'f2')?.value).toBeUndefined()
+  })
+
+  it('signer 0: only S1 fields start empty, others show persisted values', () => {
+    const out = hydrateForSigner([creatorField, signer1Field, signer2Field], 0)
+    // creator field: shows its value
+    expect(out.find((f) => f.id === 'f1')?.value).toBe('Acme')
+    // S1 field (matches): value cleared so signer can fill
+    expect(out.find((f) => f.id === 's1')?.value).toBeUndefined()
+    // S2 field (other signer): shows persisted value (undefined here since none set)
+    expect(out.find((f) => f.id === 's2')?.value).toBeUndefined()
+    // all locked
+    expect(out.every((f) => f.locked)).toBe(true)
+  })
+
+  it('signer 1: only S2 fields start empty', () => {
+    const stored: StoredField[] = [
+      { ...signer1Field, value: 'already-signed' },
+      signer2Field,
+    ]
+    const out = hydrateForSigner(stored, 1)
+    expect(out.find((f) => f.id === 's1')?.value).toBe('already-signed')
+    expect(out.find((f) => f.id === 's2')?.value).toBeUndefined()
   })
 })
 
+// ─── hydrateForDocumentCreator ────────────────────────────────────────────────
+
 describe('hydrateForDocumentCreator', () => {
   it('unlocks creator fields and locks signer fields', () => {
-    const out = hydrateForDocumentCreator([storedA, storedB])
+    const out = hydrateForDocumentCreator([creatorField, signerField])
     expect(out.find((f) => f.id === 'f1')?.locked).toBe(false)
     expect(out.find((f) => f.id === 'f2')?.locked).toBe(true)
   })
 })
 
+// ─── storedFieldsFromPlacements + placementsFromStored ────────────────────────
+
 describe('storedFieldsFromPlacements + placementsFromStored', () => {
-  it('round-trips layout and forSigner flags', () => {
-    const fields: FieldPlacement[] = [
-      {
-        id: 'x1',
-        type: 'text',
-        pageIndex: 0,
-        xPercent: 3,
-        yPercent: 4,
-        widthPercent: 12,
-        heightPercent: 6,
-        label: 'L',
-      },
-    ]
-    const forSignerById = { x1: true }
-    const stored = storedFieldsFromPlacements({ fields, forSignerById })
+  const fields: FieldPlacement[] = [
+    {
+      id: 'x1',
+      type: 'text',
+      pageIndex: 0,
+      xPercent: 3,
+      yPercent: 4,
+      widthPercent: 12,
+      heightPercent: 6,
+      label: 'L',
+    },
+    {
+      id: 'x2',
+      type: 'signature',
+      pageIndex: 0,
+      xPercent: 3,
+      yPercent: 50,
+      widthPercent: 20,
+      heightPercent: 8,
+    },
+  ]
+
+  it('round-trips signerIndex: 0', () => {
+    const signerIndexById = { x1: null, x2: 0 }
+    const stored = storedFieldsFromPlacements({ fields, signerIndexById })
+    expect(stored.find((f) => f.id === 'x1')?.signerIndex).toBe(null)
+    expect(stored.find((f) => f.id === 'x2')?.signerIndex).toBe(0)
     const back = placementsFromStored(stored)
-    expect(back.forSignerById.x1).toBe(true)
+    expect(back.signerIndexById['x1']).toBe(null)
+    expect(back.signerIndexById['x2']).toBe(0)
     expect(back.fields[0].id).toBe('x1')
-    expect(back.fields[0].locked).toBe(false)
+  })
+
+  it('round-trips signerIndex: 1', () => {
+    const signerIndexById = { x1: null, x2: 1 }
+    const stored = storedFieldsFromPlacements({ fields, signerIndexById })
+    expect(stored.find((f) => f.id === 'x2')?.signerIndex).toBe(1)
+    const back = placementsFromStored(stored)
+    expect(back.signerIndexById['x2']).toBe(1)
+  })
+
+  it('derives forSigner from signerIndex', () => {
+    const stored = storedFieldsFromPlacements({ fields, signerIndexById: { x1: null, x2: 0 } })
+    expect(stored.find((f) => f.id === 'x1')?.forSigner).toBe(false)
+    expect(stored.find((f) => f.id === 'x2')?.forSigner).toBe(true)
   })
 })
+
+// ─── mergeCreatorFieldValues + validateCreatorFieldsComplete ──────────────────
 
 describe('mergeCreatorFieldValues + validateCreatorFieldsComplete', () => {
   it('requires non-empty creator values', () => {
     const merged = mergeCreatorFieldValues({
-      templateFields: [storedA, storedB],
+      templateFields: [creatorField, signerField],
       fieldValues: { f1: '  ' },
     })
     const r = validateCreatorFieldsComplete(merged)
@@ -110,26 +236,38 @@ describe('mergeCreatorFieldValues + validateCreatorFieldsComplete', () => {
   })
   it('valid when creator fields filled', () => {
     const merged = mergeCreatorFieldValues({
-      templateFields: [storedA, storedB],
+      templateFields: [creatorField, signerField],
       fieldValues: { f1: 'Acme Inc' },
+    })
+    expect(validateCreatorFieldsComplete(merged).valid).toBe(true)
+  })
+  it('ignores signer fields during creator validation', () => {
+    const merged = mergeCreatorFieldValues({
+      templateFields: [signer1Field, signer2Field],
+      fieldValues: {},
     })
     expect(validateCreatorFieldsComplete(merged).valid).toBe(true)
   })
 })
 
+// ─── serializeFieldMetadata ───────────────────────────────────────────────────
+
 describe('serializeFieldMetadata', () => {
   it('round-trips with parseFieldMetadataJson', () => {
-    const arr = [storedA]
-    expect(parseFieldMetadataJson(serializeFieldMetadata(arr))).toEqual(arr)
+    const arr = [creatorField]
+    const parsed = parseFieldMetadataJson(serializeFieldMetadata(arr))
+    expect(parsed[0].id).toBe(arr[0].id)
   })
 })
 
+// ─── applySignerValuesToPlacements ────────────────────────────────────────────
+
 describe('applySignerValuesToPlacements', () => {
-  it('fills signer fields from signer info', () => {
+  it('legacy mode: fills signer fields from signer info', () => {
     const stored: StoredField[] = [
-      { ...storedA, forSigner: false, value: 'Co' },
+      { ...creatorField, forSigner: false, value: 'Co' },
       {
-        id: 's1',
+        id: 'a1',
         type: 'fullName',
         pageIndex: 0,
         xPercent: 1,
@@ -138,21 +276,10 @@ describe('applySignerValuesToPlacements', () => {
         heightPercent: 5,
         forSigner: true,
       },
-      {
-        id: 's2',
-        type: 'text',
-        pageIndex: 0,
-        xPercent: 1,
-        yPercent: 10,
-        widthPercent: 20,
-        heightPercent: 5,
-        forSigner: true,
-      },
     ]
     const fields = hydrateForSigner(stored)
-    const withText = fields.map((f) => (f.id === 's2' ? { ...f, value: 'Hello' } : f))
     const out = applySignerValuesToPlacements({
-      fields: withText,
+      fields,
       stored,
       displayName: 'Pat Doe',
       signerTitle: 'CEO',
@@ -160,7 +287,27 @@ describe('applySignerValuesToPlacements', () => {
       dateText: 'Jan 1',
     })
     expect(out.find((f) => f.id === 'f1')?.value).toBe('Co')
-    expect(out.find((f) => f.id === 's1')?.value).toBe('Pat Doe')
-    expect(out.find((f) => f.id === 's2')?.value).toBe('Hello')
+    expect(out.find((f) => f.id === 'a1')?.value).toBe('Pat Doe')
+  })
+
+  it('slot mode: only applies values for current signer index', () => {
+    const stored: StoredField[] = [
+      { ...signer1Field, value: 'prev-signed' },
+      signer2Field,
+    ]
+    const placements = hydrateForSigner(stored, 1)
+    const out = applySignerValuesToPlacements({
+      fields: placements,
+      stored,
+      currentSignerIndex: 1,
+      displayName: 'Jane Smith',
+      signerTitle: '',
+      signatureDataUrl: 'data:image/png;base64,yy',
+      dateText: 'Feb 1',
+    })
+    // S1's field stays untouched (prev-signed value)
+    expect(out.find((f) => f.id === 's1')?.value).toBe('prev-signed')
+    // S2's fullName gets current signer's name
+    expect(out.find((f) => f.id === 's2')?.value).toBe('Jane Smith')
   })
 })

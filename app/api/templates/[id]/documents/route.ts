@@ -50,7 +50,7 @@ export async function POST(
     const { data: template } = await supabase
       .from('templates')
       .select(
-        'id, title, file_path, field_metadata, document_type_id, template_companies(company_id)'
+        'id, title, file_path, field_metadata, document_type_id, signer_count, template_companies(company_id)'
       )
       .eq('id', templateId)
       .is('deleted_at', null)
@@ -58,6 +58,20 @@ export async function POST(
 
     if (!template)
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+
+    const templateSignerCount = typeof (template as Record<string, unknown>).signer_count === 'number'
+      ? (template as Record<string, unknown>).signer_count as number
+      : 0
+
+    // Validate signer count matches template requirements (when template has declared signers)
+    if (templateSignerCount > 0 && signers.length !== templateSignerCount) {
+      return NextResponse.json(
+        {
+          error: `This template requires exactly ${templateSignerCount} signer${templateSignerCount === 1 ? '' : 's'}`,
+        },
+        { status: 400 }
+      )
+    }
 
     const templateFields = parseFieldMetadata(template.field_metadata)
     const merged = mergeCreatorFieldValues({
@@ -145,8 +159,11 @@ export async function POST(
       })
     }
 
-    for (const signer of signers) {
+    for (let i = 0; i < signers.length; i++) {
+      const signer = signers[i]
       const token = randomUUID()
+      // Assign signer_index based on position in array (position = slot index)
+      const signerIndex = templateSignerCount > 0 ? i : null
       const { error: srErr } = await supabase.from('signature_requests').insert({
         document_id: documentId,
         signer_name: signer.signer_name,
@@ -154,6 +171,7 @@ export async function POST(
         requested_by: user.id,
         status: 'pending',
         token,
+        signer_index: signerIndex,
       })
       if (srErr) {
         console.error('Signature request insert:', srErr)

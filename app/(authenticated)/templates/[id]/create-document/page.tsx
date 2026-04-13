@@ -24,7 +24,7 @@ export default async function CreateDocumentPage({ params }: CreateDocumentPageP
 
   const { data: template } = await supabase
     .from('templates')
-    .select('id, title, description, field_metadata')
+    .select('id, title, description, field_metadata, signer_count')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle()
@@ -34,6 +34,10 @@ export default async function CreateDocumentPage({ params }: CreateDocumentPageP
   const storedFields = Array.isArray(template.field_metadata)
     ? (template.field_metadata as StoredField[])
     : []
+
+  const signerCount = typeof (template as Record<string, unknown>).signer_count === 'number'
+    ? Math.min(2, Math.max(1, (template as Record<string, unknown>).signer_count as number)) as 1 | 2
+    : 1
 
   return (
     <div className="space-y-4">
@@ -56,6 +60,7 @@ export default async function CreateDocumentPage({ params }: CreateDocumentPageP
         defaultTitle={template.title}
         defaultDescription={template.description}
         storedFields={storedFields}
+        signerCount={signerCount}
       />
     </div>
   )
