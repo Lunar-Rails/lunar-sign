@@ -5,10 +5,20 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
+import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
 import { SidebarNav, type SidebarNavItem, type SidebarNavGroup } from '@/components/SidebarNav'
 import { SidebarStatGrid, type StatItem } from '@/components/SidebarStatGrid'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface CompanySidebarItem {
   id: string
@@ -61,6 +71,7 @@ export default function CompanySidebarClient({
 
   const { data: docData } = useDocumentSidebar()
   const { data: templateData } = useTemplateSidebar()
+  const { data: editorData } = useTemplateEditorSidebar()
 
   const overviewItem: SidebarNavItem = {
     href: '/documents',
@@ -209,8 +220,78 @@ export default function CompanySidebarClient({
           </>
         )}
 
+        {/* Zone 3b: Template editor (only when TemplateFieldEditor is mounted) */}
+        {editorData && (
+          <div className="border-t border-lr-border mt-2 pt-2">
+            <div className="bg-lr-surface-2 rounded-lr p-3 space-y-3">
+              <p className="text-section-label">Template</p>
+              <div className="space-y-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-section-label">Title *</span>
+                  <Input
+                    value={editorData.title}
+                    onChange={(e) => editorData.setTitle(e.target.value)}
+                    placeholder="Template title"
+                    className="mt-0.5 h-8 text-caption bg-lr-bg border-lr-border"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-section-label">Description</span>
+                  <Textarea
+                    value={editorData.description}
+                    onChange={(e) => editorData.setDescription(e.target.value)}
+                    placeholder="Optional description"
+                    rows={2}
+                    className="mt-0.5 text-caption bg-lr-bg border-lr-border resize-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-section-label">Document type</span>
+                  <Select
+                    value={editorData.documentTypeId ?? '__none__'}
+                    onValueChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v)}
+                  >
+                    <SelectTrigger className="mt-0.5 h-8 text-caption border-lr-border bg-lr-bg">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {editorData.documentTypes.map((dt) => (
+                        <SelectItem key={dt.id} value={dt.id}>
+                          {dt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editorData.companies.length > 0 && (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-section-label">Companies</span>
+                    <div className="mt-0.5 space-y-1.5">
+                      {editorData.companies.map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex cursor-pointer items-center gap-2 text-caption"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editorData.selectedCompanyIds.includes(c.id)}
+                            onChange={() => editorData.onCompanyToggle(c.id)}
+                            className="h-3.5 w-3.5 rounded border-lr-border accent-lr-accent"
+                          />
+                          {c.name}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Zone 3b: Template detail (only on /templates/[id] when setter runs) */}
-        {templateData && (
+        {templateData && !editorData && (
           <div className="border-t border-lr-border mt-2 pt-2">
             <div className="bg-lr-surface-2 rounded-lr p-3 space-y-2">
               <p className="text-section-label">Template</p>

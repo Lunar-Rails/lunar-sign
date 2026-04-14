@@ -7,6 +7,7 @@ import type { Profile } from '@/lib/types'
 import UserDropdown from '@/components/UserDropdown'
 import { DocumentSidebarProvider } from '@/lib/document-sidebar-context'
 import { TemplateSidebarProvider } from '@/lib/template-sidebar-context'
+import { TemplateEditorSidebarProvider } from '@/lib/template-editor-sidebar-context'
 
 export function AuthenticatedShell({
   profile,
@@ -22,6 +23,7 @@ export function AuthenticatedShell({
   return (
     <DocumentSidebarProvider>
     <TemplateSidebarProvider>
+    <TemplateEditorSidebarProvider>
     <div className="flex min-h-screen flex-col bg-lr-bg">
       {/* Header */}
       <header className="sticky top-0 z-50 h-14 border-b border-lr-border bg-lr-bg/88 backdrop-blur-lr-header saturate-[1.2]">
@@ -64,6 +66,7 @@ export function AuthenticatedShell({
         </div>
       </div>
     </div>
+    </TemplateEditorSidebarProvider>
     </TemplateSidebarProvider>
     </DocumentSidebarProvider>
   )

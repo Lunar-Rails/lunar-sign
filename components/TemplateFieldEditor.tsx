@@ -1,35 +1,25 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FieldPalette, useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
+import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 
 import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
   storedFieldsFromPlacements,
-  resolveSignerIndex,
   normalizeStoredFields,
 } from '@/lib/field-metadata'
 import { DocumentUploadSchema, DocumentCompanyIdsSchema } from '@/lib/schemas'
 import type { Company, DocumentType, StoredField } from '@/lib/types'
+import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 
-import { SignerSlotSummary } from '@/components/SignerSlotSummary'
 import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { AlertCircle, UploadCloud } from 'lucide-react'
+import { AlertCircle, AlertTriangle, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TEMPLATE_FIELD_TYPES: FieldType[] = [
@@ -39,6 +29,74 @@ const TEMPLATE_FIELD_TYPES: FieldType[] = [
   'date',
   'text',
 ]
+
+const PALETTE_LABELS: Record<FieldType, string> = {
+  signature: 'Sig',
+  fullName: 'Name',
+  title: 'Title',
+  date: 'Date',
+  text: 'Text',
+}
+
+function CompactFieldPalette({
+  selected,
+  onSelect,
+}: {
+  selected: FieldType | null
+  onSelect: (t: FieldType | null) => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-section-label shrink-0 mr-1">Place</span>
+      {TEMPLATE_FIELD_TYPES.map((t) => {
+        const isActive = selected === t
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onSelect(isActive ? null : t)}
+            className={cn(
+              'rounded-full px-2.5 py-0.5 text-lr-xs font-display font-medium transition-all duration-150 border',
+              isActive
+                ? 'bg-lr-accent text-white border-lr-accent shadow-sm'
+                : 'bg-lr-bg text-lr-muted border-lr-border hover:text-lr-text hover:border-lr-text/20'
+            )}
+          >
+            {PALETTE_LABELS[t]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SignerWarnings({
+  summaryFields,
+  signerCount,
+}: {
+  summaryFields: StoredField[]
+  signerCount: 1 | 2
+}) {
+  const warnings: string[] = []
+  for (let i = 0; i < signerCount; i++) {
+    const slotFields = summaryFields.filter((f) => (f.signerIndex ?? null) === i)
+    const hasFields = slotFields.length > 0
+    const hasSignature = slotFields.some((f) => f.type === 'signature')
+    if (hasFields && !hasSignature)
+      warnings.push(`Signer ${i + 1} has no signature field`)
+  }
+  if (warnings.length === 0) return null
+  return (
+    <div className="space-y-1 pt-1">
+      {warnings.map((w) => (
+        <div key={w} className="flex items-center gap-1.5 text-lr-xs text-lr-warning">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>{w}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export interface TemplateFieldEditorProps {
   mode: 'create' | 'edit'
@@ -194,11 +252,32 @@ export function TemplateFieldEditor({
     setSignerCount(next)
   }
 
-  function handleCompanyToggle(companyId: string) {
+  const handleCompanyToggle = useCallback((companyId: string) => {
     setSelectedCompanyIds((prev) =>
       prev.includes(companyId) ? prev.filter((id) => id !== companyId) : [...prev, companyId]
     )
-  }
+  }, [])
+
+  const { setData: setSidebarData } = useTemplateEditorSidebar()
+
+  useEffect(() => {
+    setSidebarData({
+      title,
+      setTitle,
+      description,
+      setDescription,
+      documentTypeId,
+      setDocumentTypeId,
+      documentTypes,
+      companies,
+      selectedCompanyIds,
+      onCompanyToggle: handleCompanyToggle,
+    })
+  }, [title, description, documentTypeId, selectedCompanyIds, documentTypes, companies, handleCompanyToggle, setSidebarData])
+
+  useEffect(() => {
+    return () => setSidebarData(null)
+  }, [setSidebarData])
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -349,119 +428,37 @@ export function TemplateFieldEditor({
             </div>
           )}
 
-          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
-            <h2 className="font-display text-lr-lg font-semibold text-lr-text">Template</h2>
-            <div>
-              <Label htmlFor="tmpl-title">Title *</Label>
-              <Input
-                id="tmpl-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1"
-              />
+          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
+            <Label className="mb-2 block">Number of signers</Label>
+            <div className="inline-flex items-center rounded-lr border border-lr-border bg-lr-bg p-0.5 gap-0.5">
+              {([1, 2] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => handleSignerCountChange(n)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-lr-xs font-display font-medium transition-all duration-150',
+                    signerCount === n
+                      ? 'bg-lr-surface-2 text-lr-text border border-lr-border shadow-sm'
+                      : 'text-lr-muted hover:text-lr-text hover:bg-lr-surface border border-transparent'
+                  )}
+                >
+                  {n === 1 ? (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
+                      1 signer
+                    </>
+                  ) : (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
+                      <span className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-lr-cyan" />
+                      2 signers
+                    </>
+                  )}
+                </button>
+              ))}
             </div>
-            <div>
-              <Label htmlFor="tmpl-desc">Description</Label>
-              <Textarea
-                id="tmpl-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Document type</Label>
-              <Select
-                value={documentTypeId ?? '__none__'}
-                onValueChange={(v) => setDocumentTypeId(v === '__none__' ? null : v)}
-              >
-                <SelectTrigger className="mt-1 border-lr-border bg-lr-bg">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {documentTypes.map((dt) => (
-                    <SelectItem key={dt.id} value={dt.id}>
-                      {dt.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Number of signers</Label>
-              <div className="mt-1.5 inline-flex items-center rounded-lr border border-lr-border bg-lr-bg p-0.5 gap-0.5">
-                {([1, 2] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => handleSignerCountChange(n)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-lr-xs font-display font-medium transition-all duration-150',
-                      signerCount === n
-                        ? 'bg-lr-surface-2 text-lr-text border border-lr-border shadow-sm'
-                        : 'text-lr-muted hover:text-lr-text hover:bg-lr-surface border border-transparent'
-                    )}
-                  >
-                    {n === 1 ? (
-                      <>
-                        <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
-                        1 signer
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-1.5 w-1.5 rounded-full bg-lr-accent" />
-                        <span className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-lr-cyan" />
-                        2 signers
-                      </>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {companies.length > 0 && (
-              <div>
-                <Label>Companies</Label>
-                <div className="mt-1 max-h-40 space-y-2 overflow-y-auto rounded-lr border border-lr-border p-2">
-                  {companies.map((c) => (
-                    <label key={c.id} className="flex cursor-pointer items-center gap-2 text-lr-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedCompanyIds.includes(c.id)}
-                        onChange={() => handleCompanyToggle(c.id)}
-                        className="h-4 w-4 rounded border-lr-border accent-lr-accent"
-                      />
-                      {c.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-
-          {showPdfViewer && (
-            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
-              <h3 className="font-display text-lr-md font-semibold text-lr-text">Field types</h3>
-              <p className="text-lr-xs text-lr-muted">
-                Select a type, then click the PDF to place it.
-              </p>
-              <FieldPalette
-                selectedFieldType={selectedFieldType}
-                onSelectFieldType={setSelectedFieldType}
-                fieldTypes={TEMPLATE_FIELD_TYPES}
-              />
-            </div>
-          )}
-
-          {showPdfViewer && (
-            <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
-              <h3 className="font-display text-lr-md font-semibold text-lr-text">Signer assignments</h3>
-              <SignerSlotSummary fields={summaryFields} signerCount={signerCount} />
-            </div>
-          )}
 
           {showPdfViewer && (
             <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
@@ -476,6 +473,7 @@ export function TemplateFieldEditor({
                 }
                 onRemoveField={removeField}
               />
+              <SignerWarnings summaryFields={summaryFields} signerCount={signerCount} />
             </div>
           )}
 
@@ -513,6 +511,12 @@ export function TemplateFieldEditor({
               isLoading={isLoading}
               pdfErrorMessage={pdfErrorMessage}
               loadError={mode === 'edit' ? pdfLoadError ?? undefined : undefined}
+              renderAboveViewer={() => (
+                <CompactFieldPalette
+                  selected={selectedFieldType}
+                  onSelect={setSelectedFieldType}
+                />
+              )}
             />
           </div>
         )}
