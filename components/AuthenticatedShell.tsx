@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Profile } from '@/lib/types'
 import UserDropdown from '@/components/UserDropdown'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { DocumentSidebarProvider } from '@/lib/document-sidebar-context'
 import { TemplateSidebarProvider } from '@/lib/template-sidebar-context'
 import { TemplateEditorSidebarProvider } from '@/lib/template-editor-sidebar-context'
@@ -52,7 +53,10 @@ export function AuthenticatedShell({
             )}
           </nav>
 
-          <UserDropdown profile={profile} />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserDropdown profile={profile} />
+          </div>
         </div>
       </header>
 
