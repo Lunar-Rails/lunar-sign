@@ -5,9 +5,10 @@ import DocumentPreview from '../components/DocumentPreview';
 import AddSignerModal from '../components/AddSignerModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ArrowLeft, Download, Send, FileText, CheckCircle, Clock, XCircle, AlertCircle, Eye, UserPlus, CreditCard as Edit2, Trash2 } from 'lucide-react';
-import { mockDocuments, mockSigners, mockAuditEvents } from '../data/mockData';
+import { mockDocuments, mockAuditEvents } from '../data/mockData';
 import { getStatusColor, getSignerStatusColor } from '../utils/documentStatus';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Signer } from '../types/document';
 import {
   canSendReminder,
@@ -25,13 +26,42 @@ const DocumentDetails = () => {
   const [documentSigners, setDocumentSigners] = useState<Signer[]>([]);
   const [editingSigner, setEditingSigner] = useState<Signer | null>(null);
   const [signerToRemove, setSignerToRemove] = useState<Signer | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
+  // TODO: Replace with real DB fetch once document upload flow is wired up
   const document = mockDocuments.find(d => d.document_id === id) || mockDocuments[0];
   const auditEvents = mockAuditEvents.filter(e => e.document_id === document.document_id);
 
+  // Load signers from DB; fall back to mock data if document doesn't exist in DB yet
   useEffect(() => {
-    const initialSigners = mockSigners.filter(s => s.document_id === document.document_id);
-    setDocumentSigners(initialSigners);
+    async function loadSigners() {
+      const { data, error } = await supabase
+        .from('dems_document_signers')
+        .select('*')
+        .eq('document_id', document.document_id)
+        .order('signing_order', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        // Map DB columns to the Signer type used in the UI
+        const mapped: Signer[] = data.map((row) => ({
+          signer_id: row.signer_id,
+          document_id: row.document_id,
+          signer_name: row.signer_name,
+          signer_email: row.signer_email,
+          signer_role: row.signer_role,
+          signing_order: row.signing_order,
+          signer_status: row.signer_status,
+          viewed_at: row.viewed_at,
+          signed_at: row.signed_at,
+          rejected_at: row.rejected_at,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        }));
+        setDocumentSigners(mapped);
+      }
+    }
+    loadSigners();
   }, [document.document_id]);
 
   const allSigned = document.signed_signers_count === document.total_signers;
@@ -87,24 +117,42 @@ const DocumentDetails = () => {
     return FileText;
   };
 
-  const handleAddSigner = (signerData: {
+  const handleAddSigner = async (signerData: {
     signer_name: string;
     signer_email: string;
     signer_role_or_label?: string;
     signing_order?: number;
   }) => {
-    const newSigner: Signer = {
-      signer_id: `sig-${document.document_id}-${Date.now()}`,
-      document_id: document.document_id,
-      signer_name: signerData.signer_name,
-      signer_email: signerData.signer_email,
-      signer_role: signerData.signer_role_or_label,
-      signing_order: signerData.signing_order || documentSigners.length + 1,
-      signer_status: 'Pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    setActionError(null);
+    const { data, error } = await supabase.functions.invoke('add-signer', {
+      body: {
+        document_id: document.document_id,
+        signer_name: signerData.signer_name,
+        signer_email: signerData.signer_email,
+        signer_role: signerData.signer_role_or_label,
+        signing_order: signerData.signing_order,
+      },
+    });
 
+    if (error || data?.error) {
+      setActionError(data?.error ?? 'Failed to add signer. Please try again.');
+      return;
+    }
+
+    const newSigner: Signer = {
+      signer_id: data.data.signer_id,
+      document_id: data.data.document_id,
+      signer_name: data.data.signer_name,
+      signer_email: data.data.signer_email,
+      signer_role: data.data.signer_role,
+      signing_order: data.data.signing_order,
+      signer_status: data.data.signer_status,
+      viewed_at: data.data.viewed_at,
+      signed_at: data.data.signed_at,
+      rejected_at: data.data.rejected_at,
+      created_at: data.data.created_at,
+      updated_at: data.data.updated_at,
+    };
     setDocumentSigners([...documentSigners, newSigner]);
   };
 
@@ -114,6 +162,7 @@ const DocumentDetails = () => {
     setIsAddSignerModalOpen(true);
   };
 
+  // Edit is handled locally until a dedicated update-signer edge function is added
   const handleUpdateSigner = (signerId: string, signerData: {
     signer_name: string;
     signer_email: string;
@@ -141,11 +190,22 @@ const DocumentDetails = () => {
     setSignerToRemove(signer);
   };
 
-  const handleConfirmRemove = () => {
-    if (signerToRemove) {
-      setDocumentSigners(documentSigners.filter(s => s.signer_id !== signerToRemove.signer_id));
+  const handleConfirmRemove = async () => {
+    if (!signerToRemove) return;
+    setActionError(null);
+
+    const { data, error } = await supabase.functions.invoke('remove-signer', {
+      body: { signer_id: signerToRemove.signer_id },
+    });
+
+    if (error || data?.error) {
+      setActionError(data?.error ?? 'Failed to remove signer. Please try again.');
       setSignerToRemove(null);
+      return;
     }
+
+    setDocumentSigners(documentSigners.filter(s => s.signer_id !== signerToRemove.signer_id));
+    setSignerToRemove(null);
   };
 
   const handleCloseModal = () => {
@@ -153,18 +213,22 @@ const DocumentDetails = () => {
     setEditingSigner(null);
   };
 
-  const handleSendForSignature = () => {
-    if (documentSigners.length === 0) {
-      alert('Please add at least one signer before sending the document.');
+  const handleSendForSignature = async () => {
+    if (documentSigners.length === 0) return;
+    setActionError(null);
+    setIsSending(true);
+
+    const { data, error } = await supabase.functions.invoke('send-document', {
+      body: { document_id: document.document_id },
+    });
+
+    setIsSending(false);
+
+    if (error || data?.error) {
+      setActionError(data?.error ?? 'Failed to send document. Please try again.');
       return;
     }
 
-    if (!document.file_name) {
-      alert('Please upload a document file before sending.');
-      return;
-    }
-
-    alert(`Document sent to ${documentSigners.length} signer(s) successfully!`);
     navigate('/documents');
   };
 
@@ -173,6 +237,17 @@ const DocumentDetails = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {actionError && (
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-700">{actionError}</p>
+            </div>
+            <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600">
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/documents')}
@@ -384,11 +459,11 @@ const DocumentDetails = () => {
                     </button>
                     <button
                       onClick={handleSendForSignature}
-                      disabled={!canSendDocument}
+                      disabled={!canSendDocument || isSending}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       <Send className="w-4 h-4" />
-                      Send for Signature
+                      {isSending ? 'Sending…' : 'Send for Signature'}
                     </button>
                     <button
                       onClick={() => navigate('/documents')}
