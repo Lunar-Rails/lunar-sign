@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
-import { canAccessDocument } from '@/lib/authorization'
+
+type CancelDocumentRpcResult = {
+  ok: boolean
+  error?: 'not_found' | 'not_pending' | 'concurrent_update'
+}
 
 export async function POST(
   _request: NextRequest,
@@ -20,52 +24,38 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const hasAccess = await canAccessDocument({ supabase, userId: user.id, documentId })
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    }
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'cancel_accessible_pending_document',
+      { p_document_id: documentId }
+    )
 
-    const { data: document } = await supabase
-      .from('documents')
-      .select('id, status')
-      .eq('id', documentId)
-      .single()
-
-    if (!document) {
-      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    }
-
-    if (document.status !== 'pending') {
-      return NextResponse.json(
-        { error: 'Only pending documents can be revoked' },
-        { status: 400 }
-      )
-    }
-
-    const { error: docError } = await supabase
-      .from('documents')
-      .update({ status: 'cancelled' })
-      .eq('id', documentId)
-      .eq('status', 'pending')
-
-    if (docError) {
-      console.error('Cancel document error:', docError)
+    if (rpcError) {
+      console.error('Cancel document RPC error:', rpcError)
       return NextResponse.json(
         { error: 'Failed to cancel document' },
         { status: 500 }
       )
     }
 
-    const { error: requestsError } = await supabase
-      .from('signature_requests')
-      .update({ status: 'cancelled' })
-      .eq('document_id', documentId)
-      .eq('status', 'pending')
-
-    if (requestsError) {
-      console.error('Cancel signature requests error:', requestsError)
+    const result = rpcData as CancelDocumentRpcResult | null
+    if (!result?.ok) {
+      if (result?.error === 'not_found') {
+        return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+      }
+      if (result?.error === 'not_pending') {
+        return NextResponse.json(
+          { error: 'Only pending documents can be revoked' },
+          { status: 400 }
+        )
+      }
+      if (result?.error === 'concurrent_update') {
+        return NextResponse.json(
+          { error: 'Document was updated by another request; try again' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json(
-        { error: 'Failed to cancel signature requests' },
+        { error: 'Failed to cancel document' },
         { status: 500 }
       )
     }

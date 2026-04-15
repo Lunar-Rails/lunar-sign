@@ -34,11 +34,11 @@ describe('POST /api/documents/[id]/cancel', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 404 when document not found for uploader', async () => {
+  it('returns 404 when document not found or not accessible', async () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({
         user: { id: userId },
-        queue: [{ data: null, error: null }],
+        queue: [{ data: { ok: false, error: 'not_found' }, error: null }],
       })
     )
     const POST = await loadPost()
@@ -53,12 +53,7 @@ describe('POST /api/documents/[id]/cancel', () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({
         user: { id: userId },
-        queue: [
-          {
-            data: { id: docId, status: 'draft', uploaded_by: userId },
-            error: null,
-          },
-        ],
+        queue: [{ data: { ok: false, error: 'not_pending' }, error: null }],
       })
     )
     const POST = await loadPost()
@@ -69,18 +64,11 @@ describe('POST /api/documents/[id]/cancel', () => {
     expect(res.status).toBe(400)
   })
 
-  it('cancels document and signature requests', async () => {
+  it('cancels document and signature requests for uploader', async () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({
         user: { id: userId },
-        queue: [
-          {
-            data: { id: docId, status: 'pending', uploaded_by: userId },
-            error: null,
-          },
-          { data: null, error: null },
-          { data: null, error: null },
-        ],
+        queue: [{ data: { ok: true }, error: null }],
       })
     )
     const POST = await loadPost()
@@ -91,6 +79,29 @@ describe('POST /api/documents/[id]/cancel', () => {
     expect(res.status).toBe(200)
     expect(logAudit).toHaveBeenCalledWith(
       userId,
+      'document_cancelled',
+      'document',
+      docId,
+      {}
+    )
+  })
+
+  it('cancels when caller has document access but did not upload (company member path)', async () => {
+    const otherUserId = '33333333-3333-4333-8333-333333333333'
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: otherUserId },
+        queue: [{ data: { ok: true }, error: null }],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/cancel', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(200)
+    expect(logAudit).toHaveBeenCalledWith(
+      otherUserId,
       'document_cancelled',
       'document',
       docId,
