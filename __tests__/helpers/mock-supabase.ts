@@ -104,6 +104,11 @@ export function createQueuedSupabaseMock(options: {
         error: null,
       }),
     },
+    rpc(_fn: string, _args?: unknown) {
+      void _fn
+      void _args
+      return thenableResult(next())
+    },
     from(_table: string) {
       void _table
       return {
