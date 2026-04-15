@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 import { UserRole } from '@/lib/types'
 import {
   Select,
@@ -37,23 +39,27 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
 
       setRole(typed)
       router.refresh()
+      toast.success('Role updated')
     } catch (error) {
       console.error('Role update error:', error)
-      alert('Failed to update role')
+      toast.error('Failed to update role')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Select value={role} onValueChange={handleRoleChange} disabled={loading}>
-      <SelectTrigger className="w-[110px] h-8 text-lr-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="member">Member</SelectItem>
-        <SelectItem value="admin">Admin</SelectItem>
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-2">
+      <Select value={role} onValueChange={handleRoleChange} disabled={loading}>
+        <SelectTrigger className="w-[110px] h-8 text-lr-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="member">Member</SelectItem>
+          <SelectItem value="admin">Admin</SelectItem>
+        </SelectContent>
+      </Select>
+      {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-lr-muted" />}
+    </div>
   )
 }
