@@ -10,6 +10,7 @@ import { AlertCircle, AlertTriangle } from 'lucide-react'
 import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
+  resolveSignerIndex,
   storedFieldsFromPlacements,
   normalizeStoredFields,
 } from '@/lib/field-metadata'
@@ -19,6 +20,8 @@ import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
 import SignersSection from '@/components/SignersSection'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 // ── Inline sub-components (mirrored from TemplateFieldEditor) ────────────────
@@ -93,6 +96,9 @@ function SignerWarnings({
   )
 }
 
+/** Field types where the creator can supply a plain-text value. */
+const CREATOR_INPUT_TYPES: FieldType[] = ['text', 'fullName', 'title', 'date']
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface DocumentFieldEditorProps {
@@ -116,6 +122,7 @@ export function DocumentFieldEditor({
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>('signature')
   const [signerIndexById, setSignerIndexById] = useState<Record<string, number | null>>({})
+  const [creatorFieldValues, setCreatorFieldValues] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -155,6 +162,16 @@ export function DocumentFieldEditor({
     [fields, signerIndexById]
   )
 
+  // Creator fields that accept a plain-text value (shown in "Your fields" panel)
+  const creatorInputFields = useMemo(
+    () =>
+      fields.filter((f) => {
+        const idx = signerIndexById[f.id] ?? null
+        return idx === null && CREATOR_INPUT_TYPES.includes(f.type as FieldType)
+      }),
+    [fields, signerIndexById]
+  )
+
   useEffect(() => { ensureESigningConfigured() }, [])
 
   // Load document PDF from preview API
@@ -184,6 +201,14 @@ export function DocumentFieldEditor({
     const { fields: nextFields, signerIndexById: map } = placementsFromStored(initialFieldMetadata)
     setFields(nextFields)
     setSignerIndexById(map)
+    // Restore any saved creator field values
+    const vals: Record<string, string> = {}
+    for (const f of initialFieldMetadata) {
+      if (resolveSignerIndex(f) === null && f.value) {
+        vals[f.id] = f.value
+      }
+    }
+    if (Object.keys(vals).length > 0) setCreatorFieldValues(vals)
   }, [initialFieldMetadata, setFields])
 
   // Keep signerIndexById in sync — new fields default to Signer 1 (index 0)
@@ -207,6 +232,21 @@ export function DocumentFieldEditor({
     })
   }, [fields])
 
+  // Keep creatorFieldValues clean — remove entries for deleted fields
+  useEffect(() => {
+    setCreatorFieldValues((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const id of Object.keys(next)) {
+        if (!fields.some((f) => f.id === id)) {
+          delete next[id]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [fields])
+
   const handleSignerIndexChange = useCallback(
     ({ fieldId, signerIndex }: { fieldId: string; signerIndex: number | null }) => {
       setSignerIndexById((prev) => ({ ...prev, [fieldId]: signerIndex }))
@@ -216,7 +256,14 @@ export function DocumentFieldEditor({
 
   async function handleSave() {
     setError(null)
-    const fieldMetadata = storedFieldsFromPlacements({ fields, signerIndexById })
+    // Build base stored fields, then merge in creator-supplied values
+    const rawFields = storedFieldsFromPlacements({ fields, signerIndexById })
+    const fieldMetadata = rawFields.map((f) => {
+      const idx = signerIndexById[f.id] ?? null
+      if (idx !== null) return f // signer field — value filled at signing time
+      const val = creatorFieldValues[f.id]
+      return { ...f, value: val !== undefined ? val : '' }
+    })
     setIsSaving(true)
     try {
       const res = await fetch(`/api/documents/${documentId}/fields`, {
@@ -252,6 +299,42 @@ export function DocumentFieldEditor({
           signers={signers}
           documentStatus={documentStatus}
         />
+
+        {/* Creator fields — values the document creator fills before sending */}
+        {showPdfViewer && creatorInputFields.length > 0 && (
+          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
+            <div>
+              <h3 className="font-display text-lr-md font-semibold text-lr-text">Your fields</h3>
+              <p className="text-lr-xs text-lr-muted mt-0.5">
+                These will be pre-filled on the document — signers cannot edit them.
+              </p>
+            </div>
+            <ul className="space-y-3">
+              {creatorInputFields.map((field) => {
+                const label = field.label?.trim() || field.type
+                return (
+                  <li key={field.id}>
+                    <Label className="text-caption" htmlFor={`creator-field-${field.id}`}>
+                      {label}
+                    </Label>
+                    <Input
+                      id={`creator-field-${field.id}`}
+                      className="mt-1 h-8 text-caption bg-lr-bg border-lr-border"
+                      placeholder={`Enter ${label.toLowerCase()}`}
+                      value={creatorFieldValues[field.id] ?? ''}
+                      onChange={(e) =>
+                        setCreatorFieldValues((prev) => ({
+                          ...prev,
+                          [field.id]: e.target.value,
+                        }))
+                      }
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
 
         {/* Placed fields + signer assignment + warnings */}
         {showPdfViewer && (
