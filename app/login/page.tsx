@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GoogleSignInButton from './google-sign-in-button'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,10 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-lr-bg px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-lr-bg px-4 py-12">
+      <div className="fixed right-4 top-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-8 shadow-lr-card backdrop-blur-lr-card">
           {/* Logo */}

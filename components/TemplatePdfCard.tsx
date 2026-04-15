@@ -9,6 +9,7 @@ import {
   usePdfDocument,
   usePdfPageVisibility,
 } from '@drvillo/react-browser-e-signing'
+import { Minus, Plus } from 'lucide-react'
 import type {
   FieldPlacement,
   FieldType,
@@ -54,6 +55,7 @@ export interface TemplatePdfCardProps {
   pdfErrorMessage: string | null
   loadError?: string | null
   renderToolbarExtra?: () => ReactNode
+  renderAboveViewer?: () => ReactNode
   className?: string
 }
 
@@ -79,24 +81,69 @@ export function TemplatePdfCard({
   pdfErrorMessage,
   loadError = null,
   renderToolbarExtra,
+  renderAboveViewer,
   className,
 }: TemplatePdfCardProps) {
   const rootClass = className
     ? `rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden ${className}`
     : 'rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden'
 
+  const pct = Math.round(scale * 100)
+
   return (
     <div className={rootClass}>
-      <div className="border-b border-lr-border px-4 py-3">
+      {/* Card header */}
+      <div className="border-b border-lr-border px-4 py-3 flex items-center justify-between gap-4">
         <h2 className="text-card-title">{title}</h2>
+        {/* Sticky controls: page nav + zoom — rendered here, outside the scroll area */}
+        {numPages > 0 && (
+          <div className="flex items-center gap-3">
+            <PdfPageNavigator
+              currentPageIndex={currentPageIndex}
+              numPages={numPages}
+              onPageChange={onPageChange}
+            />
+            <div className="flex items-center gap-1 rounded-lr border border-lr-border bg-lr-bg p-0.5">
+              <button
+                type="button"
+                onClick={() => setScale(Math.max(0.5, scale - 0.25))}
+                className="flex h-6 w-6 items-center justify-center rounded text-lr-muted hover:text-lr-text hover:bg-lr-surface transition-colors"
+                aria-label="Zoom out"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="min-w-[38px] text-center text-lr-xs font-display text-lr-text tabular-nums">
+                {pct}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setScale(Math.min(3, scale + 0.25))}
+                className="flex h-6 w-6 items-center justify-center rounded text-lr-muted hover:text-lr-text hover:bg-lr-surface transition-colors"
+                aria-label="Zoom in"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
       {loadError && (
         <div className="border-b border-lr-border px-4 py-2">
           <p className="text-lr-sm text-lr-error">{loadError}</p>
         </div>
       )}
-      <div className="h-[640px] xl:h-[720px] p-4">
-        <div ref={viewerContainerRef} className="h-full overflow-auto">
+
+      {/* Field-type palette strip */}
+      {renderAboveViewer && (
+        <div className="border-b border-lr-border bg-lr-bg/60 px-4 py-2">
+          {renderAboveViewer()}
+        </div>
+      )}
+
+      {/* Scrollable PDF area — no toolbar inside */}
+      <div className="h-[640px] xl:h-[720px]">
+        <div ref={viewerContainerRef} className="h-full overflow-auto px-4 pt-4">
           <PdfViewer
             pdfData={pdfDataForViewer}
             numPages={numPages}
@@ -108,16 +155,7 @@ export function TemplatePdfCard({
             }
             pageMode="scroll"
             currentPageIndex={currentPageIndex}
-            renderToolbarContent={() => (
-              <div className="flex flex-wrap items-center gap-3">
-                <PdfPageNavigator
-                  currentPageIndex={currentPageIndex}
-                  numPages={numPages}
-                  onPageChange={onPageChange}
-                />
-                {renderToolbarExtra?.()}
-              </div>
-            )}
+            renderToolbarContent={() => null}
             renderOverlay={(pageIndex) => (
               <FieldOverlay
                 pageIndex={pageIndex}
@@ -133,6 +171,7 @@ export function TemplatePdfCard({
           />
         </div>
       </div>
+
       {isLoading && <p className="px-4 pb-3 text-caption text-lr-muted">Loading PDF…</p>}
       {pdfErrorMessage && (
         <p className="px-4 pb-3 text-caption text-lr-error">{pdfErrorMessage}</p>

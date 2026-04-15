@@ -6,6 +6,22 @@ import { canAccessDocument } from '@/lib/authorization'
 import { getConfig } from '@/lib/config'
 import { sendEmail } from '@/lib/email/client'
 import { signatureRequestEmail } from '@/lib/email/templates'
+import {
+  parseFieldMetadata,
+  validateCreatorFieldsComplete,
+  validateSignerFieldAssignments,
+} from '@/lib/field-metadata'
+
+function missingSignerFieldsMessage(missingSignerIndexes: number[]): string {
+  if (missingSignerIndexes.length === 1) {
+    return `Assign at least one field to Signer ${missingSignerIndexes[0] + 1} before sending`
+  }
+
+  const labels = missingSignerIndexes.map((index) => `Signer ${index + 1}`)
+  const head = labels.slice(0, -1).join(', ')
+  const tail = labels[labels.length - 1]
+  return `Assign at least one field to ${head} and ${tail} before sending`
+}
 
 export async function POST(
   request: NextRequest,
@@ -63,6 +79,32 @@ export async function POST(
     if (!signatureRequests || signatureRequests.length === 0) {
       return NextResponse.json(
         { error: 'Add at least one signer before sending' },
+        { status: 400 }
+      )
+    }
+
+    const fieldMetadata = parseFieldMetadata(document.field_metadata ?? [])
+    const creatorValidation = validateCreatorFieldsComplete(fieldMetadata)
+    if (!creatorValidation.valid) {
+      return NextResponse.json(
+        {
+          error: 'Missing values for fields',
+          missing_labels: creatorValidation.missingLabels,
+        },
+        { status: 400 }
+      )
+    }
+
+    const signerFieldValidation = validateSignerFieldAssignments(
+      fieldMetadata,
+      signatureRequests.length >= 2 ? 2 : 1
+    )
+    if (!signerFieldValidation.valid) {
+      return NextResponse.json(
+        {
+          error: missingSignerFieldsMessage(signerFieldValidation.missingSignerIndexes),
+          missing_signer_indexes: signerFieldValidation.missingSignerIndexes,
+        },
         { status: 400 }
       )
     }

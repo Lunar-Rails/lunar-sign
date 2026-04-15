@@ -20,6 +20,7 @@ import type { FieldType, SignatureStyle, SignerInfo } from '@drvillo/react-brows
 import { MobileWizardShell } from '@/components/signing/MobileWizardShell'
 import { PdfColumn } from '@/components/signing/PdfColumn'
 import { SigningControlsSidebar } from '@/components/signing/SigningControlsSidebar'
+import { ThemeToggle } from '@/components/theme-toggle'
 import {
   applySignerValuesToPlacements,
   hydrateForSigner,
@@ -334,7 +335,10 @@ export default function SigningInterface({
   )
 
   return (
-    <div className="min-h-screen bg-lr-bg px-4 py-6 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen bg-lr-bg px-4 py-6 sm:px-6 lg:px-8">
+      <div className="fixed right-4 top-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-4 rounded-lr-lg border border-lr-border bg-lr-surface px-5 py-4 shadow-lr-card">
           <h1 className="text-page-title sm:text-2xl">{documentTitle}</h1>

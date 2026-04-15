@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import '@drvillo/react-browser-e-signing/styles.css'
+import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({
@@ -28,10 +29,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`dark h-full ${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className={`h-full ${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
       <body className="min-h-full bg-lr-bg text-lr-text font-sans antialiased">
-        {children}
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          storageKey="lunar-sign-theme"
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

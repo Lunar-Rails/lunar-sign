@@ -4,14 +4,11 @@ import type { FieldPlacement, FieldType } from '@drvillo/react-browser-e-signing
 
 import { SignerAssignmentControl } from '@/components/SignerAssignmentControl'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 const TYPE_LABELS: Record<FieldType, string> = {
-  signature: 'Signature',
-  fullName: 'Full name',
+  signature: 'Sig',
+  fullName: 'Name',
   title: 'Title',
   date: 'Date',
   text: 'Text',
@@ -42,60 +39,40 @@ export function TemplateFieldList({
   fields,
   signerIndexById,
   signerCount,
-  onLabelChange,
   onSignerIndexChange,
-  onRemoveField,
 }: TemplateFieldListProps) {
   if (fields.length === 0)
     return (
-      <p className="text-lr-sm text-lr-muted">
-        Place fields on the PDF using the palette, then configure labels and which signer fills each one.
+      <p className="text-caption text-lr-muted italic">
+        Click on the PDF to place fields, then assign them below.
       </p>
     )
 
   return (
-    <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
+    <ul className="space-y-1">
       {fields.map((field) => {
         const idx = signerIndexById[field.id] ?? null
         const key = signerKey(idx)
+        const label = field.label?.trim() || TYPE_LABELS[field.type]
         return (
           <li
             key={field.id}
             className={cn(
-              'rounded-lr border border-lr-border border-l-4 bg-lr-bg p-3 shadow-sm transition-colors',
+              'flex items-center gap-2 rounded-lr border border-lr-border border-l-4 bg-lr-bg px-2.5 py-1.5',
               SIGNER_BORDER_CLASS[key]
             )}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <Badge variant="outline" className="text-micro">
-                {TYPE_LABELS[field.type]}
-              </Badge>
-              <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveField(field.id)}>
-                Remove
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <Label className="text-micro text-lr-muted" htmlFor={`field-label-${field.id}`}>
-                  Label
-                </Label>
-                <Input
-                  id={`field-label-${field.id}`}
-                  value={field.label ?? ''}
-                  onChange={(e) => onLabelChange({ fieldId: field.id, label: e.target.value })}
-                  placeholder="e.g. Company name"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-micro text-lr-muted mb-1 block">Filled by</Label>
-                <SignerAssignmentControl
-                  value={idx}
-                  onChange={(signerIndex) => onSignerIndexChange({ fieldId: field.id, signerIndex })}
-                  signerCount={signerCount}
-                />
-              </div>
-            </div>
+            <Badge variant="outline" className="text-micro shrink-0">
+              {TYPE_LABELS[field.type]}
+            </Badge>
+            <span className="flex-1 min-w-0 text-caption text-lr-text truncate" title={label}>
+              {label}
+            </span>
+            <SignerAssignmentControl
+              value={idx}
+              onChange={(signerIndex) => onSignerIndexChange({ fieldId: field.id, signerIndex })}
+              signerCount={signerCount}
+            />
           </li>
         )
       })}

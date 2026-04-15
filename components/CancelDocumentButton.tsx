@@ -2,8 +2,20 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Loader2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { XCircle } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 interface CancelDocumentButtonProps {
   documentId: string
@@ -11,16 +23,10 @@ interface CancelDocumentButtonProps {
 
 export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  async function handleClick() {
-    if (
-      !window.confirm(
-        'Revoke this signing request? Signers will no longer be able to sign with their links.'
-      )
-    )
-      return
-
+  async function handleConfirm() {
     setIsSubmitting(true)
     try {
       const response = await fetch(`/api/documents/${documentId}/cancel`, { method: 'POST' })
@@ -30,24 +36,49 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
         throw new Error(body?.error || 'Failed to revoke')
       }
 
+      setOpen(false)
       router.refresh()
+      toast.success('Signing request revoked')
     } catch (error) {
       console.error(error)
-      alert(error instanceof Error ? error.message : 'Failed to revoke')
+      toast.error(error instanceof Error ? error.message : 'Failed to revoke')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Button
-      type="button"
-      variant="destructive"
-      onClick={handleClick}
-      disabled={isSubmitting}
-    >
-      <XCircle className="h-4 w-4" />
-      {isSubmitting ? 'Revoking…' : 'Revoke signing request'}
-    </Button>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="destructive" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <XCircle className="h-4 w-4" />
+          )}
+          {isSubmitting ? 'Revoking…' : 'Revoke signing request'}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Revoke signing request?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Signers will no longer be able to sign with their links. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isSubmitting}
+            onClick={(event) => {
+              event.preventDefault()
+              handleConfirm()
+            }}
+          >
+            {isSubmitting ? 'Revoking…' : 'Revoke'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

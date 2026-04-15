@@ -64,6 +64,22 @@ describe('POST /api/documents/[id]/cancel', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 409 when cancel races (document no longer pending at update)', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userId },
+        queue: [{ data: { ok: false, error: 'concurrent_update' }, error: null }],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/cancel', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(409)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
   it('cancels document and signature requests for uploader', async () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({

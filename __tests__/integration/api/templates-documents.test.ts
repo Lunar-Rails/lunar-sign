@@ -44,6 +44,23 @@ const baseTemplate = {
 }
 
 const twoSignerTemplate = { ...baseTemplate, signer_count: 2 }
+const twoSignerTemplateMissingSecondSlot = {
+  ...twoSignerTemplate,
+  field_metadata: [
+    {
+      id: 'signer-1',
+      type: 'signature',
+      pageIndex: 0,
+      xPercent: 10,
+      yPercent: 10,
+      widthPercent: 20,
+      heightPercent: 5,
+      label: 'Signer 1 Signature',
+      forSigner: true,
+      signerIndex: 0,
+    },
+  ],
+}
 
 async function loadPost() {
   const { POST } = await import('@/app/api/templates/[id]/documents/route')
@@ -126,5 +143,34 @@ describe('POST /api/templates/[id]/documents', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/1 signer/)
+  })
+
+  it('returns 400 when a template signer slot has no assigned fields', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: USER_ID },
+        queue: [
+          { data: null, error: null },
+          { data: { id: TEMPLATE_ID }, error: null },
+          { data: twoSignerTemplateMissingSecondSlot, error: null },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      jsonRequest(`http://localhost/api/templates/${TEMPLATE_ID}/documents`, {
+        title: 'D',
+        signers: [
+          { signer_name: 'A', signer_email: 'a@b.co' },
+          { signer_name: 'B', signer_email: 'b@b.co' },
+        ],
+        field_values: {},
+      }),
+      { params: Promise.resolve({ id: TEMPLATE_ID }) }
+    )
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/Signer 2/)
+    expect(body.missing_signer_indexes).toEqual([1])
   })
 })
