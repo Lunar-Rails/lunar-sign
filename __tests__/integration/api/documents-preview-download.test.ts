@@ -6,11 +6,20 @@ import { routeParams } from '../../helpers/mock-request'
 const createClient = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
 
+/** Service client is used for storage.download on preview; must be mocked like documents-send / signatures tests. */
+const getServiceClient = vi.fn()
+vi.mock('@/lib/supabase/service', () => ({ getServiceClient }))
+
 const userId = '11111111-1111-4111-8111-111111111111'
 const docId = '22222222-2222-4222-8222-222222222222'
 
 describe('GET /api/documents/[id]/preview', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getServiceClient.mockReturnValue(
+      createQueuedSupabaseMock({ user: null, queue: [] })
+    )
+  })
 
   it('returns 401 without auth', async () => {
     createClient.mockResolvedValue(
