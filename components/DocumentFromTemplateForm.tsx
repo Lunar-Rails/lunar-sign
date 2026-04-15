@@ -11,6 +11,7 @@ import {
   normalizeStoredFields,
   resolveSignerIndex,
   validateCreatorFieldsComplete,
+  validateSignerFieldAssignments,
 } from '@/lib/field-metadata'
 import { AddSignerSchema, DocumentUploadSchema } from '@/lib/schemas'
 import type { StoredField, StoredFieldType } from '@/lib/types'
@@ -203,6 +204,24 @@ export function DocumentFromTemplateForm({
     if (validSigners.length === 0) {
       setError('Add at least one signer')
       return
+    }
+
+    if (isSlotMode) {
+      const signerFieldValidation = validateSignerFieldAssignments(
+        normalized,
+        signerSlots.length
+      )
+      if (!signerFieldValidation.valid) {
+        const labels = signerFieldValidation.missingSignerIndexes.map(
+          (index) => `Signer ${index + 1}`
+        )
+        setError(
+          labels.length === 1
+            ? `${labels[0]} needs at least one assigned field`
+            : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]} need at least one assigned field`
+        )
+        return
+      }
     }
 
     const field_values: Record<string, string> = {}

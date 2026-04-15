@@ -14,6 +14,7 @@ import {
   serializeFieldMetadata,
   storedFieldsFromPlacements,
   validateCreatorFieldsComplete,
+  validateSignerFieldAssignments,
 } from '@/lib/field-metadata'
 import type { StoredField } from '@/lib/types'
 
@@ -247,6 +248,26 @@ describe('mergeCreatorFieldValues + validateCreatorFieldsComplete', () => {
       fieldValues: {},
     })
     expect(validateCreatorFieldsComplete(merged).valid).toBe(true)
+  })
+})
+
+describe('validateSignerFieldAssignments', () => {
+  it('fails when a required signer slot has no assigned fields', () => {
+    const result = validateSignerFieldAssignments([creatorField, signer1Field], 2)
+    expect(result.valid).toBe(false)
+    expect(result.missingSignerIndexes).toEqual([1])
+  })
+
+  it('passes when every signer slot has at least one assigned field', () => {
+    const result = validateSignerFieldAssignments([signer1Field, signer2Field], 2)
+    expect(result.valid).toBe(true)
+    expect(result.missingSignerIndexes).toEqual([])
+  })
+
+  it('fails for single-signer flows without any signer-assigned fields', () => {
+    const result = validateSignerFieldAssignments([creatorField], 1)
+    expect(result.valid).toBe(false)
+    expect(result.missingSignerIndexes).toEqual([0])
   })
 })
 

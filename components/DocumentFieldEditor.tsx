@@ -80,7 +80,11 @@ function SignerWarnings({
     const slotFields = summaryFields.filter((f) => (f.signerIndex ?? null) === i)
     const hasFields = slotFields.length > 0
     const hasSignature = slotFields.some((f) => f.type === 'signature')
-    if (hasFields && !hasSignature)
+    if (!hasFields) {
+      warnings.push(`Signer ${i + 1} has no assigned fields`)
+      continue
+    }
+    if (!hasSignature)
       warnings.push(`Signer ${i + 1} has no signature field`)
   }
   if (warnings.length === 0) return null

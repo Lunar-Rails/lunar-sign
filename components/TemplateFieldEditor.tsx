@@ -10,6 +10,7 @@ import {
   placementsFromStored,
   storedFieldsFromPlacements,
   normalizeStoredFields,
+  validateSignerFieldAssignments,
 } from '@/lib/field-metadata'
 import { DocumentUploadSchema, DocumentCompanyIdsSchema } from '@/lib/schemas'
 import type { Company, DocumentType, StoredField } from '@/lib/types'
@@ -82,7 +83,11 @@ function SignerWarnings({
     const slotFields = summaryFields.filter((f) => (f.signerIndex ?? null) === i)
     const hasFields = slotFields.length > 0
     const hasSignature = slotFields.some((f) => f.type === 'signature')
-    if (hasFields && !hasSignature)
+    if (!hasFields) {
+      warnings.push(`Signer ${i + 1} has no assigned fields`)
+      continue
+    }
+    if (!hasSignature)
       warnings.push(`Signer ${i + 1} has no signature field`)
   }
   if (warnings.length === 0) return null
@@ -345,6 +350,19 @@ export function TemplateFieldEditor({
     const fieldMetadata = storedFieldsFromPlacements({ fields, signerIndexById })
     if (fieldMetadata.length === 0) {
       setError('Place at least one field on the document')
+      return
+    }
+
+    const signerFieldValidation = validateSignerFieldAssignments(fieldMetadata, signerCount)
+    if (!signerFieldValidation.valid) {
+      const labels = signerFieldValidation.missingSignerIndexes.map(
+        (index) => `Signer ${index + 1}`
+      )
+      setError(
+        labels.length === 1
+          ? `${labels[0]} needs at least one assigned field`
+          : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]} need at least one assigned field`
+      )
       return
     }
 

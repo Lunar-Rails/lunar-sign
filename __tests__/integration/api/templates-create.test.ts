@@ -38,4 +38,40 @@ describe('POST /api/templates', () => {
     const res = await POST(formDataRequest('http://localhost/api/templates', form))
     expect(res.status).toBe(400)
   })
+
+  it('returns 400 when a required signer slot has no assigned fields', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        queue: [],
+      })
+    )
+    const POST = await loadPost()
+    const form = new FormData()
+    form.set('title', 'Two signer template')
+    form.set('file', new File([Buffer.from('%PDF')], 'a.pdf', { type: 'application/pdf' }))
+    form.set('signer_count', '2')
+    form.set(
+      'field_metadata',
+      JSON.stringify([
+        {
+          id: 'signer-1',
+          type: 'signature',
+          pageIndex: 0,
+          xPercent: 10,
+          yPercent: 10,
+          widthPercent: 20,
+          heightPercent: 5,
+          label: 'Signer 1 Signature',
+          forSigner: true,
+          signerIndex: 0,
+        },
+      ])
+    )
+    const res = await POST(formDataRequest('http://localhost/api/templates', form))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/Signer 2/)
+    expect(body.missing_signer_indexes).toEqual([1])
+  })
 })

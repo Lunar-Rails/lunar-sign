@@ -119,6 +119,27 @@ export function validateCreatorFieldsComplete(fields: StoredField[]): {
   return { valid: missingLabels.length === 0, missingLabels }
 }
 
+export function validateSignerFieldAssignments(
+  fields: StoredField[],
+  signerCount: number
+): {
+  valid: boolean
+  missingSignerIndexes: number[]
+} {
+  const normalizedSignerCount = Math.min(2, Math.max(0, Math.trunc(signerCount)))
+  const missingSignerIndexes: number[] = []
+
+  for (let i = 0; i < normalizedSignerCount; i++) {
+    const hasAssignedField = fields.some((f) => resolveSignerIndex(f) === i)
+    if (!hasAssignedField) missingSignerIndexes.push(i)
+  }
+
+  return {
+    valid: missingSignerIndexes.length === 0,
+    missingSignerIndexes,
+  }
+}
+
 /** Persist template layout from editor: library placements + signer index flags. */
 export function storedFieldsFromPlacements({
   fields,

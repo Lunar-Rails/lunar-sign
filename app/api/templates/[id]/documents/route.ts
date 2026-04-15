@@ -10,10 +10,22 @@ import {
   mergeCreatorFieldValues,
   parseFieldMetadata,
   validateCreatorFieldsComplete,
+  validateSignerFieldAssignments,
 } from '@/lib/field-metadata'
 import { DocumentFromTemplateSchema } from '@/lib/schemas'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
+
+function missingSignerFieldsMessage(missingSignerIndexes: number[]): string {
+  if (missingSignerIndexes.length === 1) {
+    return `Assign at least one field to Signer ${missingSignerIndexes[0] + 1} before creating a document`
+  }
+
+  const labels = missingSignerIndexes.map((index) => `Signer ${index + 1}`)
+  const head = labels.slice(0, -1).join(', ')
+  const tail = labels[labels.length - 1]
+  return `Assign at least one field to ${head} and ${tail} before creating a document`
+}
 
 export async function POST(
   request: NextRequest,
@@ -74,6 +86,20 @@ export async function POST(
     }
 
     const templateFields = parseFieldMetadata(template.field_metadata)
+    const signerFieldValidation = validateSignerFieldAssignments(
+      templateFields,
+      templateSignerCount
+    )
+    if (!signerFieldValidation.valid) {
+      return NextResponse.json(
+        {
+          error: missingSignerFieldsMessage(signerFieldValidation.missingSignerIndexes),
+          missing_signer_indexes: signerFieldValidation.missingSignerIndexes,
+        },
+        { status: 400 }
+      )
+    }
+
     const merged = mergeCreatorFieldValues({
       templateFields,
       fieldValues: field_values,
