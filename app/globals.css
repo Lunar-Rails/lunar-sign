@@ -370,6 +370,11 @@ button,
   color: #ffffff !important;
 }
 
+/* Snap-to-text guide line — use design system accent instead of library default red */
+[data-slot='snap-guide'] {
+  background: var(--lr-accent) !important;
+}
+
 /* Mobile sticky PDF toolbar */
 @media (max-width: 1023px) {
   [data-slot='pdf-viewer-toolbar'] {

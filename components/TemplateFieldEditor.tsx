@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
+import { useFieldPlacement, usePdfDocument, usePdfPageVisibility, usePdfTextLines } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 
 import '@/lib/esigning/configure-client'
@@ -162,11 +162,14 @@ export function TemplateFieldEditor({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading,
     errorMessage: pdfErrorMessage,
   } = usePdfDocument(pdfInput)
+
+  const { textLinesByPage, handlePageTextContent } = usePdfTextLines(pageDimensions)
 
   const { fields, addField, updateField, removeField, setFields } = useFieldPlacement()
   const { currentPageIndex, scrollToPage } = usePdfPageVisibility({
@@ -524,6 +527,8 @@ export function TemplateFieldEditor({
               onUpdateField={updateField}
               onRemoveField={removeField}
               preview={fieldPreview}
+              onPageTextContent={handlePageTextContent}
+              textLinesByPage={textLinesByPage}
               isLoading={isLoading}
               pdfErrorMessage={pdfErrorMessage}
               loadError={mode === 'edit' ? pdfLoadError ?? undefined : undefined}

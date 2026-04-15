@@ -10,6 +10,7 @@ import {
   useFieldPlacement,
   usePdfDocument,
   usePdfPageVisibility,
+  usePdfTextLines,
   useSignatureRenderer,
 } from '@drvillo/react-browser-e-signing'
 
@@ -110,6 +111,8 @@ export default function SigningInterface({
     isLoading,
     errorMessage: pdfErrorMessage,
   } = usePdfDocument(pdfInput)
+
+  const { textLinesByPage, handlePageTextContent } = usePdfTextLines(pageDimensions)
 
   const { currentPageIndex, scrollToPage } = usePdfPageVisibility({
     containerRef: viewerContainerRef,
@@ -321,6 +324,8 @@ export default function SigningInterface({
       onRemoveField={removeField}
       preview={fieldPreview}
       readOnly={templateMode}
+      onPageTextContent={handlePageTextContent}
+      textLinesByPage={textLinesByPage}
       isLoading={isLoading}
       pdfErrorMessage={pdfErrorMessage}
       onPageChange={(pageIndex) => {

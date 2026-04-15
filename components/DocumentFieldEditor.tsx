@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
+import { useFieldPlacement, usePdfDocument, usePdfPageVisibility, usePdfTextLines } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 import { AlertCircle, AlertTriangle } from 'lucide-react'
 
@@ -139,11 +139,14 @@ export function DocumentFieldEditor({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading,
     errorMessage: pdfErrorMessage,
   } = usePdfDocument(pdfBytes)
+
+  const { textLinesByPage, handlePageTextContent } = usePdfTextLines(pageDimensions)
 
   const { currentPageIndex, scrollToPage } = usePdfPageVisibility({
     containerRef: viewerContainerRef,
@@ -391,6 +394,8 @@ export function DocumentFieldEditor({
             onUpdateField={updateField}
             onRemoveField={removeField}
             preview={fieldPreview}
+            onPageTextContent={handlePageTextContent}
+            textLinesByPage={textLinesByPage}
             isLoading={isLoading}
             pdfErrorMessage={pdfErrorMessage}
             loadError={pdfLoadError}

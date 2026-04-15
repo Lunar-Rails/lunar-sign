@@ -13,7 +13,9 @@ import { Minus, Plus } from 'lucide-react'
 import type {
   FieldPlacement,
   FieldType,
+  PdfTextContent,
   SignatureFieldPreview,
+  TextLine,
 } from '@drvillo/react-browser-e-signing'
 
 import '@/lib/esigning/configure-client'
@@ -51,6 +53,8 @@ export interface TemplatePdfCardProps {
   onRemoveField: (fieldId: string) => void
   preview: SignatureFieldPreview
   readOnly?: boolean
+  onPageTextContent?: (pageIndex: number, textContent: PdfTextContent) => void
+  textLinesByPage?: Map<number, TextLine[]>
   isLoading: boolean
   pdfErrorMessage: string | null
   loadError?: string | null
@@ -77,6 +81,8 @@ export function TemplatePdfCard({
   onRemoveField,
   preview,
   readOnly = false,
+  onPageTextContent,
+  textLinesByPage,
   isLoading,
   pdfErrorMessage,
   loadError = null,
@@ -155,6 +161,7 @@ export function TemplatePdfCard({
             }
             pageMode="scroll"
             currentPageIndex={currentPageIndex}
+            onPageTextContent={onPageTextContent}
             renderToolbarContent={() => null}
             renderOverlay={(pageIndex) => (
               <FieldOverlay
@@ -166,6 +173,7 @@ export function TemplatePdfCard({
                 onRemoveField={readOnly ? noopRemove : onRemoveField}
                 preview={preview}
                 readOnly={readOnly}
+                textLines={textLinesByPage?.get(pageIndex)}
               />
             )}
           />
