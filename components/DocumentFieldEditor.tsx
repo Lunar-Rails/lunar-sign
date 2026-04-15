@@ -1,42 +1,114 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import {
-  FieldPalette,
-  useFieldPlacement,
-  usePdfDocument,
-  usePdfPageVisibility,
-} from '@drvillo/react-browser-e-signing'
+import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
-import { Loader2, Save } from 'lucide-react'
+import { AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
-import { placementsFromStored, storedFieldsFromPlacements } from '@/lib/field-metadata'
-import type { SignatureRequest, StoredField } from '@/lib/types'
+import {
+  placementsFromStored,
+  storedFieldsFromPlacements,
+  normalizeStoredFields,
+} from '@/lib/field-metadata'
+import type { DocumentStatus, SignatureRequest, StoredField } from '@/lib/types'
 
 import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
+import SignersSection from '@/components/SignersSection'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-const FIELD_TYPES: FieldType[] = ['signature', 'fullName', 'title', 'date', 'text']
+// ── Inline sub-components (mirrored from TemplateFieldEditor) ────────────────
 
-const SIGNER_DOT_CLASS: Record<number, string> = {
-  0: 'bg-lr-accent',
-  1: 'bg-lr-cyan',
+const TEMPLATE_FIELD_TYPES: FieldType[] = ['signature', 'fullName', 'title', 'date', 'text']
+
+const PALETTE_LABELS: Record<FieldType, string> = {
+  signature: 'Sig',
+  fullName: 'Name',
+  title: 'Title',
+  date: 'Date',
+  text: 'Text',
 }
+
+function CompactFieldPalette({
+  selected,
+  onSelect,
+}: {
+  selected: FieldType | null
+  onSelect: (t: FieldType | null) => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-section-label shrink-0 mr-1">Place</span>
+      {TEMPLATE_FIELD_TYPES.map((t) => {
+        const isActive = selected === t
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onSelect(isActive ? null : t)}
+            className={cn(
+              'rounded-full px-2.5 py-0.5 text-lr-xs font-display font-medium transition-all duration-150 border',
+              isActive
+                ? 'bg-lr-accent text-white border-lr-accent shadow-sm'
+                : 'bg-lr-bg text-lr-muted border-lr-border hover:text-lr-text hover:border-lr-text/20'
+            )}
+          >
+            {PALETTE_LABELS[t]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SignerWarnings({
+  summaryFields,
+  signerCount,
+}: {
+  summaryFields: StoredField[]
+  signerCount: 1 | 2
+}) {
+  const warnings: string[] = []
+  for (let i = 0; i < signerCount; i++) {
+    const slotFields = summaryFields.filter((f) => (f.signerIndex ?? null) === i)
+    const hasFields = slotFields.length > 0
+    const hasSignature = slotFields.some((f) => f.type === 'signature')
+    if (hasFields && !hasSignature)
+      warnings.push(`Signer ${i + 1} has no signature field`)
+  }
+  if (warnings.length === 0) return null
+  return (
+    <div className="space-y-1 pt-1">
+      {warnings.map((w) => (
+        <div key={w} className="flex items-center gap-1.5 text-lr-xs text-lr-warning">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>{w}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 interface DocumentFieldEditorProps {
   documentId: string
   signers: SignatureRequest[]
   initialFieldMetadata?: StoredField[] | null
+  documentStatus: DocumentStatus
 }
 
 export function DocumentFieldEditor({
   documentId,
   signers,
   initialFieldMetadata,
+  documentStatus,
 }: DocumentFieldEditorProps) {
+  const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
   const hydratedRef = useRef(false)
 
@@ -44,6 +116,7 @@ export function DocumentFieldEditor({
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>('signature')
   const [signerIndexById, setSignerIndexById] = useState<Record<string, number | null>>({})
+  const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const signerCount: 1 | 2 = signers.length >= 2 ? 2 : 1
@@ -76,11 +149,15 @@ export function DocumentFieldEditor({
     [pdfData]
   )
 
-  useEffect(() => {
-    ensureESigningConfigured()
-  }, [])
+  // Derive StoredField[] for warnings from current placements + signerIndexById
+  const summaryFields: StoredField[] = useMemo(
+    () => normalizeStoredFields(storedFieldsFromPlacements({ fields, signerIndexById })),
+    [fields, signerIndexById]
+  )
 
-  // Load document PDF
+  useEffect(() => { ensureESigningConfigured() }, [])
+
+  // Load document PDF from preview API
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -97,9 +174,7 @@ export function DocumentFieldEditor({
         if (!cancelled) setPdfLoadError('Could not load document PDF')
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [documentId])
 
   // Hydrate from saved field_metadata on first load
@@ -111,7 +186,7 @@ export function DocumentFieldEditor({
     setSignerIndexById(map)
   }, [initialFieldMetadata, setFields])
 
-  // Keep signerIndexById in sync with placed fields; default new fields to Signer 1 (index 0)
+  // Keep signerIndexById in sync — new fields default to Signer 1 (index 0)
   useEffect(() => {
     setSignerIndexById((prev) => {
       const next = { ...prev }
@@ -132,7 +207,15 @@ export function DocumentFieldEditor({
     })
   }, [fields])
 
+  const handleSignerIndexChange = useCallback(
+    ({ fieldId, signerIndex }: { fieldId: string; signerIndex: number | null }) => {
+      setSignerIndexById((prev) => ({ ...prev, [fieldId]: signerIndex }))
+    },
+    []
+  )
+
   async function handleSave() {
+    setError(null)
     const fieldMetadata = storedFieldsFromPlacements({ fields, signerIndexById })
     setIsSaving(true)
     try {
@@ -145,112 +228,96 @@ export function DocumentFieldEditor({
         const data = await res.json().catch(() => ({}))
         throw new Error((data as { error?: string }).error || 'Failed to save fields')
       }
-      toast.success(
-        fieldMetadata.length === 0
-          ? 'Fields cleared'
-          : `${fieldMetadata.length} field${fieldMetadata.length === 1 ? '' : 's'} saved`
-      )
+      toast.success('Fields saved')
+      router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save fields')
+      const msg = err instanceof Error ? err.message : 'Failed to save fields'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setIsSaving(false)
     }
   }
 
+  const showPdfViewer = Boolean(pdfBytes)
+
   return (
     <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
-      {/* Left control panel */}
+      {/* Left sticky panel — mirrors TemplateFieldEditor layout */}
       <div className="space-y-4 xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0 xl:max-h-[calc(100dvh-88px)] xl:overflow-y-auto">
 
-        {/* Signer legend */}
-        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
-          <h3 className="font-display text-lr-md font-semibold text-lr-text">Signers</h3>
-          <p className="text-lr-xs text-lr-muted">
-            Assign each field to the correct signer below.
-          </p>
-          <ul className="space-y-1.5">
-            {signers.map((s, i) => (
-              <li key={s.id} className="flex items-center gap-2 text-lr-sm">
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${SIGNER_DOT_CLASS[i] ?? 'bg-lr-muted'}`}
-                />
-                <span className="font-medium text-lr-text">{s.signer_name}</span>
-                <span className="truncate text-lr-muted">{s.signer_email}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Embedded signers section — replaces the 1/2 signer toggle */}
+        <SignersSection
+          documentId={documentId}
+          signers={signers}
+          documentStatus={documentStatus}
+        />
 
-        {/* Field type palette */}
-        {pdfBytes && (
+        {/* Placed fields + signer assignment + warnings */}
+        {showPdfViewer && (
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-2">
-            <h3 className="font-display text-lr-md font-semibold text-lr-text">Field types</h3>
-            <p className="text-lr-xs text-lr-muted">
-              Select a type, then click anywhere on the PDF to place it.
-            </p>
-            <FieldPalette
-              selectedFieldType={selectedFieldType}
-              onSelectFieldType={setSelectedFieldType}
-              fieldTypes={FIELD_TYPES}
-            />
-          </div>
-        )}
-
-        {/* Placed fields list */}
-        {pdfBytes && (
-          <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card space-y-3">
             <h3 className="font-display text-lr-md font-semibold text-lr-text">Placed fields</h3>
             <TemplateFieldList
               fields={fields}
               signerIndexById={signerIndexById}
               signerCount={signerCount}
               onLabelChange={({ fieldId, label }) => updateField(fieldId, { label })}
-              onSignerIndexChange={({ fieldId, signerIndex }) =>
-                setSignerIndexById((prev) => ({ ...prev, [fieldId]: signerIndex }))
-              }
+              onSignerIndexChange={handleSignerIndexChange}
               onRemoveField={removeField}
             />
+            <SignerWarnings summaryFields={summaryFields} signerCount={signerCount} />
+          </div>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <div className="flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-3 py-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-lr-error" />
+            <p className="text-lr-sm text-lr-error">{error}</p>
           </div>
         )}
 
         <Button
           onClick={handleSave}
-          disabled={isSaving || !pdfBytes}
+          disabled={isSaving || !showPdfViewer}
           className="w-full sm:w-auto"
         >
-          {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {isSaving ? 'Saving…' : 'Save fields'}
+          {isSaving ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
 
-      {/* Right: interactive PDF canvas */}
-      <div className="flex-1 min-w-0">
-        <TemplatePdfCard
-          title="Place signature fields"
-          viewerContainerRef={viewerContainerRef}
-          pdfDataForViewer={pdfDataForViewer}
-          numPages={numPages}
-          scale={scale}
-          setScale={setScale}
-          handleDocumentLoadSuccess={handleDocumentLoadSuccess}
-          setPageDimension={setPageDimension}
-          currentPageIndex={currentPageIndex}
-          onPageChange={(i) => scrollToPage(i)}
-          fields={fields}
-          selectedFieldType={selectedFieldType}
-          onAddField={addField}
-          onUpdateField={updateField}
-          onRemoveField={removeField}
-          preview={fieldPreview}
-          isLoading={isLoading}
-          pdfErrorMessage={pdfErrorMessage}
-          loadError={pdfLoadError}
-        />
-      </div>
+      {/* Right panel — interactive PDF with CompactFieldPalette strip */}
+      {showPdfViewer && (
+        <div className="flex-1 min-w-0">
+          <TemplatePdfCard
+            title="Document Preview"
+            viewerContainerRef={viewerContainerRef}
+            pdfDataForViewer={pdfDataForViewer}
+            numPages={numPages}
+            scale={scale}
+            setScale={setScale}
+            handleDocumentLoadSuccess={handleDocumentLoadSuccess}
+            setPageDimension={setPageDimension}
+            currentPageIndex={currentPageIndex}
+            onPageChange={(i) => scrollToPage(i)}
+            fields={fields}
+            selectedFieldType={selectedFieldType}
+            onAddField={addField}
+            onUpdateField={updateField}
+            onRemoveField={removeField}
+            preview={fieldPreview}
+            isLoading={isLoading}
+            pdfErrorMessage={pdfErrorMessage}
+            loadError={pdfLoadError}
+            renderAboveViewer={() => (
+              <CompactFieldPalette
+                selected={selectedFieldType}
+                onSelect={setSelectedFieldType}
+              />
+            )}
+          />
+        </div>
+      )}
     </div>
   )
 }

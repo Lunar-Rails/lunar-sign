@@ -250,18 +250,12 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
         />
 
         {doc.status === 'draft' && signers.length > 0 ? (
-          <div className="space-y-4">
-            <SignersSection
-              documentId={doc.id}
-              signers={signers}
-              documentStatus={doc.status}
-            />
-            <DocumentFieldEditor
-              documentId={doc.id}
-              signers={signers}
-              initialFieldMetadata={doc.field_metadata}
-            />
-          </div>
+          <DocumentFieldEditor
+            documentId={doc.id}
+            signers={signers}
+            initialFieldMetadata={doc.field_metadata}
+            documentStatus={doc.status}
+          />
         ) : (
           <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
             <div className="xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0">
