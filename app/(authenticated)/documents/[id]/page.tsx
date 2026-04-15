@@ -10,6 +10,7 @@ import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
 import { DeleteDocumentButton } from '@/components/DeleteDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
+import { DocumentFieldEditor } from '@/components/DocumentFieldEditor'
 import { DocumentSidebarSetter } from '@/components/DocumentSidebarSetter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -247,24 +248,39 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
           signedCount={signedCount}
         />
 
-        <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
-          <div className="xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0">
+        {doc.status === 'draft' && signers.length > 0 ? (
+          <div className="space-y-4">
             <SignersSection
               documentId={doc.id}
               signers={signers}
               documentStatus={doc.status}
             />
+            <DocumentFieldEditor
+              documentId={doc.id}
+              signers={signers}
+              initialFieldMetadata={doc.field_metadata}
+            />
           </div>
+        ) : (
+          <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
+            <div className="xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0">
+              <SignersSection
+                documentId={doc.id}
+                signers={signers}
+                documentStatus={doc.status}
+              />
+            </div>
 
-          <div className="flex-1 min-w-0 rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
-            <div className="border-b border-lr-border px-4 py-3">
-              <h2 className="text-card-title">Document Preview</h2>
-            </div>
-            <div className="h-[640px] xl:h-[720px] p-4">
-              <DocumentPdfPreview documentId={doc.id} fieldMetadata={doc.field_metadata} />
+            <div className="flex-1 min-w-0 rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden">
+              <div className="border-b border-lr-border px-4 py-3">
+                <h2 className="text-card-title">Document Preview</h2>
+              </div>
+              <div className="h-[640px] xl:h-[720px] p-4">
+                <DocumentPdfPreview documentId={doc.id} fieldMetadata={doc.field_metadata} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="lg:hidden space-y-4">
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card p-4">
