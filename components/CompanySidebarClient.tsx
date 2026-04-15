@@ -432,6 +432,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function getActionLabel(action: string): string {
   const labels: Record<string, string> = {
     document_uploaded: 'Uploaded',
+    document_fields_updated: 'Fields saved',
     signer_added: 'Signer added',
     signer_removed: 'Signer removed',
     document_sent: 'Sent for signing',
