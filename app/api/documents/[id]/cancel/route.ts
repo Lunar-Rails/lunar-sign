@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { logAudit } from '@/lib/audit'
+import { canAccessDocument } from '@/lib/authorization'
 
 export async function POST(
   _request: NextRequest,
@@ -19,11 +20,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const hasAccess = await canAccessDocument({ supabase, userId: user.id, documentId })
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
+
     const { data: document } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, status')
       .eq('id', documentId)
-      .eq('uploaded_by', user.id)
       .single()
 
     if (!document) {
