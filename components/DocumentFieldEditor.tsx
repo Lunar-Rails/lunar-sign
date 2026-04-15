@@ -7,7 +7,7 @@ import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvill
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 import { AlertCircle, AlertTriangle } from 'lucide-react'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
   resolveSignerIndex,
@@ -175,8 +175,6 @@ export function DocumentFieldEditor({
       }),
     [fields, signerIndexById]
   )
-
-  useEffect(() => { ensureESigningConfigured() }, [])
 
   // Load document PDF from preview API
   useEffect(() => {

@@ -16,7 +16,7 @@ import type {
   SignatureFieldPreview,
 } from '@drvillo/react-browser-e-signing'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 import { hydrateForSigner } from '@/lib/field-metadata'
 import type { StoredField } from '@/lib/types'
 
@@ -238,10 +238,6 @@ export function TemplatePdfPreviewByTemplateId({
     if (!pdfData) return null
     return pdfData.slice(0)
   }, [pdfData])
-
-  useEffect(() => {
-    ensureESigningConfigured()
-  }, [])
 
   useEffect(() => {
     let cancelled = false

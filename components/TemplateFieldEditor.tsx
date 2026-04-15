@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
   storedFieldsFromPlacements,
@@ -183,8 +183,6 @@ export function TemplateFieldEditor({
     if (!pdfData) return null
     return pdfData.slice(0)
   }, [pdfData])
-
-  useEffect(() => { ensureESigningConfigured() }, [])
 
   useEffect(() => {
     if (mode !== 'edit' || !templateId) return

@@ -13,7 +13,7 @@ import {
   useSignatureRenderer,
 } from '@drvillo/react-browser-e-signing'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 
 import type { FieldType, SignatureStyle, SignerInfo } from '@drvillo/react-browser-e-signing'
 
@@ -161,10 +161,6 @@ export default function SigningInterface({
     }
     setSinglePageIndex((index) => Math.min(Math.max(0, index), Math.max(0, numPages - 1)))
   }, [numPages])
-
-  useEffect(() => {
-    ensureESigningConfigured()
-  }, [])
 
   const showFieldPalette = !templateMode
 

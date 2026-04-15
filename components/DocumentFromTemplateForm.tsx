@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 import {
   hydrateForDocumentCreator,
   mergeCreatorFieldValues,
@@ -122,8 +122,6 @@ export function DocumentFromTemplateForm({
     if (!pdfData) return null
     return pdfData.slice(0)
   }, [pdfData])
-
-  useEffect(() => { ensureESigningConfigured() }, [])
 
   useEffect(() => {
     let cancelled = false
