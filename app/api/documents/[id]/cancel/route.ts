@@ -37,17 +37,26 @@ export async function POST(
       )
     }
 
-    const { error: docError } = await supabase
+    const { data: cancelledDocument, error: docError } = await supabase
       .from('documents')
       .update({ status: 'cancelled' })
       .eq('id', documentId)
       .eq('status', 'pending')
+      .select('id')
+      .maybeSingle()
 
     if (docError) {
       console.error('Cancel document error:', docError)
       return NextResponse.json(
         { error: 'Failed to cancel document' },
         { status: 500 }
+      )
+    }
+
+    if (!cancelledDocument) {
+      return NextResponse.json(
+        { error: 'Only pending documents can be revoked' },
+        { status: 409 }
       )
     }
 

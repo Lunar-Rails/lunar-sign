@@ -69,7 +69,7 @@ describe('POST /api/documents/[id]/cancel', () => {
     expect(res.status).toBe(400)
   })
 
-  it('cancels document and signature requests', async () => {
+  it('returns 409 when the pending document was already cancelled before update', async () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({
         user: { id: userId },
@@ -79,6 +79,28 @@ describe('POST /api/documents/[id]/cancel', () => {
             error: null,
           },
           { data: null, error: null },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/cancel', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(409)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
+  it('cancels document and signature requests', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userId },
+        queue: [
+          {
+            data: { id: docId, status: 'pending', uploaded_by: userId },
+            error: null,
+          },
+          { data: { id: docId }, error: null },
           { data: null, error: null },
         ],
       })

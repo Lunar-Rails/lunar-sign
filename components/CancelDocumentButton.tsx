@@ -23,6 +23,7 @@ interface CancelDocumentButtonProps {
 
 export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleConfirm() {
@@ -35,6 +36,7 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
         throw new Error(body?.error || 'Failed to revoke')
       }
 
+      setOpen(false)
       router.refresh()
       toast.success('Signing request revoked')
     } catch (error) {
@@ -46,7 +48,7 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button type="button" variant="destructive" disabled={isSubmitting}>
           {isSubmitting ? (
@@ -65,8 +67,16 @@ export function CancelDocumentButton({ documentId }: CancelDocumentButtonProps) 
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm}>Revoke</AlertDialogAction>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isSubmitting}
+            onClick={(event) => {
+              event.preventDefault()
+              handleConfirm()
+            }}
+          >
+            {isSubmitting ? 'Revoking…' : 'Revoke'}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
