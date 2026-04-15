@@ -89,6 +89,142 @@ describe('POST /api/documents/[id]/send', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when creator-assigned fields are blank', async () => {
+    getServiceClient.mockReturnValue(
+      createQueuedSupabaseMock({
+        user: null,
+        queue: [
+          {
+            data: [
+              {
+                token: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                signer_email: 's@x.com',
+                signer_name: 'S',
+              },
+            ],
+            error: null,
+          },
+        ],
+      })
+    )
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userId },
+        queue: [
+          {
+            data: {
+              id: docId,
+              status: 'draft',
+              title: 'Title',
+              field_metadata: [
+                {
+                  id: 'creator-1',
+                  type: 'text',
+                  pageIndex: 0,
+                  xPercent: 1,
+                  yPercent: 1,
+                  widthPercent: 10,
+                  heightPercent: 5,
+                  label: 'Company',
+                  value: '   ',
+                  forSigner: false,
+                  signerIndex: null,
+                },
+                {
+                  id: 'signer-1',
+                  type: 'signature',
+                  pageIndex: 0,
+                  xPercent: 10,
+                  yPercent: 10,
+                  widthPercent: 20,
+                  heightPercent: 5,
+                  label: 'Signature',
+                  forSigner: true,
+                  signerIndex: 0,
+                },
+              ],
+            },
+            error: null,
+          },
+          { data: { role: 'admin' }, error: null },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/send', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Missing values for fields')
+    expect(body.missing_labels).toEqual(['Company'])
+  })
+
+  it('returns 400 when a signer slot has no assigned fields', async () => {
+    getServiceClient.mockReturnValue(
+      createQueuedSupabaseMock({
+        user: null,
+        queue: [
+          {
+            data: [
+              {
+                token: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                signer_email: 's1@x.com',
+                signer_name: 'Signer 1',
+              },
+              {
+                token: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                signer_email: 's2@x.com',
+                signer_name: 'Signer 2',
+              },
+            ],
+            error: null,
+          },
+        ],
+      })
+    )
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userId },
+        queue: [
+          {
+            data: {
+              id: docId,
+              status: 'draft',
+              title: 'Title',
+              field_metadata: [
+                {
+                  id: 'signer-1',
+                  type: 'signature',
+                  pageIndex: 0,
+                  xPercent: 10,
+                  yPercent: 10,
+                  widthPercent: 20,
+                  heightPercent: 5,
+                  label: 'Signature',
+                  forSigner: true,
+                  signerIndex: 0,
+                },
+              ],
+            },
+            error: null,
+          },
+          { data: { role: 'admin' }, error: null },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/send', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/Signer 2/)
+    expect(body.missing_signer_indexes).toEqual([1])
+  })
+
   it('sets pending and logs audit', async () => {
     const signers = [
       {
@@ -107,7 +243,28 @@ describe('POST /api/documents/[id]/send', () => {
       createQueuedSupabaseMock({
         user: { id: userId },
         queue: [
-          { data: { id: docId, status: 'draft', title: 'Title' }, error: null },
+          {
+            data: {
+              id: docId,
+              status: 'draft',
+              title: 'Title',
+              field_metadata: [
+                {
+                  id: 'signer-1',
+                  type: 'signature',
+                  pageIndex: 0,
+                  xPercent: 10,
+                  yPercent: 10,
+                  widthPercent: 20,
+                  heightPercent: 5,
+                  label: 'Signature',
+                  forSigner: true,
+                  signerIndex: 0,
+                },
+              ],
+            },
+            error: null,
+          },
           { data: { role: 'admin' }, error: null },
           { data: null, error: null },
         ],

@@ -7,6 +7,7 @@ interface AuditTimelineProps {
 function getActionLabel(action: string): string {
   const labels: Record<string, string> = {
     document_uploaded: 'Document uploaded',
+    document_fields_updated: 'Signature fields saved',
     signer_added: 'Signer added',
     signer_removed: 'Signer removed',
     document_sent: 'Document sent for signing',
@@ -25,6 +26,8 @@ function getDotClass(action: string): string {
       return 'bg-lr-accent'
     case 'signer_added':
     case 'signer_removed':
+      return 'bg-lr-accent-soft'
+    case 'document_fields_updated':
       return 'bg-lr-accent-soft'
     case 'document_signed':
     case 'document_completed':

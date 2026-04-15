@@ -10,6 +10,7 @@ import {
   FieldMetadataSchema,
 } from '@/lib/schemas'
 import type { StoredField } from '@/lib/types'
+import { validateSignerFieldAssignments } from '@/lib/field-metadata'
 
 export async function GET(request: NextRequest) {
   try {
@@ -111,6 +112,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function missingSignerFieldsMessage(missingSignerIndexes: number[]): string {
+  if (missingSignerIndexes.length === 1) {
+    return `Assign at least one field to Signer ${missingSignerIndexes[0] + 1} before saving the template`
+  }
+
+  const labels = missingSignerIndexes.map((index) => `Signer ${index + 1}`)
+  const head = labels.slice(0, -1).join(', ')
+  const tail = labels[labels.length - 1]
+  return `Assign at least one field to ${head} and ${tail} before saving the template`
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -183,6 +195,17 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       fieldMetadata = fm.data
+    }
+
+    const signerFieldValidation = validateSignerFieldAssignments(fieldMetadata, signerCount)
+    if (!signerFieldValidation.valid) {
+      return NextResponse.json(
+        {
+          error: missingSignerFieldsMessage(signerFieldValidation.missingSignerIndexes),
+          missing_signer_indexes: signerFieldValidation.missingSignerIndexes,
+        },
+        { status: 400 }
+      )
     }
 
     const uniqueCompanyIds = [...new Set(companyValidation.data.companyIds)]
