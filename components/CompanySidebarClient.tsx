@@ -244,7 +244,7 @@ export default function CompanySidebarClient({
                         return (
                           <div key={log.id} className="flex gap-2">
                             <div className="flex flex-col items-center pt-1">
-                              <div className={cn('h-2 w-2 shrink-0 rounded-full', getDotClass(log.action))} />
+                              <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
                               {index < docData.auditLogs.length - 1 && (
                                 <div className="mt-0.5 flex-1 w-px bg-lr-border" />
                               )}
@@ -253,7 +253,7 @@ export default function CompanySidebarClient({
                               <p className="text-caption font-medium text-lr-text leading-tight">
                                 {getActionLabel(log.action)}
                               </p>
-                              <p className="text-caption leading-tight mt-0.5">
+                              <p className="text-caption leading-tight mt-0.5 text-lr-muted">
                                 {actorLine && <span>{actorLine} · </span>}
                                 {new Date(log.created_at).toLocaleDateString('en-US', {
                                   month: 'short',
