@@ -53,10 +53,18 @@ export function createQueuedSupabaseMock(options: {
   }
 
   function updateChain() {
+    const afterSelect = {
+      maybeSingle: () => thenableResult(next()),
+      single: () => thenableResult(next()),
+      then: (onFulfilled: never, onRejected: never) =>
+        thenableResult(next()).then(onFulfilled, onRejected),
+    }
+
     const chain = {
       eq: () => chain,
       in: () => chain,
       is: () => chain,
+      select: () => afterSelect,
       then: (onFulfilled: never, onRejected: never) =>
         thenableResult(next()).then(onFulfilled, onRejected),
     }
@@ -67,6 +75,11 @@ export function createQueuedSupabaseMock(options: {
     const chain = {
       eq: () => chain,
       in: () => chain,
+      is: () => chain,
+      select: () => ({
+        maybeSingle: () => thenableResult(next()),
+        single: () => thenableResult(next()),
+      }),
       then: (onFulfilled: never, onRejected: never) =>
         thenableResult(next()).then(onFulfilled, onRejected),
     }
@@ -91,12 +104,17 @@ export function createQueuedSupabaseMock(options: {
         error: null,
       }),
     },
+    rpc(_fn: string, _args?: unknown) {
+      void _fn
+      void _args
+      return thenableResult(next())
+    },
     from(_table: string) {
       void _table
       return {
         select: () => filterAfterSelect(),
         insert: () => insertChain(),
-        update: () => updateOrDeleteChain(),
+        update: () => updateChain(),
         delete: () => updateOrDeleteChain(),
       }
     },

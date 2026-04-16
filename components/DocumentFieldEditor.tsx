@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useFieldPlacement, usePdfDocument, usePdfPageVisibility } from '@drvillo/react-browser-e-signing'
+import { useFieldPlacement, usePdfDocument, usePdfPageVisibility, usePdfTextLines } from '@drvillo/react-browser-e-signing'
 import type { FieldType } from '@drvillo/react-browser-e-signing'
 import { AlertCircle, AlertTriangle } from 'lucide-react'
 
-import { ensureESigningConfigured } from '@/lib/esigning/configure-client'
+import '@/lib/esigning/configure-client'
 import {
   placementsFromStored,
   resolveSignerIndex,
@@ -138,11 +138,14 @@ export function DocumentFieldEditor({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading,
     errorMessage: pdfErrorMessage,
   } = usePdfDocument(pdfBytes)
+
+  const { textLinesByPage, handlePageTextContent } = usePdfTextLines(pageDimensions)
 
   const { currentPageIndex, scrollToPage } = usePdfPageVisibility({
     containerRef: viewerContainerRef,
@@ -176,8 +179,6 @@ export function DocumentFieldEditor({
       }),
     [fields, signerIndexById]
   )
-
-  useEffect(() => { ensureESigningConfigured() }, [])
 
   // Load document PDF from preview API
   useEffect(() => {
@@ -374,6 +375,8 @@ export function DocumentFieldEditor({
             onUpdateField={updateField}
             onRemoveField={removeField}
             preview={fieldPreview}
+            onPageTextContent={handlePageTextContent}
+            textLinesByPage={textLinesByPage}
             isLoading={isLoading}
             pdfErrorMessage={pdfErrorMessage}
             loadError={pdfLoadError}

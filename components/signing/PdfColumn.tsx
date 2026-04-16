@@ -3,7 +3,7 @@
 import type { RefObject } from 'react'
 import type { ReactNode } from 'react'
 import { FieldOverlay, PdfPageNavigator, PdfViewer } from '@drvillo/react-browser-e-signing'
-import type { FieldPlacement, FieldType, SignatureFieldPreview } from '@drvillo/react-browser-e-signing'
+import type { FieldPlacement, FieldType, PdfTextContent, SignatureFieldPreview, TextLine } from '@drvillo/react-browser-e-signing'
 
 export interface PdfColumnProps {
   viewerContainerRef: RefObject<HTMLDivElement | null>
@@ -28,6 +28,8 @@ export interface PdfColumnProps {
   onRemoveField: (fieldId: string) => void
   preview: SignatureFieldPreview
   readOnly?: boolean
+  onPageTextContent?: (pageIndex: number, textContent: PdfTextContent) => void
+  textLinesByPage?: Map<number, TextLine[]>
   isLoading: boolean
   pdfErrorMessage: string | null
   onPageChange: (pageIndex: number) => void
@@ -51,6 +53,8 @@ export function PdfColumn({
   onRemoveField,
   preview,
   readOnly = false,
+  onPageTextContent,
+  textLinesByPage,
   isLoading,
   pdfErrorMessage,
   onPageChange,
@@ -69,6 +73,7 @@ export function PdfColumn({
           }
           pageMode={pageMode}
           currentPageIndex={viewerPageIndex}
+          onPageTextContent={onPageTextContent}
           renderToolbarContent={() => (
             <div className="flex flex-wrap items-center gap-3">
               <PdfPageNavigator
@@ -89,6 +94,7 @@ export function PdfColumn({
               onRemoveField={onRemoveField}
               preview={preview}
               readOnly={readOnly}
+              textLines={textLinesByPage?.get(pageIndex)}
             />
           )}
         />

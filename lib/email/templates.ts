@@ -82,6 +82,24 @@ export function documentCompletedSignerEmail(params: {
   return { subject, html }
 }
 
+export function signatureReminderEmail(params: {
+  signerName: string
+  documentTitle: string
+  requesterName: string
+  signingUrl: string
+}): { subject: string; html: string } {
+  const subject = `Reminder: Please sign ${params.documentTitle}`
+  const html = renderEmail('signature-request', {
+    subject,
+    preheader: `Reminder from ${params.requesterName}: your signature is still needed on ${params.documentTitle}`,
+    signerName: params.signerName,
+    documentTitle: params.documentTitle,
+    requesterName: params.requesterName,
+    signingUrl: params.signingUrl,
+  })
+  return { subject, html }
+}
+
 // Backward-compatible alias for legacy call sites.
 export function documentCompleteSignerEmail(params: {
   signerName: string

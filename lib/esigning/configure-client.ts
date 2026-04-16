@@ -20,3 +20,9 @@ export function ensureESigningConfigured() {
 
   window.__lunarSignESigningConfigured__ = true
 }
+
+// Run eagerly at module-load time so the PDF worker URL is registered
+// before any PdfViewer useEffect reads it (child effects fire before
+// parent effects, causing a race in production where Strict Mode
+// double-invocation isn't there to paper over the timing).
+ensureESigningConfigured()
