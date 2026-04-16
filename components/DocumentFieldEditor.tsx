@@ -126,7 +126,6 @@ export function DocumentFieldEditor({
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>('signature')
   const [signerIndexById, setSignerIndexById] = useState<Record<string, number | null>>({})
-  const [creatorFieldValues, setCreatorFieldValues] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -199,21 +198,19 @@ export function DocumentFieldEditor({
     return () => { cancelled = true }
   }, [documentId])
 
-  // Hydrate from saved field_metadata on first load
+  // Hydrate from saved field_metadata on first load (including creator field values)
   useEffect(() => {
     if (hydratedRef.current || !initialFieldMetadata?.length) return
     hydratedRef.current = true
     const { fields: nextFields, signerIndexById: map } = placementsFromStored(initialFieldMetadata)
-    setFields(nextFields)
+    // Restore saved values for creator fields directly into the placement objects
+    const fieldsWithValues = nextFields.map((f) => {
+      const stored = initialFieldMetadata.find((sf) => sf.id === f.id)
+      if (!stored || resolveSignerIndex(stored) !== null) return f
+      return { ...f, value: stored.value ?? '' }
+    })
+    setFields(fieldsWithValues)
     setSignerIndexById(map)
-    // Restore any saved creator field values
-    const vals: Record<string, string> = {}
-    for (const f of initialFieldMetadata) {
-      if (resolveSignerIndex(f) === null && f.value) {
-        vals[f.id] = f.value
-      }
-    }
-    if (Object.keys(vals).length > 0) setCreatorFieldValues(vals)
   }, [initialFieldMetadata, setFields])
 
   // Keep signerIndexById in sync — new fields default to Signer 1 (index 0)
@@ -237,21 +234,6 @@ export function DocumentFieldEditor({
     })
   }, [fields])
 
-  // Keep creatorFieldValues clean — remove entries for deleted fields
-  useEffect(() => {
-    setCreatorFieldValues((prev) => {
-      const next = { ...prev }
-      let changed = false
-      for (const id of Object.keys(next)) {
-        if (!fields.some((f) => f.id === id)) {
-          delete next[id]
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  }, [fields])
-
   const handleSignerIndexChange = useCallback(
     ({ fieldId, signerIndex }: { fieldId: string; signerIndex: number | null }) => {
       setSignerIndexById((prev) => ({ ...prev, [fieldId]: signerIndex }))
@@ -261,13 +243,13 @@ export function DocumentFieldEditor({
 
   async function handleSave() {
     setError(null)
-    // Build base stored fields, then merge in creator-supplied values
+    // Build stored fields; for creator fields, carry the value from the placement
     const rawFields = storedFieldsFromPlacements({ fields, signerIndexById })
     const fieldMetadata = rawFields.map((f) => {
       const idx = signerIndexById[f.id] ?? null
       if (idx !== null) return f // signer field — value filled at signing time
-      const val = creatorFieldValues[f.id]
-      return { ...f, value: val !== undefined ? val : '' }
+      const placement = fields.find((fl) => fl.id === f.id)
+      return { ...f, value: placement?.value ?? '' }
     })
     setIsSaving(true)
     try {
@@ -324,15 +306,10 @@ export function DocumentFieldEditor({
                     </Label>
                     <Input
                       id={`creator-field-${field.id}`}
-                      className="mt-1 h-8 text-caption bg-lr-bg border-lr-border"
+                      className="mt-1"
                       placeholder={`Enter ${label.toLowerCase()}`}
-                      value={creatorFieldValues[field.id] ?? ''}
-                      onChange={(e) =>
-                        setCreatorFieldValues((prev) => ({
-                          ...prev,
-                          [field.id]: e.target.value,
-                        }))
-                      }
+                      value={field.value ?? ''}
+                      onChange={(e) => updateField(field.id, { value: e.target.value })}
                     />
                   </li>
                 )
