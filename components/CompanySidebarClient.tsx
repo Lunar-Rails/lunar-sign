@@ -7,22 +7,14 @@ import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
 import type { AuditLogWithActor } from '@/lib/types'
-import { CheckboxList } from '@/components/CheckboxList'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
 import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
-import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
 import { SidebarNav, type SidebarNavItem, type SidebarNavGroup } from '@/components/SidebarNav'
 import { SidebarStatGrid, type StatItem } from '@/components/SidebarStatGrid'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LrSelect } from '@/components/ui/lr-select'
 
 interface CompanySidebarItem {
   id: string
@@ -148,11 +140,10 @@ export default function CompanySidebarClient({
                 <p className="text-section-label">Details</p>
                 <div className="space-y-2 pt-0.5">
                   <DetailRow label="Type">
-                    <DocumentTypeInlineEditor
+                    <DocumentTypePicker
                       documentId={docData.documentId}
-                      initialTypeNames={docData.assignedTypes.map((t) => t.name)}
-                      availableTypeNames={docData.allDocumentTypeNames}
-                      isCompact
+                      assignedTypeId={docData.assignedTypes[0]?.id ?? null}
+                      allDocumentTypes={docData.allDocumentTypes}
                     />
                   </DetailRow>
                   <DetailRow label="Companies">
@@ -238,57 +229,52 @@ export default function CompanySidebarClient({
         {/* Zone 3b: Template editor (only when TemplateFieldEditor is mounted) */}
         {editorData && (
           <div className="border-t border-lr-border mt-2 pt-2">
-            <div className="bg-lr-surface-2 rounded-lr p-3 space-y-3">
+            <div className="bg-lr-surface-2 rounded-lr p-3 space-y-2">
               <p className="text-section-label">Template</p>
-              <div className="space-y-2.5">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Title *</span>
+              <div className="space-y-2 pt-0.5">
+                <DetailRow label="Title *">
                   <Input
                     value={editorData.title}
                     onChange={(e) => editorData.setTitle(e.target.value)}
                     placeholder="Template title"
-                    className="mt-0.5 h-8 text-caption bg-lr-bg border-lr-border"
+                    className="h-8 text-caption bg-lr-bg border-lr-border"
                   />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Description</span>
+                </DetailRow>
+                <DetailRow label="Description">
                   <Textarea
                     value={editorData.description}
                     onChange={(e) => editorData.setDescription(e.target.value)}
                     placeholder="Optional description"
                     rows={2}
-                    className="mt-0.5 text-caption bg-lr-bg border-lr-border resize-none"
+                    className="text-caption bg-lr-bg border-lr-border resize-none"
                   />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Document type</span>
-                  <Select
+                </DetailRow>
+                <DetailRow label="Type">
+                  <LrSelect
+                    options={[
+                      { value: '__none__', label: 'None' },
+                      ...editorData.documentTypes.map((dt) => ({ value: dt.id, label: dt.name })),
+                    ]}
                     value={editorData.documentTypeId ?? '__none__'}
-                    onValueChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v)}
-                  >
-                    <SelectTrigger className="mt-0.5 h-8 text-caption border-lr-border bg-lr-bg">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {editorData.documentTypes.map((dt) => (
-                        <SelectItem key={dt.id} value={dt.id}>
-                          {dt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    onChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v as string)}
+                    className="h-8 text-caption"
+                  />
+                </DetailRow>
                 {editorData.companies.length > 0 && (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-section-label">Companies</span>
-                    <CheckboxList
-                      className="mt-0.5"
-                      options={editorData.companies.map((c) => ({ id: c.id, label: c.name }))}
-                      selectedIds={editorData.selectedCompanyIds}
-                      onChange={editorData.onCompanyToggle}
+                  <DetailRow label="Companies">
+                    <LrSelect
+                      mode="multi"
+                      options={editorData.companies.map((c) => ({ value: c.id, label: c.name }))}
+                      value={editorData.selectedCompanyIds}
+                      onChange={(ids) => {
+                        const prev = editorData.selectedCompanyIds
+                        const next = ids as string[]
+                        const toggled = next.find((id) => !prev.includes(id)) ?? prev.find((id) => !next.includes(id))
+                        if (toggled) editorData.onCompanyToggle(toggled)
+                      }}
+                      className="h-8 text-caption"
                     />
-                  </div>
+                  </DetailRow>
                 )}
               </div>
             </div>
@@ -422,6 +408,48 @@ function TemplateNavRow({ item, active }: { item: SidebarNavItem; active: boolea
         {item.count}
       </span>
     </Link>
+  )
+}
+
+function DocumentTypePicker({
+  documentId,
+  assignedTypeId,
+  allDocumentTypes,
+}: {
+  documentId: string
+  assignedTypeId: string | null
+  allDocumentTypes: { id: string; name: string }[]
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(assignedTypeId)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleChange(value: string) {
+    const nextId = value === '__none__' ? null : value
+    setSelectedId(nextId)
+    setIsSaving(true)
+    const selectedName = allDocumentTypes.find((t) => t.id === nextId)?.name
+    try {
+      await fetch(`/api/documents/${documentId}/types`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ typeNames: selectedName ? [selectedName] : [] }),
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <LrSelect
+      options={[
+        { value: '__none__', label: 'None' },
+        ...allDocumentTypes.map((dt) => ({ value: dt.id, label: dt.name })),
+      ]}
+      value={selectedId ?? '__none__'}
+      onChange={(v) => void handleChange(v as string)}
+      disabled={isSaving}
+      className="h-8 text-caption"
+    />
   )
 }
 

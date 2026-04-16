@@ -155,7 +155,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
     supabase.from('companies').select('*').order('name', { ascending: true }),
     supabase.from('document_companies').select('company_id, companies(id, name, slug)').eq('document_id', id),
     supabase.from('document_document_types').select('document_type_id, document_types(id, name)').eq('document_id', id),
-    supabase.from('document_types').select('name').order('name', { ascending: true }),
+    supabase.from('document_types').select('id, name').order('name', { ascending: true }),
   ])
 
   const allCompanies: Company[] = companies || []
@@ -170,7 +170,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
     if (!value) return []
     return Array.isArray(value) ? value : [value]
   })
-  const allDocumentTypeNames = (allDocumentTypeRows || []).map((row) => row.name)
+  const allDocumentTypes = (allDocumentTypeRows || []).map((row) => ({ id: row.id, name: row.name }))
   const signers: SignatureRequest[] = signatureRequests || []
   const logs = mapSupabaseAuditRows(auditLogs)
   const signedCount = signers.filter((s) => s.status === 'signed').length
@@ -182,7 +182,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
           documentId: doc.id,
           documentStatus: doc.status,
           assignedTypes,
-          allDocumentTypeNames,
+          allDocumentTypes,
           assignedCompanies,
           allCompanies,
           assignedCompanyIds,

@@ -6,13 +6,7 @@ import { Company, UserRole } from '@/lib/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LrSelect } from '@/components/ui/lr-select'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 import { CheckboxList } from '@/components/CheckboxList'
 
@@ -92,19 +86,15 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
 
         <div>
           <Label htmlFor="invite-role">Workspace role</Label>
-          <Select
+          <LrSelect
+            options={[
+              { value: 'member', label: 'Member' },
+              { value: 'admin', label: 'Admin' },
+            ]}
             value={role}
-            onValueChange={(v) => setRole(v as UserRole)}
+            onChange={(v) => setRole(v as UserRole)}
             disabled={isSaving}
-          >
-            <SelectTrigger id="invite-role">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
       </div>
 

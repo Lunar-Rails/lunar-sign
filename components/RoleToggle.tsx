@@ -3,13 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserRole } from '@/lib/types'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LrSelect } from '@/components/ui/lr-select'
 
 interface RoleToggleProps {
   userId: string
@@ -25,16 +19,13 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
     const typed = newRole as UserRole
     if (typed === role) return
     setLoading(true)
-
     try {
       const response = await fetch(`/api/admin/users/${userId}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: typed }),
       })
-
       if (!response.ok) throw new Error('Failed to update role')
-
       setRole(typed)
       router.refresh()
     } catch (error) {
@@ -46,14 +37,15 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
   }
 
   return (
-    <Select value={role} onValueChange={handleRoleChange} disabled={loading}>
-      <SelectTrigger className="w-[110px] h-8 text-lr-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="member">Member</SelectItem>
-        <SelectItem value="admin">Admin</SelectItem>
-      </SelectContent>
-    </Select>
+    <LrSelect
+      options={[
+        { value: 'member', label: 'Member' },
+        { value: 'admin', label: 'Admin' },
+      ]}
+      value={role}
+      onChange={(v) => void handleRoleChange(v as string)}
+      disabled={loading}
+      className="w-[110px] h-8 text-lr-xs"
+    />
   )
 }

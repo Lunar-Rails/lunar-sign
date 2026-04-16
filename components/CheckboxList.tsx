@@ -36,11 +36,11 @@ export function CheckboxList({
         <label
           key={option.id}
           className={cn(
-            'flex cursor-pointer items-center gap-2 text-caption text-lr-text',
+            'flex cursor-pointer items-center gap-2 text-lr-text',
             disabled && 'cursor-not-allowed opacity-60',
             variant === 'menu'
-              ? 'rounded-lr px-3 py-1.5 transition-colors hover:bg-lr-surface-2'
-              : 'py-0.5'
+              ? 'rounded-lr px-3 py-1.5 text-lr-sm transition-colors hover:bg-lr-surface-2'
+              : 'py-0.5 text-caption'
           )}
         >
           <input

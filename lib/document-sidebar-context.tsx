@@ -7,7 +7,7 @@ export interface DocumentSidebarData {
   documentId: string
   documentStatus: DocumentStatus
   assignedTypes: Pick<DocumentType, 'id' | 'name'>[]
-  allDocumentTypeNames: string[]
+  allDocumentTypes: Pick<DocumentType, 'id' | 'name'>[]
   assignedCompanies: Pick<Company, 'id' | 'name' | 'slug'>[]
   allCompanies: Company[]
   assignedCompanyIds: string[]
