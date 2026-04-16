@@ -168,11 +168,13 @@ export function DocumentFieldEditor({
     [fields, signerIndexById]
   )
 
-  // Creator fields that accept a plain-text value (shown in "Your fields" panel)
+  // Creator fields that accept a plain-text value (shown in "Your fields" panel).
+  // Use strict `=== null` — `undefined` means the field is not yet in signerIndexById
+  // (the sync effect hasn't run yet) and must not be treated as a creator assignment.
   const creatorInputFields = useMemo(
     () =>
       fields.filter((f) => {
-        const idx = signerIndexById[f.id] ?? null
+        const idx = signerIndexById[f.id]
         return idx === null && CREATOR_INPUT_TYPES.includes(f.type as FieldType)
       }),
     [fields, signerIndexById]
@@ -213,14 +215,16 @@ export function DocumentFieldEditor({
     setSignerIndexById(map)
   }, [initialFieldMetadata, setFields])
 
-  // Keep signerIndexById in sync — new fields default to Signer 1 (index 0)
+  // Keep signerIndexById in sync — new fields default to Signer 1 (index 0),
+  // except "text" fields which default to creator (null) since they are
+  // typically pre-filled values rather than signer inputs.
   useEffect(() => {
     setSignerIndexById((prev) => {
       const next = { ...prev }
       let changed = false
       for (const f of fields) {
         if (!(f.id in next)) {
-          next[f.id] = 0
+          next[f.id] = f.type === 'text' ? null : 0
           changed = true
         }
       }

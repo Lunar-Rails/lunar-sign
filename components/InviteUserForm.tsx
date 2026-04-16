@@ -6,14 +6,9 @@ import { Company, UserRole } from '@/lib/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LrSelect } from '@/components/ui/lr-select'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { CheckboxList } from '@/components/CheckboxList'
 
 interface InviteUserFormProps {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
@@ -91,19 +86,15 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
 
         <div>
           <Label htmlFor="invite-role">Workspace role</Label>
-          <Select
+          <LrSelect
+            options={[
+              { value: 'member', label: 'Member' },
+              { value: 'admin', label: 'Admin' },
+            ]}
             value={role}
-            onValueChange={(v) => setRole(v as UserRole)}
+            onChange={(v) => setRole(v as UserRole)}
             disabled={isSaving}
-          >
-            <SelectTrigger id="invite-role">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
       </div>
 
@@ -112,19 +103,13 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
         {companies.length === 0 ? (
           <p className="mt-2 text-lr-sm text-lr-muted">No companies available yet.</p>
         ) : (
-          <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
-            {companies.map((company) => (
-              <label key={company.id} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedCompanyIds.includes(company.id)}
-                  onChange={() => handleCompanyToggle(company.id)}
-                  className="h-4 w-4 rounded border-lr-border accent-lr-accent"
-                  disabled={isSaving}
-                />
-                <span className="text-lr-sm text-lr-text-2">{company.name}</span>
-              </label>
-            ))}
+          <div className="mt-2 max-h-44 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
+            <CheckboxList
+              options={companies.map((c) => ({ id: c.id, label: c.name }))}
+              selectedIds={selectedCompanyIds}
+              onChange={handleCompanyToggle}
+              disabled={isSaving}
+            />
           </div>
         )}
       </div>

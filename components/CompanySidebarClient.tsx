@@ -6,21 +6,15 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
+import type { AuditLogWithActor } from '@/lib/types'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
 import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
-import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
 import DocumentCompaniesEditor from '@/components/DocumentCompaniesEditor'
 import { SidebarNav, type SidebarNavItem, type SidebarNavGroup } from '@/components/SidebarNav'
 import { SidebarStatGrid, type StatItem } from '@/components/SidebarStatGrid'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LrSelect } from '@/components/ui/lr-select'
 
 interface CompanySidebarItem {
   id: string
@@ -146,11 +140,10 @@ export default function CompanySidebarClient({
                 <p className="text-section-label">Details</p>
                 <div className="space-y-2 pt-0.5">
                   <DetailRow label="Type">
-                    <DocumentTypeInlineEditor
+                    <DocumentTypePicker
                       documentId={docData.documentId}
-                      initialTypeNames={docData.assignedTypes.map((t) => t.name)}
-                      availableTypeNames={docData.allDocumentTypeNames}
-                      isCompact
+                      assignedTypeId={docData.assignedTypes[0]?.id ?? null}
+                      allDocumentTypes={docData.allDocumentTypes}
                     />
                   </DetailRow>
                   <DetailRow label="Companies">
@@ -202,29 +195,12 @@ export default function CompanySidebarClient({
                   />
                 </button>
 
-                {/* Collapsed: show latest 2 entries as a preview */}
+                {/* Collapsed: latest 2 entries + overflow count */}
                 {!activityExpanded && docData.auditLogs.length > 0 && (
                   <div className="mt-2 space-y-1.5">
-                    {docData.auditLogs.slice(0, 2).map((log) => {
-                      const actorLine = getActorLine(log)
-                      return (
-                        <div key={log.id} className="flex items-start gap-2">
-                          <div className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-caption font-medium text-lr-text leading-tight truncate">
-                              {getActionLabel(log.action)}
-                            </p>
-                            <p className="text-caption leading-tight text-lr-muted truncate">
-                              {actorLine && <span>{actorLine} · </span>}
-                              {new Date(log.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {docData.auditLogs.slice(0, 2).map((log) => (
+                      <ActivityLogItem key={log.id} log={log} />
+                    ))}
                     {docData.auditLogs.length > 2 && (
                       <p className="text-caption text-lr-muted pl-3.5">
                         +{docData.auditLogs.length - 2} more
@@ -233,37 +209,15 @@ export default function CompanySidebarClient({
                   </div>
                 )}
 
-                {/* Expanded: full timeline */}
+                {/* Expanded: full list, identical item layout */}
                 {activityExpanded && (
-                  <div className="mt-2 max-h-[320px] overflow-y-auto space-y-0">
+                  <div className="mt-2 max-h-[320px] overflow-y-auto space-y-1.5">
                     {docData.auditLogs.length === 0 ? (
                       <p className="text-caption text-lr-muted">No activity yet.</p>
                     ) : (
-                      docData.auditLogs.map((log, index) => {
-                        const actorLine = getActorLine(log)
-                        return (
-                          <div key={log.id} className="flex gap-2">
-                            <div className="flex flex-col items-center pt-1">
-                              <div className={cn('h-2 w-2 shrink-0 rounded-full', getDotClass(log.action))} />
-                              {index < docData.auditLogs.length - 1 && (
-                                <div className="mt-0.5 flex-1 w-px bg-lr-border" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1 pb-2.5">
-                              <p className="text-caption font-medium text-lr-text leading-tight">
-                                {getActionLabel(log.action)}
-                              </p>
-                              <p className="text-caption leading-tight mt-0.5">
-                                {actorLine && <span>{actorLine} · </span>}
-                                {new Date(log.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })
+                      docData.auditLogs.map((log) => (
+                        <ActivityLogItem key={log.id} log={log} />
+                      ))
                     )}
                   </div>
                 )}
@@ -275,67 +229,52 @@ export default function CompanySidebarClient({
         {/* Zone 3b: Template editor (only when TemplateFieldEditor is mounted) */}
         {editorData && (
           <div className="border-t border-lr-border mt-2 pt-2">
-            <div className="bg-lr-surface-2 rounded-lr p-3 space-y-3">
+            <div className="bg-lr-surface-2 rounded-lr p-3 space-y-2">
               <p className="text-section-label">Template</p>
-              <div className="space-y-2.5">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Title *</span>
+              <div className="space-y-2 pt-0.5">
+                <DetailRow label="Title *">
                   <Input
                     value={editorData.title}
                     onChange={(e) => editorData.setTitle(e.target.value)}
                     placeholder="Template title"
-                    className="mt-0.5 h-8 text-caption bg-lr-bg border-lr-border"
+                    className="h-8 text-caption bg-lr-bg border-lr-border"
                   />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Description</span>
+                </DetailRow>
+                <DetailRow label="Description">
                   <Textarea
                     value={editorData.description}
                     onChange={(e) => editorData.setDescription(e.target.value)}
                     placeholder="Optional description"
                     rows={2}
-                    className="mt-0.5 text-caption bg-lr-bg border-lr-border resize-none"
+                    className="text-caption bg-lr-bg border-lr-border resize-none"
                   />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-section-label">Document type</span>
-                  <Select
+                </DetailRow>
+                <DetailRow label="Type">
+                  <LrSelect
+                    options={[
+                      { value: '__none__', label: 'None' },
+                      ...editorData.documentTypes.map((dt) => ({ value: dt.id, label: dt.name })),
+                    ]}
                     value={editorData.documentTypeId ?? '__none__'}
-                    onValueChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v)}
-                  >
-                    <SelectTrigger className="mt-0.5 h-8 text-caption border-lr-border bg-lr-bg">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {editorData.documentTypes.map((dt) => (
-                        <SelectItem key={dt.id} value={dt.id}>
-                          {dt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    onChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v as string)}
+                    className="h-8 text-caption"
+                  />
+                </DetailRow>
                 {editorData.companies.length > 0 && (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-section-label">Companies</span>
-                    <div className="mt-0.5 space-y-1.5">
-                      {editorData.companies.map((c) => (
-                        <label
-                          key={c.id}
-                          className="flex cursor-pointer items-center gap-2 text-caption"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={editorData.selectedCompanyIds.includes(c.id)}
-                            onChange={() => editorData.onCompanyToggle(c.id)}
-                            className="h-3.5 w-3.5 rounded border-lr-border accent-lr-accent"
-                          />
-                          {c.name}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                  <DetailRow label="Companies">
+                    <LrSelect
+                      mode="multi"
+                      options={editorData.companies.map((c) => ({ value: c.id, label: c.name }))}
+                      value={editorData.selectedCompanyIds}
+                      onChange={(ids) => {
+                        const prev = editorData.selectedCompanyIds
+                        const next = ids as string[]
+                        const toggled = next.find((id) => !prev.includes(id)) ?? prev.find((id) => !next.includes(id))
+                        if (toggled) editorData.onCompanyToggle(toggled)
+                      }}
+                      className="h-8 text-caption"
+                    />
+                  </DetailRow>
                 )}
               </div>
             </div>
@@ -472,11 +411,74 @@ function TemplateNavRow({ item, active }: { item: SidebarNavItem; active: boolea
   )
 }
 
+function DocumentTypePicker({
+  documentId,
+  assignedTypeId,
+  allDocumentTypes,
+}: {
+  documentId: string
+  assignedTypeId: string | null
+  allDocumentTypes: { id: string; name: string }[]
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(assignedTypeId)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleChange(value: string) {
+    const nextId = value === '__none__' ? null : value
+    setSelectedId(nextId)
+    setIsSaving(true)
+    const selectedName = allDocumentTypes.find((t) => t.id === nextId)?.name
+    try {
+      await fetch(`/api/documents/${documentId}/types`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ typeNames: selectedName ? [selectedName] : [] }),
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <LrSelect
+      options={[
+        { value: '__none__', label: 'None' },
+        ...allDocumentTypes.map((dt) => ({ value: dt.id, label: dt.name })),
+      ]}
+      value={selectedId ?? '__none__'}
+      onChange={(v) => void handleChange(v as string)}
+      disabled={isSaving}
+      className="h-8 text-caption"
+    />
+  )
+}
+
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-section-label">{label}</span>
       <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function ActivityLogItem({ log }: { log: AuditLogWithActor }) {
+  const actorLine = getActorLine(log)
+  return (
+    <div className="flex items-start gap-2">
+      <div className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
+      <div className="min-w-0 flex-1">
+        <p className="text-caption font-medium text-lr-text leading-tight truncate">
+          {getActionLabel(log.action)}
+        </p>
+        <p className="text-caption leading-tight text-lr-muted truncate">
+          {actorLine && <span>{actorLine} · </span>}
+          {new Date(log.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
     </div>
   )
 }

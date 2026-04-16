@@ -51,7 +51,10 @@ export function TemplateFieldList({
   return (
     <ul className="space-y-1">
       {fields.map((field) => {
-        const idx = signerIndexById[field.id] ?? null
+        // Strict check: undefined (field not yet in map) falls back to s1 default,
+        // null (explicitly assigned to creator) maps to 'creator'.
+        const rawIdx = signerIndexById[field.id]
+        const idx = rawIdx === undefined ? 0 : rawIdx
         const key = signerKey(idx)
         const label = field.label?.trim() || TYPE_LABELS[field.type]
         return (
