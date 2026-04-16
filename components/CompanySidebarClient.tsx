@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
+import type { AuditLogWithActor } from '@/lib/types'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
 import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
@@ -202,29 +203,12 @@ export default function CompanySidebarClient({
                   />
                 </button>
 
-                {/* Collapsed: show latest 2 entries as a preview */}
+                {/* Collapsed: latest 2 entries + overflow count */}
                 {!activityExpanded && docData.auditLogs.length > 0 && (
                   <div className="mt-2 space-y-1.5">
-                    {docData.auditLogs.slice(0, 2).map((log) => {
-                      const actorLine = getActorLine(log)
-                      return (
-                        <div key={log.id} className="flex items-start gap-2">
-                          <div className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-caption font-medium text-lr-text leading-tight truncate">
-                              {getActionLabel(log.action)}
-                            </p>
-                            <p className="text-caption leading-tight text-lr-muted truncate">
-                              {actorLine && <span>{actorLine} · </span>}
-                              {new Date(log.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {docData.auditLogs.slice(0, 2).map((log) => (
+                      <ActivityLogItem key={log.id} log={log} />
+                    ))}
                     {docData.auditLogs.length > 2 && (
                       <p className="text-caption text-lr-muted pl-3.5">
                         +{docData.auditLogs.length - 2} more
@@ -233,37 +217,15 @@ export default function CompanySidebarClient({
                   </div>
                 )}
 
-                {/* Expanded: full timeline */}
+                {/* Expanded: full list, identical item layout */}
                 {activityExpanded && (
-                  <div className="mt-2 max-h-[320px] overflow-y-auto space-y-0">
+                  <div className="mt-2 max-h-[320px] overflow-y-auto space-y-1.5">
                     {docData.auditLogs.length === 0 ? (
                       <p className="text-caption text-lr-muted">No activity yet.</p>
                     ) : (
-                      docData.auditLogs.map((log, index) => {
-                        const actorLine = getActorLine(log)
-                        return (
-                          <div key={log.id} className="flex gap-2">
-                            <div className="flex flex-col items-center pt-1">
-                              <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
-                              {index < docData.auditLogs.length - 1 && (
-                                <div className="mt-0.5 flex-1 w-px bg-lr-border" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1 pb-2.5">
-                              <p className="text-caption font-medium text-lr-text leading-tight">
-                                {getActionLabel(log.action)}
-                              </p>
-                              <p className="text-caption leading-tight mt-0.5 text-lr-muted">
-                                {actorLine && <span>{actorLine} · </span>}
-                                {new Date(log.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })
+                      docData.auditLogs.map((log) => (
+                        <ActivityLogItem key={log.id} log={log} />
+                      ))
                     )}
                   </div>
                 )}
@@ -477,6 +439,27 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
     <div className="flex flex-col gap-0.5">
       <span className="text-section-label">{label}</span>
       <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function ActivityLogItem({ log }: { log: AuditLogWithActor }) {
+  const actorLine = getActorLine(log)
+  return (
+    <div className="flex items-start gap-2">
+      <div className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
+      <div className="min-w-0 flex-1">
+        <p className="text-caption font-medium text-lr-text leading-tight truncate">
+          {getActionLabel(log.action)}
+        </p>
+        <p className="text-caption leading-tight text-lr-muted truncate">
+          {actorLine && <span>{actorLine} · </span>}
+          {new Date(log.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
     </div>
   )
 }
