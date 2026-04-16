@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
@@ -72,6 +74,7 @@ export default function CompanySidebarClient({
   const { data: docData } = useDocumentSidebar()
   const { data: templateData } = useTemplateSidebar()
   const { data: editorData } = useTemplateEditorSidebar()
+  const [activityExpanded, setActivityExpanded] = useState(false)
 
   const overviewItem: SidebarNavItem = {
     href: '/documents',
@@ -183,26 +186,35 @@ export default function CompanySidebarClient({
 
             <div className="border-t border-lr-border mt-2 pt-2">
               <div className="bg-lr-surface-2 rounded-lr p-3">
-                <p className="text-section-label mb-2">Activity</p>
-                {docData.auditLogs.length === 0 ? (
-                  <p className="text-caption">No activity yet.</p>
-                ) : (
-                  <div className="max-h-[280px] overflow-y-auto space-y-0">
-                    {docData.auditLogs.map((log, index) => {
+                {/* Collapsible header */}
+                <button
+                  type="button"
+                  onClick={() => setActivityExpanded((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2 group"
+                  aria-expanded={activityExpanded}
+                >
+                  <p className="text-section-label">Activity</p>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 text-lr-muted transition-transform duration-150 group-hover:text-lr-text',
+                      activityExpanded && 'rotate-180'
+                    )}
+                  />
+                </button>
+
+                {/* Collapsed: show latest 2 entries as a preview */}
+                {!activityExpanded && docData.auditLogs.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {docData.auditLogs.slice(0, 2).map((log) => {
                       const actorLine = getActorLine(log)
                       return (
-                        <div key={log.id} className="flex gap-2">
-                          <div className="flex flex-col items-center pt-1">
-                            <div className={cn('h-2 w-2 shrink-0 rounded-full', getDotClass(log.action))} />
-                            {index < docData.auditLogs.length - 1 && (
-                              <div className="mt-0.5 flex-1 w-px bg-lr-border" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1 pb-2.5">
-                            <p className="text-caption font-medium text-lr-text leading-tight">
+                        <div key={log.id} className="flex items-start gap-2">
+                          <div className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', getDotClass(log.action))} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-caption font-medium text-lr-text leading-tight truncate">
                               {getActionLabel(log.action)}
                             </p>
-                            <p className="text-caption leading-tight mt-0.5">
+                            <p className="text-caption leading-tight text-lr-muted truncate">
                               {actorLine && <span>{actorLine} · </span>}
                               {new Date(log.created_at).toLocaleDateString('en-US', {
                                 month: 'short',
@@ -213,6 +225,46 @@ export default function CompanySidebarClient({
                         </div>
                       )
                     })}
+                    {docData.auditLogs.length > 2 && (
+                      <p className="text-caption text-lr-muted pl-3.5">
+                        +{docData.auditLogs.length - 2} more
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Expanded: full timeline */}
+                {activityExpanded && (
+                  <div className="mt-2 max-h-[320px] overflow-y-auto space-y-0">
+                    {docData.auditLogs.length === 0 ? (
+                      <p className="text-caption text-lr-muted">No activity yet.</p>
+                    ) : (
+                      docData.auditLogs.map((log, index) => {
+                        const actorLine = getActorLine(log)
+                        return (
+                          <div key={log.id} className="flex gap-2">
+                            <div className="flex flex-col items-center pt-1">
+                              <div className={cn('h-2 w-2 shrink-0 rounded-full', getDotClass(log.action))} />
+                              {index < docData.auditLogs.length - 1 && (
+                                <div className="mt-0.5 flex-1 w-px bg-lr-border" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1 pb-2.5">
+                              <p className="text-caption font-medium text-lr-text leading-tight">
+                                {getActionLabel(log.action)}
+                              </p>
+                              <p className="text-caption leading-tight mt-0.5">
+                                {actorLine && <span>{actorLine} · </span>}
+                                {new Date(log.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
                 )}
               </div>

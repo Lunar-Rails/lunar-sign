@@ -11,7 +11,6 @@ import { CancelDocumentButton } from '@/components/CancelDocumentButton'
 import { DeleteDocumentButton } from '@/components/DeleteDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
 import { DocumentFieldEditor } from '@/components/DocumentFieldEditor'
-import { DocumentActivityLog } from '@/components/DocumentActivityLog'
 import { DocumentSidebarSetter } from '@/components/DocumentSidebarSetter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -276,8 +275,6 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
             </div>
           </div>
         )}
-
-        <DocumentActivityLog logs={logs} />
 
         <div className="lg:hidden space-y-4">
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card p-4">
