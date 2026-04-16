@@ -125,6 +125,31 @@ export async function POST(request: NextRequest) {
       .update(signedPdfBytes)
       .digest('hex')
 
+    // Hash the signature image itself so the captured ink is independently verifiable.
+    const signatureImageHash = crypto
+      .createHash('sha256')
+      .update(Buffer.from(signature_data))
+      .digest('hex')
+
+    // Pre-compute signed_at so it's identical in the DB row and the evidence hash.
+    const signedAt = new Date().toISOString()
+
+    // Evidence hash: canonical commit over all signing event fields.
+    // Format: each field on its own line, ordered deterministically.
+    // Re-computing this from the DB later proves the record hasn't been tampered with.
+    const evidenceInput = [
+      signatureRequest.signer_email,
+      signer_name,
+      signatureImageHash,
+      originalDocumentHash,
+      signedDocumentHash,
+      signedAt,
+    ].join('\n')
+    const evidenceHash = crypto
+      .createHash('sha256')
+      .update(evidenceInput)
+      .digest('hex')
+
     const uploadPath = `${document.id}/${signatureRequest.id}_signed.pdf`
     const { error: uploadError } = await supabase.storage
       .from('signed-documents')
@@ -162,9 +187,12 @@ export async function POST(request: NextRequest) {
       signature_data,
       document_hash: signedDocumentHash,
       original_document_hash: originalDocumentHash,
+      signature_image_hash: signatureImageHash,
+      evidence_hash: evidenceHash,
       signed_pdf_path: uploadPath,
       ip_address: ip === 'unknown' ? null : ip,
       user_agent: userAgent,
+      signed_at: signedAt,
     })
     const { error: sigInsertError } = sigInsertResult
 
@@ -178,7 +206,7 @@ export async function POST(request: NextRequest) {
 
     const reqUpdateResult = await supabase
       .from('signature_requests')
-      .update({ status: 'signed', signed_at: new Date().toISOString() })
+      .update({ status: 'signed', signed_at: signedAt })
       .eq('id', signatureRequest.id)
     const { error: reqUpdateError } = reqUpdateResult
 

@@ -8,6 +8,7 @@ import { mapSupabaseAuditRows } from '@/lib/map-audit-log-row'
 import SignersSection from '@/components/SignersSection'
 import SendDocumentButton from '@/components/SendDocumentButton'
 import { CancelDocumentButton } from '@/components/CancelDocumentButton'
+import { ReminderButton } from '@/components/ReminderButton'
 import { DeleteDocumentButton } from '@/components/DeleteDocumentButton'
 import DocumentPdfPreview from '@/components/DocumentPdfPreview'
 import { DocumentFieldEditor } from '@/components/DocumentFieldEditor'
@@ -226,7 +227,13 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
               <SendDocumentButton documentId={doc.id} />
             )}
             {doc.status === 'pending' && (
-              <CancelDocumentButton documentId={doc.id} />
+              <>
+                <ReminderButton
+                  documentId={doc.id}
+                  pendingCount={signers.filter((s) => s.status === 'pending').length}
+                />
+                <CancelDocumentButton documentId={doc.id} />
+              </>
             )}
             {doc.status === 'completed' && (
               <Button asChild variant="gold">

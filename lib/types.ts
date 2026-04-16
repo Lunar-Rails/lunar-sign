@@ -141,6 +141,9 @@ export interface Signature {
   request_id: string
   signature_data: string
   document_hash: string
+  original_document_hash: string | null
+  signature_image_hash: string | null
+  evidence_hash: string | null
   signed_pdf_path: string
   ip_address: string | null
   user_agent: string | null

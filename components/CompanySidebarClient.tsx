@@ -492,6 +492,7 @@ function getActionLabel(action: string): string {
     document_viewed: 'Viewed',
     document_completed: 'Completed',
     document_cancelled: 'Cancelled',
+    document_reminder_sent: 'Reminder sent',
   }
   return labels[action] || action.replace(/_/g, ' ')
 }
@@ -509,6 +510,8 @@ function getDotClass(action: string): string {
       return 'bg-lr-cyan'
     case 'document_cancelled':
       return 'bg-lr-error'
+    case 'document_reminder_sent':
+      return 'bg-lr-warning'
     default:
       return 'bg-lr-muted'
   }
