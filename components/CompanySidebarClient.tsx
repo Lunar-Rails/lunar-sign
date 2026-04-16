@@ -7,6 +7,7 @@ import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDocumentSidebar } from '@/lib/document-sidebar-context'
 import type { AuditLogWithActor } from '@/lib/types'
+import { CheckboxList } from '@/components/CheckboxList'
 import { useTemplateSidebar } from '@/lib/template-sidebar-context'
 import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 import DocumentTypeInlineEditor from '@/components/DocumentTypeInlineEditor'
@@ -281,22 +282,12 @@ export default function CompanySidebarClient({
                 {editorData.companies.length > 0 && (
                   <div className="flex flex-col gap-0.5">
                     <span className="text-section-label">Companies</span>
-                    <div className="mt-0.5 space-y-1.5">
-                      {editorData.companies.map((c) => (
-                        <label
-                          key={c.id}
-                          className="flex cursor-pointer items-center gap-2 text-caption"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={editorData.selectedCompanyIds.includes(c.id)}
-                            onChange={() => editorData.onCompanyToggle(c.id)}
-                            className="h-3.5 w-3.5 rounded border-lr-border accent-lr-accent"
-                          />
-                          {c.name}
-                        </label>
-                      ))}
-                    </div>
+                    <CheckboxList
+                      className="mt-0.5"
+                      options={editorData.companies.map((c) => ({ id: c.id, label: c.name }))}
+                      selectedIds={editorData.selectedCompanyIds}
+                      onChange={editorData.onCompanyToggle}
+                    />
                   </div>
                 )}
               </div>

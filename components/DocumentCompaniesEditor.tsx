@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Company } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { CheckboxList } from '@/components/CheckboxList'
 import { AlertCircle, ChevronDown } from 'lucide-react'
 
 interface DocumentCompaniesEditorProps {
@@ -96,25 +97,14 @@ export default function DocumentCompaniesEditor({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lr-lg border border-lr-border bg-lr-surface py-1 shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lr-lg border border-lr-border bg-lr-bg py-1 shadow-lg">
           <div className="max-h-48 overflow-y-auto">
-            {companies.map((company) => {
-              const isChecked = nextSelectedCompanyIds.includes(company.id)
-              return (
-                <label
-                  key={company.id}
-                  className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-lr-sm text-lr-text-2 transition-colors hover:bg-lr-surface-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleToggle(company.id)}
-                    className="h-3.5 w-3.5 rounded border-lr-border accent-lr-accent"
-                  />
-                  <span>{company.name}</span>
-                </label>
-              )
-            })}
+            <CheckboxList
+              variant="menu"
+              options={companies.map((c) => ({ id: c.id, label: c.name }))}
+              selectedIds={nextSelectedCompanyIds}
+              onChange={handleToggle}
+            />
           </div>
           {error && (
             <div className="flex items-center gap-1.5 border-t border-lr-border px-3 py-1.5 text-lr-xs text-lr-error">

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { CheckboxList } from '@/components/CheckboxList'
 
 interface InviteUserFormProps {
   companies: Pick<Company, 'id' | 'name' | 'slug'>[]
@@ -112,19 +113,13 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
         {companies.length === 0 ? (
           <p className="mt-2 text-lr-sm text-lr-muted">No companies available yet.</p>
         ) : (
-          <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
-            {companies.map((company) => (
-              <label key={company.id} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedCompanyIds.includes(company.id)}
-                  onChange={() => handleCompanyToggle(company.id)}
-                  className="h-4 w-4 rounded border-lr-border accent-lr-accent"
-                  disabled={isSaving}
-                />
-                <span className="text-lr-sm text-lr-text-2">{company.name}</span>
-              </label>
-            ))}
+          <div className="mt-2 max-h-44 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
+            <CheckboxList
+              options={companies.map((c) => ({ id: c.id, label: c.name }))}
+              selectedIds={selectedCompanyIds}
+              onChange={handleCompanyToggle}
+              disabled={isSaving}
+            />
           </div>
         )}
       </div>
