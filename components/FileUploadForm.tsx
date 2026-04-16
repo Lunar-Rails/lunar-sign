@@ -3,11 +3,10 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  DocumentCompanyIdsSchema,
   DocumentTypeNamesSchema,
   DocumentUploadSchema,
 } from '@/lib/schemas'
-import { Company, DocumentType } from '@/lib/types'
+import { DocumentType } from '@/lib/types'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -16,9 +15,7 @@ import { AlertCircle, UploadCloud, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FileUploadFormProps {
-  companies: Company[]
   documentTypes: DocumentType[]
-  initialCompanyIds?: string[]
 }
 
 function normalizeTypeName(name: string) {
@@ -29,19 +26,11 @@ function isSameTypeName(a: string, b: string) {
   return a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0
 }
 
-export default function FileUploadForm({
-  companies,
-  documentTypes,
-  initialCompanyIds = [],
-}: FileUploadFormProps) {
+export default function FileUploadForm({ documentTypes }: FileUploadFormProps) {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>(() => {
-    const allowed = new Set(companies.map((c) => c.id))
-    return initialCompanyIds.filter((id) => allowed.has(id))
-  })
   const [selectedTypeNames, setSelectedTypeNames] = useState<string[]>([])
   const [typeInput, setTypeInput] = useState('')
   const [isDragging, setIsDragging] = useState(false)
@@ -75,12 +64,6 @@ export default function FileUploadForm({
     } else if (selected) {
       setError('Only PDF files are supported')
     }
-  }
-
-  function handleCompanyToggle(companyId: string) {
-    setSelectedCompanyIds((prev) =>
-      prev.includes(companyId) ? prev.filter((id) => id !== companyId) : [...prev, companyId]
-    )
   }
 
   function handleAddType(rawName: string) {
@@ -125,9 +108,6 @@ export default function FileUploadForm({
       return
     }
 
-    const companyValidation = DocumentCompanyIdsSchema.safeParse({ companyIds: selectedCompanyIds })
-    if (!companyValidation.success) { setError('Invalid company selection'); return }
-
     const typeValidation = DocumentTypeNamesSchema.safeParse({ typeNames: selectedTypeNames })
     if (!typeValidation.success) { setError('Invalid document type selection'); return }
 
@@ -142,7 +122,6 @@ export default function FileUploadForm({
       formData.append('description', description || '')
       formData.append('file', file)
       typeValidation.data.typeNames.forEach((typeName) => formData.append('typeNames', typeName))
-      selectedCompanyIds.forEach((companyId) => formData.append('companyIds', companyId))
 
       const response = await fetch('/api/documents/upload', { method: 'POST', body: formData })
 
@@ -235,29 +214,6 @@ export default function FileUploadForm({
           Press Enter to convert typed text into a document type tag.
         </p>
       </div>
-
-      {/* Company Assignment */}
-      {companies.length > 0 && (
-        <div>
-          <Label>Assign to Companies</Label>
-          <div className="mt-1.5 max-h-52 space-y-2 overflow-y-auto rounded-lr border border-lr-border bg-lr-surface p-3">
-            {companies.map((company) => (
-              <label key={company.id} className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedCompanyIds.includes(company.id)}
-                  onChange={() => handleCompanyToggle(company.id)}
-                  className="h-4 w-4 rounded border-lr-border accent-lr-accent"
-                />
-                <span className="text-lr-sm text-lr-text-2">{company.name}</span>
-              </label>
-            ))}
-          </div>
-          <p className="mt-1 text-lr-xs text-lr-muted">
-            A document can belong to multiple companies.
-          </p>
-        </div>
-      )}
 
       {/* File Drop Zone */}
       <div>
