@@ -7,7 +7,7 @@
  *   Phase 2 — upgrade of pending proofs once Bitcoin confirms (~1h)
  *
  * Vercel migration: delete this file, add to vercel.json:
- *   { "crons": [{ "path": "/api/internal/ots/upgrade", "schedule": "*/30 * * * *" }] }
+ *   { "crons": [{ "path": "/api/internal/ots/upgrade", "schedule": "every 30 minutes" }] }
  *   and replace x-cron-secret check with Authorization: Bearer ${CRON_SECRET}.
  */
 
@@ -49,5 +49,5 @@ export default async (): Promise<Response> => {
 }
 
 export const config: Config = {
-  schedule: '*/30 * * * *',
+  schedule: '*/5 * * * *',
 }
