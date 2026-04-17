@@ -6,6 +6,8 @@ import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import { sendEmail } from '@/lib/email/client'
 import { computeEvidenceMac } from '@/lib/esigning/evidence-mac'
+import { appendCertificateOfCompletion } from '@/lib/esigning/certificate'
+import type { CertSignerRecord } from '@/lib/esigning/certificate'
 import {
   documentCompletedOwnerEmail,
   documentCompletedSignerEmail,
@@ -16,12 +18,22 @@ import type {
   SignatureRequestWithToken,
 } from '@/lib/types'
 
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024 // 15 MB
+
 interface AllRequestRow {
   id: string
   status: string
   signer_name: string
   signer_email: string
   token: string
+}
+
+interface SignatureRow {
+  request_id: string
+  evidence_mac: string | null
+  signed_at: string
+  ip_address: string | null
+  otp_verified: boolean
 }
 
 interface OwnerProfileRow {
@@ -295,11 +307,87 @@ export async function POST(request: NextRequest) {
 
     let completed = false
     if (allSigned) {
+      const completedAt = new Date().toISOString()
+
+      // ── Certificate of Completion ────────────────────────────────────
+      // Best-effort: a failure must never block the completion transition.
+      let certificatePdfBytes: Buffer | null = null
+      let certificatePdfPath: string | null = null
+      let finalDocumentHash: string | null = null
+
+      try {
+        // Fetch all signature records for this document to populate the CoC.
+        const { data: sigRowsRaw } = await supabase
+          .from('signatures')
+          .select('request_id, evidence_mac, signed_at, ip_address, otp_verified')
+          .in('request_id', allRequests.map((r) => r.id))
+
+        const sigRows = (sigRowsRaw ?? []) as SignatureRow[]
+
+        // Build per-signer records, joining on allRequests for name/email.
+        const certSigners: CertSignerRecord[] = allRequests.map((req) => {
+          const sig = sigRows.find((s) => s.request_id === req.id)
+          return {
+            signerName: req.signer_name,
+            signerEmail: req.signer_email,
+            signedAt: sig?.signed_at ?? completedAt,
+            ipAddress: sig?.ip_address ?? null,
+            evidenceMac: sig?.evidence_mac ?? '',
+            otpVerified: sig?.otp_verified ?? false,
+          }
+        })
+
+        // Download the latest signed PDF (has every signer's ink layer).
+        const latestPath = document.latest_signed_pdf_path ?? uploadPath
+        const { data: latestPdfData, error: latestErr } = await supabase.storage
+          .from('signed-documents')
+          .download(latestPath)
+
+        if (!latestErr && latestPdfData) {
+          const latestPdfBytes = Buffer.from(await latestPdfData.arrayBuffer())
+
+          certificatePdfBytes = await appendCertificateOfCompletion(latestPdfBytes, {
+            documentTitle: document.title,
+            documentId: document.id,
+            originalDocumentHash,
+            finalDocumentHash: crypto
+              .createHash('sha256')
+              .update(latestPdfBytes)
+              .digest('hex'),
+            signers: certSigners,
+            generatedAt: completedAt,
+          })
+
+          finalDocumentHash = crypto
+            .createHash('sha256')
+            .update(certificatePdfBytes)
+            .digest('hex')
+
+          certificatePdfPath = `${document.id}/certificate.pdf`
+          const { error: certUploadErr } = await supabase.storage
+            .from('signed-documents')
+            .upload(certificatePdfPath, certificatePdfBytes, {
+              contentType: 'application/pdf',
+              upsert: true,
+            })
+          if (certUploadErr) {
+            console.error('Certificate upload error:', certUploadErr)
+            certificatePdfPath = null
+            finalDocumentHash = null
+          }
+        }
+      } catch (certErr) {
+        console.error('Certificate of completion error:', certErr)
+      }
+
+      // ── Mark document completed ─────────────────────────────────────
       const completeResult = await supabase
         .from('documents')
         .update({
           status: 'completed',
-          completed_at: new Date().toISOString(),
+          completed_at: completedAt,
+          ...(certificatePdfPath ? { certificate_pdf_path: certificatePdfPath } : {}),
+          ...(finalDocumentHash ? { final_document_hash: finalDocumentHash } : {}),
         })
         .eq('id', document.id)
       const { error: completeError } = completeResult
@@ -311,11 +399,23 @@ export async function POST(request: NextRequest) {
 
         await logAudit(null, 'document_completed', 'document', document.id, {
           total_signers: allRequests.length,
+          has_certificate: !!certificatePdfPath,
         })
 
-        // Completion emails: DB state is already committed above. Failures here
-        // must not fail the request or hide the completed state from the UI.
+        // Completion emails — failures here must not fail the request.
         try {
+          // Attach the certificate PDF if it fits within the size limit.
+          const pdfAttachment =
+            certificatePdfBytes && certificatePdfBytes.length <= MAX_ATTACHMENT_BYTES
+              ? [
+                  {
+                    filename: `${document.title.replace(/[^a-zA-Z0-9-_ ]/g, '')}_signed.pdf`,
+                    content: certificatePdfBytes,
+                    contentType: 'application/pdf',
+                  },
+                ]
+              : undefined
+
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
             const { subject, html } = documentCompletedOwnerEmail({
@@ -323,7 +423,7 @@ export async function POST(request: NextRequest) {
               documentTitle: document.title,
               downloadUrl,
             })
-            await sendEmail({ to: ownerProfile.email, subject, html })
+            await sendEmail({ to: ownerProfile.email, subject, html, attachments: pdfAttachment })
           }
 
           for (const req of allRequests) {
@@ -333,7 +433,7 @@ export async function POST(request: NextRequest) {
               documentTitle: document.title,
               downloadUrl: signerDownloadUrl,
             })
-            await sendEmail({ to: req.signer_email, subject, html })
+            await sendEmail({ to: req.signer_email, subject, html, attachments: pdfAttachment })
           }
         } catch (emailError) {
           console.error('Completion email error:', emailError)

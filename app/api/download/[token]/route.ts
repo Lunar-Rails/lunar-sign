@@ -62,9 +62,15 @@ export async function GET(
       )
     }
 
+    // Prefer the certificate PDF (CoC page appended) when the document is fully
+    // completed; fall back to latest signed PDF for partial or legacy docs.
+    const downloadPath =
+      (document as unknown as { certificate_pdf_path?: string | null }).certificate_pdf_path ||
+      document.latest_signed_pdf_path
+
     const { data: signedUrl, error: urlError } = await supabase.storage
       .from('signed-documents')
-      .createSignedUrl(document.latest_signed_pdf_path, 3600)
+      .createSignedUrl(downloadPath, 3600)
 
     if (urlError || !signedUrl) {
       console.error('Signed URL error:', urlError)
