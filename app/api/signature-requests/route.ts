@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { AddSignerSchema } from '@/lib/schemas'
 import { logAudit } from '@/lib/audit'
 import { canAccessDocument } from '@/lib/authorization'
@@ -69,6 +70,26 @@ export async function POST(request: NextRequest) {
     // Generate token
     const token = randomUUID()
 
+    // Derive signer_index from insertion position so multi-signer docs route the
+    // correct fields to each signer at sign time. Without this, both signers would
+    // fall into legacy (null) mode and every signer-assigned field would be treated
+    // as theirs, letting S1 overwrite S2's slot (and vice versa) in the rendered PDF.
+    const { count: existingCount, error: countError } = await supabase
+      .from('signature_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('document_id', document_id)
+      .neq('status', 'cancelled')
+
+    if (countError) {
+      console.error('Count signers error:', countError)
+      return NextResponse.json(
+        { error: 'Failed to add signer' },
+        { status: 500 }
+      )
+    }
+
+    const signerIndex = existingCount ?? 0
+
     // Create signature request
     const { data: signatureRequest, error: dbError } = await supabase
       .from('signature_requests')
@@ -79,6 +100,7 @@ export async function POST(request: NextRequest) {
         requested_by: user.id,
         status: 'pending',
         token,
+        signer_index: signerIndex,
       })
       .select()
       .single()
@@ -181,6 +203,28 @@ export async function DELETE(request: NextRequest) {
         { error: 'Failed to remove signer' },
         { status: 500 }
       )
+    }
+
+    // Renumber remaining signers so signer_index stays contiguous (0, 1, ...).
+    // Only valid in draft; pending/completed docs can't remove signers.
+    const serviceSupabase = getServiceClient()
+    const { data: remaining, error: remainingError } = await serviceSupabase
+      .from('signature_requests')
+      .select('id, created_at')
+      .eq('document_id', sigRequest.document_id)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: true })
+
+    if (remainingError) {
+      console.error('Reindex fetch error:', remainingError)
+    } else if (remaining) {
+      for (let i = 0; i < remaining.length; i++) {
+        const { error: updErr } = await serviceSupabase
+          .from('signature_requests')
+          .update({ signer_index: i })
+          .eq('id', remaining[i].id)
+        if (updErr) console.error('Reindex update error:', updErr)
+      }
     }
 
     // Log audit (entity_id = document so owners see it on document activity)

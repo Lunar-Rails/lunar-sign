@@ -25,6 +25,7 @@ type SigningOutcome =
       document: Document
       pdfBase64: string
       signerIndex: number | null
+      baseVersion: string
     }
 
 export default async function SigningPage({ params }: SigningPageProps) {
@@ -98,6 +99,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
               document,
               pdfBase64,
               signerIndex: (signatureRequest as unknown as { signer_index?: number | null }).signer_index ?? null,
+              baseVersion: document.latest_signed_pdf_path ?? 'original',
             }
           }
         }
@@ -153,6 +155,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
       pdfBase64={outcome.pdfBase64}
       initialFieldsJson={initialFieldsJson}
       signerIndex={outcome.signerIndex}
+      baseVersion={outcome.baseVersion}
     />
   )
 }

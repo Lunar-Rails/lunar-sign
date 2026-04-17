@@ -42,6 +42,12 @@ interface SigningInterfaceProps {
   initialFieldsJson?: string | null
   /** Which signer slot this user belongs to. null = legacy single-signer behavior. */
   signerIndex?: number | null
+  /**
+   * Identifier for the PDF version this page was rendered from. Echoed back
+   * to the server so it can reject stale submissions (another signer signed
+   * between page load and submit). 'original' = no prior signatures.
+   */
+  baseVersion: string
 }
 
 export default function SigningInterface({
@@ -52,6 +58,7 @@ export default function SigningInterface({
   pdfBase64,
   initialFieldsJson,
   signerIndex,
+  baseVersion,
 }: SigningInterfaceProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
@@ -243,8 +250,21 @@ export default function SigningInterface({
           signer_name: displayName,
           signature_data: activeSignatureDataUrl,
           signed_pdf_base64: signedPdfBase64,
+          base_version: baseVersion,
         }),
       })
+
+      if (response.status === 409) {
+        // Another signer committed a signature between our page load and submit.
+        // Refresh the RSC page so we re-render with the current latest_signed_pdf_path
+        // and a fresh baseVersion; the signer then re-signs on top of the new state.
+        setErrorMessage(
+          'Another signer just signed this document. Reloading with the latest version...'
+        )
+        setLoading(false)
+        setTimeout(() => router.refresh(), 1500)
+        return
+      }
 
       if (!response.ok) {
         const errorPayload = await parseJsonResponse({ response })

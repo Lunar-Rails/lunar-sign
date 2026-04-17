@@ -71,6 +71,7 @@ export function documentCompletedOwnerEmail(params: {
 export function documentCompletedSignerEmail(params: {
   signerName: string
   documentTitle: string
+  downloadUrl: string
 }): { subject: string; html: string } {
   const subject = `Document Fully Signed: ${params.documentTitle}`
   const html = renderEmail('document-completed-signer', {
@@ -78,6 +79,7 @@ export function documentCompletedSignerEmail(params: {
     preheader: `All parties have signed ${params.documentTitle}`,
     signerName: params.signerName,
     documentTitle: params.documentTitle,
+    downloadUrl: params.downloadUrl,
   })
   return { subject, html }
 }
@@ -104,6 +106,7 @@ export function signatureReminderEmail(params: {
 export function documentCompleteSignerEmail(params: {
   signerName: string
   documentTitle: string
+  downloadUrl: string
 }): { subject: string; html: string } {
   return documentCompletedSignerEmail(params)
 }

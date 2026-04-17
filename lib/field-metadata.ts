@@ -47,28 +47,51 @@ export function normalizeStoredFields(fields: StoredField[]): StoredField[] {
   })
 }
 
-/** Signer session: all boxes fixed; creator values shown; only the current signer's fields are editable. */
+/**
+ * Signer session: all boxes fixed; creator values shown; only the current
+ * signer's fields are editable.
+ *
+ * Multi-signer note: other signers' fields are filtered OUT of the overlay.
+ * The library renders the global `preview` (current signer's name / signature)
+ * on any empty signature/fullName field, so keeping them would show the
+ * current signer's preview in slots that belong to another signer. Those
+ * slots are already burned into the PDF by the previous signer (or will be
+ * by the next one), so omitting them here is correct — the overlay only
+ * represents what *this* signer still needs to do.
+ *
+ * Legacy (currentSignerIndex == null) keeps all signer fields — single-signer
+ * flow where every signer-assigned field belongs to the one signer.
+ */
 export function hydrateForSigner(
   stored: StoredField[],
   currentSignerIndex?: number | null
 ): FieldPlacement[] {
-  return stored.map((f) => {
-    const idx = resolveSignerIndex(f)
-    const isCurrentSigner = currentSignerIndex != null && idx === currentSignerIndex
-    return {
-      id: f.id,
-      type: f.type,
-      pageIndex: f.pageIndex,
-      xPercent: f.xPercent,
-      yPercent: f.yPercent,
-      widthPercent: f.widthPercent,
-      heightPercent: f.heightPercent,
-      label: f.label,
-      locked: true,
-      // Current signer's fields start empty; creator and other-signer fields show persisted value
-      value: isCurrentSigner ? undefined : (f.value ?? undefined),
-    }
-  })
+  return stored
+    .filter((f) => {
+      const idx = resolveSignerIndex(f)
+      if (idx === null) return true
+      if (currentSignerIndex == null) return true
+      return idx === currentSignerIndex
+    })
+    .map((f) => {
+      const idx = resolveSignerIndex(f)
+      const isCurrentSigner =
+        currentSignerIndex != null && idx === currentSignerIndex
+      return {
+        id: f.id,
+        type: f.type,
+        pageIndex: f.pageIndex,
+        xPercent: f.xPercent,
+        yPercent: f.yPercent,
+        widthPercent: f.widthPercent,
+        heightPercent: f.heightPercent,
+        label: f.label,
+        locked: true,
+        // Current signer's fields start empty so the library overlay shows the preview;
+        // creator fields display their persisted value.
+        value: isCurrentSigner ? undefined : (f.value ?? undefined),
+      }
+    })
 }
 
 /** Document-from-template UI: creator can move/edit only their fields. */

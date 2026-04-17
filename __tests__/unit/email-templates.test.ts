@@ -81,16 +81,19 @@ describe('allPartiesSignedEmail', () => {
 })
 
 describe('documentCompleteSignerEmail', () => {
-  it('includes signer name and document title', () => {
+  it('includes signer name, document title, and download URL', () => {
     const { subject, html } = documentCompleteSignerEmail({
       signerName: 'Alice',
       documentTitle: 'Contract',
+      downloadUrl: 'https://app/api/download/tok-1',
     })
     expect(subject).toContain('Contract')
     expect(subject).toContain('Fully Signed')
     expect(html).toContain('Alice')
     expect(html).toContain('Contract')
     expect(html).toContain('Thank you for your signature')
+    expect(html).toContain('https://app/api/download/tok-1')
+    expect(html).toContain('Download Signed Document')
   })
 })
 
@@ -108,14 +111,30 @@ describe('documentCompletedOwnerEmail', () => {
 })
 
 describe('documentCompletedSignerEmail', () => {
-  it('includes signer name and title', () => {
+  it('includes signer name, title, and token-specific download URL', () => {
     const { subject, html } = documentCompletedSignerEmail({
       signerName: 'Bob',
       documentTitle: 'Agreement',
+      downloadUrl: 'https://app/api/download/tok-xyz',
     })
     expect(subject).toContain('Agreement')
     expect(html).toContain('Bob')
     expect(html).toContain('Agreement')
+    expect(html).toContain('https://app/api/download/tok-xyz')
+    expect(html).toContain('Download Signed Document')
+  })
+
+  it('CTA renders both MSO and non-MSO branches', () => {
+    const { html } = documentCompletedSignerEmail({
+      signerName: 'Bob',
+      documentTitle: 'Agreement',
+      downloadUrl: 'https://app/api/download/tok',
+    })
+    // Guards against regressions where one branch is accidentally removed.
+    expect(html).toContain('<!--[if mso]>')
+    expect(html).toContain('<v:roundrect')
+    expect(html).toContain('<!--[if !mso]><!-->')
+    expect(html).toContain('class="button-a"')
   })
 })
 
@@ -164,6 +183,16 @@ describe('shared layout structure', () => {
         documentTitle: 'D',
         downloadUrl: 'https://d',
       }),
+      documentCompletedOwnerEmail({
+        ownerName: 'O',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }),
+      documentCompletedSignerEmail({
+        signerName: 'S',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }),
       userInvitationEmail({
         inviteeEmail: 'e@e.com',
         inviterName: 'I',
@@ -178,6 +207,51 @@ describe('shared layout structure', () => {
       expect(html).toContain('Lunar Rails')
       expect(html).toContain('role="presentation"')
       expect(html).toContain('automated message')
+    }
+  })
+
+  it('every CTA-bearing template has both MSO and non-MSO button branches', () => {
+    const ctaTemplates = [
+      signatureRequestEmail({
+        signerName: 'S',
+        documentTitle: 'D',
+        requesterName: 'R',
+        signingUrl: 'https://s',
+      }).html,
+      documentSignedEmail({
+        ownerName: 'O',
+        documentTitle: 'D',
+        signerName: 'S',
+        documentUrl: 'https://d',
+      }).html,
+      allPartiesSignedEmail({
+        recipientName: 'R',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }).html,
+      documentCompletedOwnerEmail({
+        ownerName: 'O',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }).html,
+      documentCompletedSignerEmail({
+        signerName: 'S',
+        documentTitle: 'D',
+        downloadUrl: 'https://d',
+      }).html,
+      userInvitationEmail({
+        inviteeEmail: 'e@e.com',
+        inviterName: 'I',
+        role: 'member',
+        loginUrl: 'https://l',
+      }).html,
+    ]
+
+    for (const html of ctaTemplates) {
+      expect(html).toContain('<!--[if mso]>')
+      expect(html).toContain('<v:roundrect')
+      expect(html).toContain('<!--[if !mso]><!-->')
+      expect(html).toContain('class="button-a"')
     }
   })
 })

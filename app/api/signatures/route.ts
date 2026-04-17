@@ -8,12 +8,20 @@ import { sendEmail } from '@/lib/email/client'
 import {
   documentCompletedOwnerEmail,
   documentCompletedSignerEmail,
+  documentSignedEmail,
 } from '@/lib/email/templates'
 import type {
   Document,
-  SignatureRequest,
   SignatureRequestWithToken,
 } from '@/lib/types'
+
+interface AllRequestRow {
+  id: string
+  status: string
+  signer_name: string
+  signer_email: string
+  token: string
+}
 
 interface OwnerProfileRow {
   email: string
@@ -44,17 +52,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServiceClient()
     const body = await request.json()
-    const { token, signature_data, signer_name, signed_pdf_base64 } = body
+    const {
+      token,
+      signature_data,
+      signer_name,
+      signed_pdf_base64,
+      base_version,
+    } = body
 
     if (
       typeof token !== 'string' ||
       typeof signer_name !== 'string' ||
       typeof signature_data !== 'string' ||
       typeof signed_pdf_base64 !== 'string' ||
+      typeof base_version !== 'string' ||
       !token ||
       !signer_name ||
       !signature_data ||
-      !signed_pdf_base64
+      !signed_pdf_base64 ||
+      !base_version
     ) {
       return NextResponse.json(
         { error: 'Missing required signing payload' },
@@ -93,6 +109,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Document not found' },
         { status: 404 }
+      )
+    }
+
+    // Optimistic concurrency: reject if another signer updated the document
+    // between the time this client loaded the signing page and submitted.
+    // 'original' is the sentinel for a document that has not been signed yet.
+    const currentBase = document.latest_signed_pdf_path ?? 'original'
+    if (currentBase !== base_version) {
+      return NextResponse.json(
+        {
+          error:
+            'Another signer updated this document. Please reload to sign the latest version.',
+          code: 'STALE_BASE',
+        },
+        { status: 409 }
       )
     }
 
@@ -226,12 +257,23 @@ export async function POST(request: NextRequest) {
 
     const { data: allRequestsRaw } = await supabase
       .from('signature_requests')
-      .select('id, status, signer_name, signer_email')
+      .select('id, status, signer_name, signer_email, token')
       .eq('document_id', document.id)
 
-    const allRequests = (allRequestsRaw ?? []) as SignatureRequest[]
+    const allRequests = (allRequestsRaw ?? []) as AllRequestRow[]
 
-    const allSigned = allRequests.every((req) => req.status === 'signed')
+    const allSigned =
+      allRequests.length > 0 && allRequests.every((req) => req.status === 'signed')
+
+    // Resolve owner profile once; reused for both partial- and completion-emails.
+    const { data: ownerProfileRaw } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', document.uploaded_by)
+      .single()
+
+    const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
+    const config = getConfig()
 
     let completed = false
     if (allSigned) {
@@ -253,17 +295,9 @@ export async function POST(request: NextRequest) {
           total_signers: allRequests.length,
         })
 
+        // Completion emails: DB state is already committed above. Failures here
+        // must not fail the request or hide the completed state from the UI.
         try {
-          const config = getConfig()
-
-          const { data: ownerProfileRaw } = await supabase
-            .from('profiles')
-            .select('email, full_name')
-            .eq('id', document.uploaded_by)
-            .single()
-
-          const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
-
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
             const { subject, html } = documentCompletedOwnerEmail({
@@ -275,15 +309,33 @@ export async function POST(request: NextRequest) {
           }
 
           for (const req of allRequests) {
+            const signerDownloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/download/${req.token}`
             const { subject, html } = documentCompletedSignerEmail({
               signerName: req.signer_name,
               documentTitle: document.title,
+              downloadUrl: signerDownloadUrl,
             })
             await sendEmail({ to: req.signer_email, subject, html })
           }
         } catch (emailError) {
           console.error('Completion email error:', emailError)
         }
+      }
+    } else if (ownerProfile) {
+      // Partial signing: notify the owner of this specific signature.
+      // Skipped when the signature also completes the document (owner gets the
+      // completion email instead - no double-notify).
+      try {
+        const documentUrl = `${config.NEXT_PUBLIC_APP_URL}/documents/${document.id}`
+        const { subject, html } = documentSignedEmail({
+          ownerName: ownerProfile.full_name,
+          documentTitle: document.title,
+          signerName: signer_name,
+          documentUrl,
+        })
+        await sendEmail({ to: ownerProfile.email, subject, html })
+      } catch (emailError) {
+        console.error('Partial signing email error:', emailError)
       }
     }
 
