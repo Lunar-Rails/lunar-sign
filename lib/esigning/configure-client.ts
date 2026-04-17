@@ -1,6 +1,6 @@
 'use client'
 
-import { configure } from '@drvillo/react-browser-e-signing'
+import { configure, loadSignatureFont } from '@drvillo/react-browser-e-signing'
 import { getPdfWorkerSrc } from '@drvillo/react-browser-e-signing/worker'
 
 declare global {
@@ -22,6 +22,9 @@ export function ensureESigningConfigured() {
     pdfWorkerSrc: getPdfWorkerSrc(),
     fontMode: 'bundled',
   })
+
+  // Preload the single signature font used across the signer flow.
+  void loadSignatureFont('Homemade Apple')
 
   window.__lunarSignESigningConfigured__ = true
 

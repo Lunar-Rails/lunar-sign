@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, type RefObject, type ReactNode } from 'react'
+import { useEffect, useState, type RefObject } from 'react'
 import { FieldOverlay, PdfPageNavigator, PdfViewer } from '@drvillo/react-browser-e-signing'
-import type { FieldPlacement, FieldType, PdfTextContent, SignatureFieldPreview, TextLine } from '@drvillo/react-browser-e-signing'
+import type { FieldPlacement, PdfTextContent, SignatureFieldPreview, TextLine } from '@drvillo/react-browser-e-signing'
 
 const LOAD_WATCHDOG_MS = 6000
 
@@ -16,19 +16,13 @@ export interface PdfColumnProps {
   setPageDimension: (pageIndex: number, widthPt: number, heightPt: number) => void
   pageMode: 'scroll' | 'single'
   viewerPageIndex: number
-  renderToolbarExtra?: () => ReactNode
   fields: FieldPlacement[]
-  selectedFieldType: FieldType | null
-  onAddField: (input: {
-    pageIndex: number
-    type: FieldType
-    xPercent: number
-    yPercent: number
-  }) => void
+  selectedFieldType: null
+  onAddField: () => void
   onUpdateField: (fieldId: string, partial: Partial<FieldPlacement>) => void
-  onRemoveField: (fieldId: string) => void
+  onRemoveField: () => void
   preview: SignatureFieldPreview
-  readOnly?: boolean
+  readOnly: true
   onPageTextContent?: (pageIndex: number, textContent: PdfTextContent) => void
   textLinesByPage?: Map<number, TextLine[]>
   isLoading: boolean
@@ -46,14 +40,9 @@ export function PdfColumn({
   setPageDimension,
   pageMode,
   viewerPageIndex,
-  renderToolbarExtra,
   fields,
-  selectedFieldType,
-  onAddField,
   onUpdateField,
-  onRemoveField,
   preview,
-  readOnly = false,
   onPageTextContent,
   textLinesByPage,
   isLoading,
@@ -83,31 +72,28 @@ export function PdfColumn({
           currentPageIndex={viewerPageIndex}
           onPageTextContent={onPageTextContent}
           renderToolbarContent={() => (
-            <div className="flex flex-wrap items-center gap-3">
-              <PdfPageNavigator
-                currentPageIndex={viewerPageIndex}
-                numPages={numPages}
-                onPageChange={onPageChange}
-              />
-              {renderToolbarExtra?.()}
-            </div>
+            <PdfPageNavigator
+              currentPageIndex={viewerPageIndex}
+              numPages={numPages}
+              onPageChange={onPageChange}
+            />
           )}
           renderOverlay={(pageIndex) => (
             <FieldOverlay
               pageIndex={pageIndex}
               fields={fields}
-              selectedFieldType={selectedFieldType}
-              onAddField={onAddField}
+              selectedFieldType={null}
+              onAddField={() => {}}
               onUpdateField={onUpdateField}
-              onRemoveField={onRemoveField}
+              onRemoveField={() => {}}
               preview={preview}
-              readOnly={readOnly}
+              readOnly
               textLines={textLinesByPage?.get(pageIndex)}
             />
           )}
         />
       </div>
-      {isLoading && !stuck && <p className="text-caption mt-3">Loading document preview...</p>}
+      {isLoading && !stuck && <p className="text-caption mt-3 text-lr-muted">Loading document preview…</p>}
       {pdfErrorMessage && <p className="text-caption mt-3 text-lr-error">{pdfErrorMessage}</p>}
       {stuck && !pdfErrorMessage && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-lr border border-lr-border bg-lr-bg p-3">
@@ -117,7 +103,7 @@ export function PdfColumn({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="shrink-0 rounded-lr border border-lr-border bg-lr-surface px-3 py-1.5 text-lr-sm font-medium text-lr-text hover:bg-lr-surface-2"
+            className="shrink-0 rounded-lr border border-lr-border bg-lr-surface px-3 py-1.5 text-caption font-medium text-lr-text hover:bg-lr-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lr-accent"
           >
             Reload
           </button>
@@ -141,7 +127,6 @@ function useLoadWatchdog({
   useEffect(() => {
     setStuck(false)
     if (!armed) return
-
     const handle = window.setTimeout(() => setStuck(true), timeoutMs)
     return () => window.clearTimeout(handle)
   }, [armed, timeoutMs, resetKey])

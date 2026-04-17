@@ -5,6 +5,9 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { logAudit } from '@/lib/audit'
 
 import SigningInterfaceClient from '@/components/SigningInterfaceClient'
+import { SignerShell } from '@/components/signer/SignerShell'
+import { SignerStateCard } from '@/components/signer/SignerStateCard'
+import { Clock, XCircle } from 'lucide-react'
 
 import type { SignatureRequestWithToken, Document, StoredField } from '@/lib/types'
 
@@ -155,34 +158,29 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
   if (outcome.kind === 'expired') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-lr-bg px-4">
-        <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-8 text-center shadow-lr-card">
-          <h1 className="font-display text-lr-xl font-semibold text-lr-text">
-            Signing link expired
-          </h1>
-          <p className="mt-4 text-lr-sm text-lr-muted">
-            This signing link has expired. Please contact the document owner to request a new link.
-          </p>
-        </div>
-      </div>
+      <SignerShell width="narrow" align="center">
+        <SignerStateCard
+          tone="warning"
+          icon={Clock}
+          kicker="Expired"
+          title="Signing link expired"
+          description="This signing link has expired. Please contact the document owner to request a new link."
+        />
+      </SignerShell>
     )
   }
 
   if (outcome.kind === 'revoked') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-lr-bg px-4">
-        <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-8 text-center shadow-lr-card">
-          <h1 className="font-display text-lr-xl font-semibold text-lr-text">
-            Signing request cancelled
-          </h1>
-          <p className="mt-2 text-lr-sm text-lr-muted">
-            <span className="font-medium text-lr-text">{outcome.documentTitle}</span>
-          </p>
-          <p className="mt-4 text-lr-sm text-lr-muted">
-            This signing request has been cancelled by the document owner. You can close this page.
-          </p>
-        </div>
-      </div>
+      <SignerShell width="narrow" align="center">
+        <SignerStateCard
+          tone="error"
+          icon={XCircle}
+          kicker="Cancelled"
+          title="Signing request cancelled"
+          description={`"${outcome.documentTitle}" has been cancelled by the document owner. You can close this page.`}
+        />
+      </SignerShell>
     )
   }
 

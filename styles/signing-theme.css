@@ -1,0 +1,286 @@
+/*
+ * Signing library primitive theme overrides.
+ *
+ * Applies LR design tokens to the data-slot attributes exposed by
+ * @drvillo/react-browser-e-signing. Only covers slots we actually render
+ * (pdf-viewer*, pdf-page-navigator*, field-overlay, signature-field*,
+ * signature-pad*, signing-complete*, snap-guide). No compound-component
+ * slots (signature-preview-*, field-palette-*, signer-panel-*) since those
+ * compound components are replaced by LR-native equivalents.
+ *
+ * Uses :where() so any className overrides on the component win by specificity.
+ */
+
+/* ─── PDF Viewer ──────────────────────────────────────────────────────────── */
+
+:where([data-slot='pdf-viewer-toolbar']) {
+  background: var(--lr-surface);
+  border: 1px solid var(--lr-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+
+:where([data-slot='pdf-viewer-toolbar-content']) {
+  gap: 0.5rem;
+}
+
+:where([data-slot='pdf-viewer-zoom-button']),
+:where([data-slot='pdf-page-navigator-button']) {
+  background: transparent;
+  border: 1px solid var(--lr-border);
+  border-radius: 8px;
+  color: var(--lr-text);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+  min-width: 1.875rem;
+  min-height: 1.875rem;
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+}
+
+:where([data-slot='pdf-viewer-zoom-button']):hover,
+:where([data-slot='pdf-page-navigator-button']):hover:not(:disabled) {
+  background: var(--lr-surface-2);
+  border-color: var(--lr-border-2);
+}
+
+:where([data-slot='pdf-viewer-zoom-button']):focus-visible,
+:where([data-slot='pdf-page-navigator-button']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--lr-bg), 0 0 0 4px var(--lr-accent);
+}
+
+:where([data-slot='pdf-viewer-zoom-button']):disabled,
+:where([data-slot='pdf-page-navigator-button']):disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:where([data-slot='pdf-viewer-page-count']),
+:where([data-slot='pdf-viewer-zoom-value']),
+:where([data-slot='pdf-page-navigator-label']) {
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+}
+
+:where([data-slot='pdf-viewer-loading']) {
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+}
+
+:where([data-slot='pdf-viewer-error']) {
+  color: var(--lr-error);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+}
+
+:where([data-slot='pdf-viewer-empty']) {
+  border: 1px dashed var(--lr-border-2);
+  border-radius: 10px;
+  background: var(--lr-surface);
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+}
+
+/* ─── Signature Field ─────────────────────────────────────────────────────── */
+
+:where([data-slot='signature-field']) {
+  border: 1.5px dashed var(--lr-border-2);
+  border-radius: 8px;
+  background: rgba(124, 92, 252, 0.04);
+  transition: border-color 150ms ease-out, background 150ms ease-out;
+}
+
+:where([data-slot='signature-field']):focus-within {
+  border-color: var(--lr-accent);
+  background: rgba(124, 92, 252, 0.07);
+}
+
+:where([data-slot='signature-field'][data-locked='true']) {
+  border-style: solid;
+  border-color: var(--lr-accent);
+  background: rgba(124, 92, 252, 0.06);
+}
+
+:where([data-slot='signature-field'][data-has-value='true']) {
+  border-style: solid;
+  border-color: rgba(124, 92, 252, 0.30);
+}
+
+:where([data-slot='signature-field-label']) {
+  color: var(--lr-muted);
+  font-family: var(--font-space-grotesk, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:where([data-slot='signature-field-label-input']),
+:where([data-slot='signature-field-value-input']) {
+  background: var(--lr-bg);
+  border: 1px solid var(--lr-border);
+  border-radius: 6px;
+  color: var(--lr-text);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+  transition: border-color 150ms ease-out;
+}
+
+:where([data-slot='signature-field-label-input']):focus,
+:where([data-slot='signature-field-value-input']):focus {
+  outline: none;
+  border-color: var(--lr-accent);
+  box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.20);
+}
+
+:where([data-slot='signature-field-remove']) {
+  background: var(--lr-error-dim);
+  border: 1px solid rgba(239, 68, 68, 0.20);
+  border-radius: 6px;
+  color: var(--lr-error);
+  transition: opacity 150ms ease-out;
+}
+
+:where([data-slot='signature-field-remove']):hover {
+  opacity: 0.8;
+}
+
+:where([data-slot='signature-field-resize']) {
+  background: var(--lr-accent);
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+/* ─── Signature Pad ───────────────────────────────────────────────────────── */
+
+:where([data-slot='signature-pad']) {
+  border: 1px solid var(--lr-border);
+  border-radius: 10px;
+  background: var(--lr-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(124, 92, 252, 0.06);
+  overflow: hidden;
+}
+
+:where([data-slot='signature-pad-canvas']) {
+  display: block;
+  width: 100%;
+}
+
+:where([data-slot='signature-pad-clear']) {
+  background: transparent;
+  border: 1px solid var(--lr-border);
+  border-radius: 8px;
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+}
+
+:where([data-slot='signature-pad-clear']):hover {
+  background: var(--lr-surface-2);
+  border-color: var(--lr-border-2);
+  color: var(--lr-text);
+}
+
+:where([data-slot='signature-pad-clear']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--lr-bg), 0 0 0 4px var(--lr-accent);
+}
+
+/* ─── Signing Complete ────────────────────────────────────────────────────── */
+
+:where([data-slot='signing-complete']) {
+  background: var(--lr-surface);
+  border: 1px solid var(--lr-border);
+  border-radius: 14px;
+  padding: 2rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+:where([data-slot='signing-complete-heading']) {
+  color: var(--lr-text);
+  font-family: var(--font-space-grotesk, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+:where([data-slot='signing-complete-details']) {
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.875rem;
+}
+
+:where([data-slot='signing-complete-hash']) {
+  background: var(--lr-bg);
+  border: 1px solid var(--lr-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+:where([data-slot='signing-complete-hash-label']) {
+  color: var(--lr-muted);
+  font-family: var(--font-space-grotesk, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+:where([data-slot='signing-complete-hash-value']) {
+  color: var(--lr-text-2);
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  font-size: 0.6875rem;
+  word-break: break-all;
+}
+
+:where([data-slot='signing-complete-download']) {
+  background: var(--lr-accent);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease-out, transform 150ms ease-out;
+}
+
+:where([data-slot='signing-complete-download']):hover {
+  background: var(--lr-accent-hover);
+  transform: translateY(-1px);
+}
+
+:where([data-slot='signing-complete-download']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--lr-bg), 0 0 0 4px var(--lr-accent);
+}
+
+:where([data-slot='signing-complete-reset']) {
+  background: transparent;
+  border: 1px solid var(--lr-border);
+  border-radius: 10px;
+  color: var(--lr-muted);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+}
+
+:where([data-slot='signing-complete-reset']):hover {
+  background: var(--lr-surface-2);
+  border-color: var(--lr-border-2);
+}
+
+/* ─── Snap guide ──────────────────────────────────────────────────────────── */
+
+:where([data-slot='snap-guide']) {
+  background: var(--lr-accent);
+  opacity: 0.6;
+}

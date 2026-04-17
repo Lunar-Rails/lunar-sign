@@ -24,7 +24,7 @@ export function IntentConfirmDialog({ open, onConfirm, onCancel }: IntentConfirm
         <AlertDialogHeader>
           <AlertDialogTitle>Confirm your signature</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-3 text-lr-sm text-lr-text-2">
+            <div className="space-y-3 text-body text-lr-text-2">
               <p>
                 By clicking <strong className="text-lr-text">Sign Document</strong>, you:
               </p>
@@ -36,7 +36,7 @@ export function IntentConfirmDialog({ open, onConfirm, onCancel }: IntentConfirm
                   handwritten signature under the U.S. ESIGN Act and UETA
                 </li>
               </ul>
-              <p className="text-lr-xs text-lr-muted">
+              <p className="text-caption text-lr-muted">
                 This action cannot be undone. If you do not wish to sign, click Cancel.
               </p>
             </div>
