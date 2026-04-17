@@ -4,7 +4,11 @@ import './globals.css'
 import '@drvillo/react-browser-e-signing/styles.css'
 import '@/styles/signing-theme.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ThemeScript } from '@/components/theme-script'
 import { Toaster } from '@/components/ui/sonner'
+
+const THEME_STORAGE_KEY = 'lunar-sign-theme'
+const DEFAULT_THEME = 'dark' as const
 
 const inter = Inter({
   subsets: ['latin'],
@@ -30,14 +34,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`h-full ${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`h-full ${DEFAULT_THEME} ${inter.variable} ${spaceGrotesk.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full bg-lr-bg text-lr-text font-sans antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          storageKey="lunar-sign-theme"
-        >
+        <ThemeScript storageKey={THEME_STORAGE_KEY} defaultTheme={DEFAULT_THEME} />
+        <ThemeProvider defaultTheme={DEFAULT_THEME} storageKey={THEME_STORAGE_KEY}>
           {children}
           <Toaster />
         </ThemeProvider>
