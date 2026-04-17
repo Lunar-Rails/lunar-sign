@@ -57,7 +57,7 @@ alter table public.signatures
 
 -- Index used by the OTS cron job to find rows needing phase-1 stamp or phase-2 upgrade.
 create index if not exists signatures_ots_queue_idx
-  on public.signatures (ots_pending, ots_upgraded_at, created_at);
+  on public.signatures (ots_pending, ots_upgraded_at, signed_at);
 
 -- ── documents additions ───────────────────────────────────────────────────────
 
