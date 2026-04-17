@@ -19,6 +19,8 @@ type SigningOutcome =
   | { kind: 'deleted' }
   | { kind: 'revoked'; documentTitle: string }
   | { kind: 'already_signed' }
+  | { kind: 'needs_consent' }
+  | { kind: 'expired' }
   | {
       kind: 'ready'
       signatureRequest: SignatureRequestWithToken
@@ -37,7 +39,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, signer_index'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, signer_index, consent_given_at, expires_at'
       )
       .eq('token', token)
       .single()
@@ -63,10 +65,17 @@ export default async function SigningPage({ params }: SigningPageProps) {
           document.status === 'cancelled' ||
           signatureRequest.status === 'cancelled'
 
+        const expiresAt = (signatureRequest as unknown as { expires_at?: string | null }).expires_at
+        const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false
+
         if (isRevoked) {
           outcome = { kind: 'revoked', documentTitle: document.title }
         } else if (signatureRequest.status !== 'pending') {
           outcome = { kind: 'already_signed' }
+        } else if (isExpired) {
+          outcome = { kind: 'expired' }
+        } else if (!(signatureRequest as unknown as { consent_given_at?: string | null }).consent_given_at) {
+          outcome = { kind: 'needs_consent' }
         } else {
           let pdfPath = document.file_path
           if (document.latest_signed_pdf_path) {
@@ -120,6 +129,25 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
   if (outcome.kind === 'already_signed') {
     redirect(`/sign/${token}/already-signed`)
+  }
+
+  if (outcome.kind === 'needs_consent') {
+    redirect(`/sign/${token}/consent`)
+  }
+
+  if (outcome.kind === 'expired') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-lr-bg px-4">
+        <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-8 text-center shadow-lr-card">
+          <h1 className="font-display text-lr-xl font-semibold text-lr-text">
+            Signing link expired
+          </h1>
+          <p className="mt-4 text-lr-sm text-lr-muted">
+            This signing link has expired. Please contact the document owner to request a new link.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (outcome.kind === 'revoked') {

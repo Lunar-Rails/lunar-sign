@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const VALID_HMAC_KEY = 'a'.repeat(64)
+
 const baseEnv = () => ({
   NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pk',
@@ -10,6 +12,7 @@ const baseEnv = () => ({
   MAILTRAP_USER: 'u',
   MAILTRAP_PASSWORD: 'p',
   EMAIL_FROM: 'test@example.com',
+  EVIDENCE_HMAC_KEY: VALID_HMAC_KEY,
 })
 
 describe('lib/config', () => {
@@ -49,5 +52,24 @@ describe('lib/config', () => {
     process.env.MAILTRAP_PORT = 'not-a-number'
     const { getConfig } = await import('@/lib/config')
     expect(() => getConfig()).toThrow('Invalid environment configuration')
+  })
+
+  it('getConfig throws when EVIDENCE_HMAC_KEY is missing', async () => {
+    delete process.env.EVIDENCE_HMAC_KEY
+    const { getConfig } = await import('@/lib/config')
+    expect(() => getConfig()).toThrow('Invalid environment configuration')
+  })
+
+  it('getConfig throws when EVIDENCE_HMAC_KEY is wrong length', async () => {
+    process.env.EVIDENCE_HMAC_KEY = 'tooshort'
+    const { getConfig } = await import('@/lib/config')
+    expect(() => getConfig()).toThrow('Invalid environment configuration')
+  })
+
+  it('getConfig returns EVIDENCE_HMAC_KEY and defaults', async () => {
+    const { getConfig } = await import('@/lib/config')
+    const c = getConfig()
+    expect(c.EVIDENCE_HMAC_KEY).toBe(VALID_HMAC_KEY)
+    expect(c.CONSENT_TEXT_VERSION).toBe('2026-04-16')
   })
 })

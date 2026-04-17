@@ -11,6 +11,8 @@ const getConfig = vi.fn(() => ({
   MAILTRAP_PASSWORD: 'p',
   EMAIL_FROM: 'from@example.com',
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+  EVIDENCE_HMAC_KEY: 'a'.repeat(64),
+  CONSENT_TEXT_VERSION: '2026-04-16',
 }))
 
 const sendMail = vi.fn().mockResolvedValue(undefined)

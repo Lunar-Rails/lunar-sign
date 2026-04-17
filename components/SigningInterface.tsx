@@ -18,6 +18,7 @@ import '@/lib/esigning/configure-client'
 
 import type { FieldType, SignatureStyle, SignerInfo } from '@drvillo/react-browser-e-signing'
 
+import { IntentConfirmDialog } from '@/components/signing/IntentConfirmDialog'
 import { MobileWizardShell } from '@/components/signing/MobileWizardShell'
 import { PdfColumn } from '@/components/signing/PdfColumn'
 import { SigningControlsSidebar } from '@/components/signing/SigningControlsSidebar'
@@ -96,6 +97,9 @@ export default function SigningInterface({
   const [submitFieldCount, setSubmitFieldCount] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showIntentDialog, setShowIntentDialog] = useState(false)
+  // Stash validated form state until user confirms intent.
+  const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null)
 
   const [signerInfo, setSignerInfo] = useState<SignerInfo>(() => {
     const [firstName = '', ...rest] = signerName.trim().split(' ')
@@ -174,44 +178,7 @@ export default function SigningInterface({
 
   const showFieldPalette = !templateMode
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMessage(null)
-
-    if (!activeSignatureDataUrl) {
-      setErrorMessage('Please provide a signature')
-      return
-    }
-
-    if (!displayName.trim()) {
-      setErrorMessage('Please enter your full name')
-      return
-    }
-
-    if (!pdfInput.length) {
-      setErrorMessage('Document is not loaded yet')
-      return
-    }
-
-    if (!templateMode && !fields.length) {
-      setErrorMessage('Please place at least one field on the document')
-      return
-    }
-
-    if (templateMode && templateStored) {
-      for (const s of templateStored) {
-        const idx = resolveSignerIndex(s)
-        const isMyField = currentSignerIndex != null ? idx === currentSignerIndex : idx !== null
-        if (isMyField && s.type === 'text') {
-          const f = fields.find((x) => x.id === s.id)
-          if (!f?.value?.trim()) {
-            setErrorMessage(`Please fill "${s.label?.trim() || 'Text field'}"`)
-            return
-          }
-        }
-      }
-    }
-
+  const doSubmit = async () => {
     setLoading(true)
 
     try {
@@ -295,6 +262,49 @@ export default function SigningInterface({
     }
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMessage(null)
+
+    if (!activeSignatureDataUrl) {
+      setErrorMessage('Please provide a signature')
+      return
+    }
+
+    if (!displayName.trim()) {
+      setErrorMessage('Please enter your full name')
+      return
+    }
+
+    if (!pdfInput.length) {
+      setErrorMessage('Document is not loaded yet')
+      return
+    }
+
+    if (!templateMode && !fields.length) {
+      setErrorMessage('Please place at least one field on the document')
+      return
+    }
+
+    if (templateMode && templateStored) {
+      for (const s of templateStored) {
+        const idx = resolveSignerIndex(s)
+        const isMyField = currentSignerIndex != null ? idx === currentSignerIndex : idx !== null
+        if (isMyField && s.type === 'text') {
+          const f = fields.find((x) => x.id === s.id)
+          if (!f?.value?.trim()) {
+            setErrorMessage(`Please fill "${s.label?.trim() || 'Text field'}"`)
+            return
+          }
+        }
+      }
+    }
+
+    // Show intent-to-sign dialog before proceeding.
+    pendingSubmitRef.current = doSubmit
+    setShowIntentDialog(true)
+  }
+
   if (success) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center justify-center px-4 py-10">
@@ -356,6 +366,18 @@ export default function SigningInterface({
   )
 
   return (
+    <>
+    <IntentConfirmDialog
+      open={showIntentDialog}
+      onConfirm={() => {
+        setShowIntentDialog(false)
+        if (pendingSubmitRef.current) pendingSubmitRef.current()
+      }}
+      onCancel={() => {
+        setShowIntentDialog(false)
+        pendingSubmitRef.current = null
+      }}
+    />
     <div className="relative min-h-screen bg-lr-bg px-4 py-6 sm:px-6 lg:px-8">
       <div className="fixed right-4 top-4 z-50">
         <ThemeToggle />
@@ -431,6 +453,7 @@ export default function SigningInterface({
         )}
       </div>
     </div>
+    </>
   )
 }
 

@@ -13,6 +13,15 @@ const getServiceClient = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
 vi.mock('@/lib/supabase/service', () => ({ getServiceClient }))
 
+vi.mock('@/lib/config', () => ({
+  getConfig: () => ({
+    NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+    EMAIL_FROM: 'noreply@example.com',
+    EVIDENCE_HMAC_KEY: 'a'.repeat(64),
+    CONSENT_TEXT_VERSION: '2026-04-16',
+  }),
+}))
+
 const adminUserId = '11111111-1111-4111-8111-111111111111'
 
 async function loadRoute() {
