@@ -4,12 +4,11 @@ import {
   FieldOverlay,
   PdfPageNavigator,
   PdfViewer,
-  configure,
   usePdfDocument,
   usePdfPageVisibility,
 } from '@drvillo/react-browser-e-signing'
-import { getPdfWorkerSrc } from '@drvillo/react-browser-e-signing/worker'
 import '@drvillo/react-browser-e-signing/styles.css'
+import '@/lib/esigning/configure-client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -19,14 +18,6 @@ import { hydrateForSigner } from '@/lib/field-metadata'
 interface DocumentPdfPreviewProps {
   documentId: string
   fieldMetadata?: StoredField[] | null
-}
-
-let isPdfWorkerConfigured = false
-
-function ensurePdfWorkerConfiguration() {
-  if (isPdfWorkerConfigured) return
-  configure({ pdfWorkerSrc: getPdfWorkerSrc() })
-  isPdfWorkerConfigured = true
 }
 
 const noopAdd = () => {}
@@ -70,8 +61,6 @@ export default function DocumentPdfPreview({
   )
 
   useEffect(() => {
-    ensurePdfWorkerConfiguration()
-
     const controller = new AbortController()
 
     async function fetchPdfPreview() {

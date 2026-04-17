@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@drvillo/react-browser-e-signing':
-        specifier: ^0.6.1
-        version: 0.6.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.6.2
+        version: 0.6.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.72.1(react@19.2.4))
@@ -231,8 +231,8 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@drvillo/react-browser-e-signing@0.6.1':
-    resolution: {integrity: sha512-vvatTJ9erBRChEnv530I0+cjuyuk4Hn1JytF8Bt9FJeQ5RG3WhRRvtfvLGK+0iO2PcMR4gdSmpnLt9l1ienqKg==}
+  '@drvillo/react-browser-e-signing@0.6.2':
+    resolution: {integrity: sha512-e2Q4Uvu7bpqm20hHk6T6bftXIBbYhKFpquEgwSJfHljvyV8QRj2MQOWTqt9B029g+ZZLcmD3LrYNbNeRPBFj+A==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -3876,7 +3876,7 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@drvillo/react-browser-e-signing@0.6.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@drvillo/react-browser-e-signing@0.6.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@pdf-lib/fontkit': 1.1.1
       pdf-lib: 1.17.1

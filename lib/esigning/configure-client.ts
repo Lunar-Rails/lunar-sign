@@ -2,7 +2,6 @@
 
 import { configure } from '@drvillo/react-browser-e-signing'
 import { getPdfWorkerSrc } from '@drvillo/react-browser-e-signing/worker'
-import { pdfjs } from 'react-pdf'
 
 declare global {
   interface Window {
@@ -15,25 +14,14 @@ export function ensureESigningConfigured() {
   if (typeof window === 'undefined') return
   if (window.__lunarSignESigningConfigured__) return
 
-  const workerSrc = getPdfWorkerSrc()
-
+  // As of @drvillo/react-browser-e-signing >= 0.6.2, configure() applies
+  // pdfWorkerSrc to pdfjs.GlobalWorkerOptions synchronously, so the previous
+  // race-fix workaround (importing react-pdf to pre-set GlobalWorkerOptions)
+  // is no longer needed.
   configure({
-    pdfWorkerSrc: workerSrc,
+    pdfWorkerSrc: getPdfWorkerSrc(),
     fontMode: 'bundled',
   })
-
-  // Set workerSrc directly so child <Document> effects (which run before
-  // PdfViewer's parent useEffect) find a configured worker. Without this,
-  // the first getDocument() call races with an empty workerSrc and only
-  // succeeds in dev because StrictMode double-invokes effects.
-  if (workerSrc) {
-    try {
-      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
-    } catch {
-      // GlobalWorkerOptions may be sealed in some pdfjs builds; the lib's
-      // own useEffect remains as a fallback.
-    }
-  }
 
   window.__lunarSignESigningConfigured__ = true
 
