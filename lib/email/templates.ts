@@ -111,6 +111,29 @@ export function documentCompleteSignerEmail(params: {
   return documentCompletedSignerEmail(params)
 }
 
+export function documentDeclinedOwnerEmail(params: {
+  ownerName: string
+  documentTitle: string
+  signerName: string
+  signerEmail: string
+  reason: string | null
+}): { subject: string; html: string } {
+  const subject = `Signature Declined: ${params.documentTitle}`
+  const reasonRow = params.reason
+    ? `<span style="font-size: 13px; color: #b8b4c8; margin-top: 4px; display: block;">Reason: ${params.reason}</span>`
+    : `<span style="font-size: 13px; color: #7e7a92; margin-top: 4px; display: block;">No reason was provided.</span>`
+  const html = renderEmail('document-declined-owner', {
+    subject,
+    preheader: `${params.signerName} declined to sign ${params.documentTitle}`,
+    ownerName: params.ownerName,
+    documentTitle: params.documentTitle,
+    signerName: params.signerName,
+    signerEmail: params.signerEmail,
+    reasonRow,
+  })
+  return { subject, html }
+}
+
 export function signingOtpEmail(params: {
   signerName: string
   documentTitle: string

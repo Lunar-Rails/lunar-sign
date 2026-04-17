@@ -1,0 +1,30 @@
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+  <!-- Greeting -->
+  <tr>
+    <td style="font-size: 15px; color: #e8e6f0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding-bottom: 20px;">
+      <p style="margin: 0 0 14px;">Hello <strong style="color: #e8e6f0;">{{ownerName}}</strong>,</p>
+      <p style="margin: 0;"><strong style="color: #e8e6f0;">{{signerName}}</strong> ({{signerEmail}}) has declined to sign <strong style="color: #e8e6f0;">{{documentTitle}}</strong>. The document has been cancelled.</p>
+    </td>
+  </tr>
+
+  <!-- Decline notice -->
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #1a1a30; border-radius: 10px; border-left: 3px solid #e05c5c;">
+        <tr>
+          <td style="padding: 16px 20px; font-size: 14px; color: #b8b4c8; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6;">
+            <span style="font-size: 14px; font-weight: 600; color: #e05c5c; font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;">&#10007;&nbsp; Signing declined</span><br />
+            {{reasonRow}}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Guidance -->
+  <tr>
+    <td style="font-size: 13px; color: #7e7a92; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding-bottom: 8px;">
+      You may re-upload the document or contact the signer to resolve any concerns before requesting a new signature.
+    </td>
+  </tr>
+</table>
