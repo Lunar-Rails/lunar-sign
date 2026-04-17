@@ -1,12 +1,56 @@
 # E-Signature Scheme
 
-This document describes how Lunar Sign generates, validates, and records electronic signatures.
+This document describes how Lunar Sign generates, validates, and records electronic signatures after the P0/P1 legal-defensibility hardening.
 
 ---
 
 ## Overview
 
-Lunar Sign implements a **bearer-token-gated e-signature scheme** backed by server-side SHA-256 document hashing. It is legally oriented (comparable to DocuSign's audit-trail model) and targets compliance with Simple Electronic Signature requirements under ESIGN and eIDAS, rather than PKI-based qualified digital signatures.
+Lunar Sign implements a **bearer-token-gated e-signature scheme** with a layered legal-defensibility stack:
+
+| Layer | Mechanism |
+|---|---|
+| Consent | Explicit consent + disclosure before any signing action |
+| Identity | Email OTP verification (6-digit, 15-min TTL, 5-attempt lockout) |
+| Document integrity | SHA-256 of the original and signed PDFs |
+| Evidence integrity | HMAC-SHA256 over the canonical signing event, keyed by `EVIDENCE_HMAC_KEY` |
+| Certificate | pdf-lib Certificate of Completion page appended to the final PDF |
+| Timestamping | Bitcoin blockchain anchoring via OpenTimestamps (async, cron-driven) |
+| Audit trail | Append-only `audit_log` table, immutable via RLS |
+
+---
+
+## Signing Flow
+
+```
+Signer opens /sign/[token]
+  ↓
+Expiry check  → 410 if link expired
+  ↓
+Consent gate  → redirect to /consent if not yet consented
+  ↓
+OTP gate      → redirect to /otp if OTP not yet verified
+  ↓
+Signing UI    (place fields, draw/type signature)
+  ↓
+Intent dialog → confirm intent to sign
+  ↓
+POST /api/signatures
+  ├─ Validate: token, OTP verified, link not expired
+  ├─ Download original PDF → SHA-256 (originalDocumentHash)
+  ├─ Hash signed PDF → SHA-256 (signedDocumentHash)
+  ├─ Hash signature image → SHA-256 (signatureImageHash)
+  ├─ Compute evidence_mac = HMAC-SHA256(canonical_fields, EVIDENCE_HMAC_KEY)
+  ├─ Upload signed PDF to signed-documents bucket
+  ├─ Insert signature row (ots_pending=true, otp_verified=true)
+  ├─ Update signature_request (status=signed)
+  └─ If all signers signed:
+       ├─ Fetch all signature rows for CoC
+       ├─ Append Certificate of Completion page (pdf-lib)
+       ├─ Upload CoC PDF, store certificate_pdf_path + final_document_hash
+       ├─ Mark document completed
+       └─ Send completion emails (PDF attached if ≤15 MB)
+```
 
 ---
 
@@ -15,156 +59,116 @@ Lunar Sign implements a **bearer-token-gated e-signature scheme** backed by serv
 ```
 documents
   id, title, file_path, status, latest_signed_pdf_path, uploaded_by
+  certificate_pdf_path  ← path to the CoC PDF (set on completion)
+  final_document_hash   ← SHA-256 of the CoC PDF
 
-signature_requests                        ← one row per signer per document
+signature_requests                              ← one row per signer per document
   id, document_id, signer_name, signer_email
-  status   : pending | signed | declined | cancelled
-  token    : uuid (gen_random_uuid())     ← the bearer credential
-  signed_at
+  status       : pending | signed | cancelled
+  token        : uuid (gen_random_uuid())       ← the bearer credential
+  consent_given_at, consent_text_hash           ← records which copy was agreed to
+  expires_at                                    ← default now()+30d, bumped on remind
+  declined_at, decline_reason                   ← set when signer declines
 
-signatures                                ← one row written at signing time
+signing_otps                                    ← one row per signature_request
+  request_id (FK), code_hash (SHA-256), sent_to
+  expires_at, verified_at, attempts
+
+signatures                                      ← one row written at signing time
   id, request_id
   signature_data        : base64 image of the drawn/typed signature
   original_document_hash: sha256 of the source PDF (pre-signing)
   document_hash         : sha256 of the signed PDF (post-signing)
-  signed_pdf_path       : storage path of the baked output
-  ip_address, user_agent
-  signed_at
+  signature_image_hash  : sha256 of the raw signature image bytes
+  evidence_hash         : plain SHA-256 (legacy; kept for one release)
+  evidence_mac          : HMAC-SHA256 keyed by EVIDENCE_HMAC_KEY (canonical)
+  otp_verified          : bool (true when signer passed email OTP)
+  signed_pdf_path       : storage path of the baked PDF
+  ip_address, user_agent, signed_at
+  ots_proof             : serialized OTS proof bytes (bytea)
+  ots_pending           : true while awaiting Bitcoin confirmation
+  ots_upgraded_at       : when Bitcoin block was confirmed
+  ots_bitcoin_block     : Bitcoin block height of attestation
+
+audit_log                                       ← immutable append-only
+  id, actor_id, action, resource_type, resource_id, metadata, created_at
 ```
 
 ---
 
-## The Signer Token
+## Evidence MAC
 
-Each `signature_requests` row carries a **UUID v4 token** generated by Postgres:
+The evidence MAC is computed as:
 
-```sql
-token uuid not null default gen_random_uuid()
+```
+HMAC-SHA256(
+  key = EVIDENCE_HMAC_KEY (64 hex chars = 32 bytes),
+  message = join('\n', [
+    signerEmail,
+    signerName,
+    signatureImageHash,
+    originalDocumentHash,
+    signedDocumentHash,
+    signedAt (ISO 8601),
+    consentTextHash (sha256 of version+copy),
+    otpVerified ('true'|'false'),
+  ])
+)
 ```
 
-- 128-bit value with 122 bits of effective entropy — brute-forcing is infeasible.
-- Unique index ensures no collisions and fast lookups.
-- After migration `0010_security_hardening`, the `token` column is **revoked from all authenticated and anonymous Supabase roles** — it is only readable via the service-role key inside server code, never exposed to the Supabase JS client.
+The key is stored outside the database as an environment variable. A verifier who possesses the key can independently recompute the MAC and confirm the signing event was not tampered with.
 
 ---
 
-## Signing Flow
+## Certificate of Completion
 
-### 1. Document upload & signer setup
+When every signer has signed, Lunar Sign:
 
-An authenticated user uploads a PDF and adds one or more signers (name + email). Postgres generates a unique UUID token per signer. The document remains in `draft` status.
+1. Downloads the latest signed PDF (with all signature ink layers).
+2. Appends a **Certificate of Completion** page using pdf-lib containing:
+   - Document title and ID
+   - SHA-256 of the original (unsigned) document
+   - SHA-256 of the final signed document
+   - Per-signer table: name, email, signed timestamp, IP address, OTP status, `evidence_mac`
+3. Uploads the CoC PDF and stores `certificate_pdf_path` + `final_document_hash` on the document.
+4. Both download routes (`/api/documents/[id]/download` and `/api/download/[token]`) serve the CoC PDF in preference to the plain signed PDF.
 
-### 2. Send for signing — `POST /api/documents/[id]/send`
+---
 
-The document owner triggers the send. The server:
+## OpenTimestamps
 
-1. Verifies the caller owns the document and it is in `draft` status.
-2. Transitions the document to `pending`.
-3. Emails each signer a unique signing link: `https://<app>/sign/<token>`.
+Every signature row is inserted with `ots_pending = true`. A Netlify Scheduled Function
+(every 30 minutes) calls `POST /api/internal/ots/upgrade`:
 
-The token is the only credential. Signers do not need an account.
+- **Phase 1** — for rows where `ots_pending=true AND ots_proof IS NULL`:
+  stamps `evidence_mac` on the configured OTS calendars and stores the
+  serialized proof in `ots_proof`.
+- **Phase 2** — for rows where `ots_pending=true AND ots_proof IS NOT NULL`:
+  attempts to upgrade the proof from the calendars. When a Bitcoin block
+  attestation is found, sets `ots_pending=false`, `ots_upgraded_at`, and
+  `ots_bitcoin_block`.
 
-### 3. Signing page — `GET /sign/[token]`
-
-A Next.js server component resolves the token. It validates:
-
-- A `signature_requests` row exists for this token.
-- Status is still `pending` (not already signed, declined, or cancelled).
-- The parent document is not cancelled.
-
-On success, the server downloads the current PDF from private Supabase storage and streams it to the client as base64. A `document_viewed` audit event is recorded (storing only the last 8 characters of the token).
-
-### 4. Client-side signing
-
-The `@drvillo/react-browser-e-signing` library renders the PDF in-browser. The signer:
-
-- Places one or more fields (signature, full name, date) anywhere on the document pages.
-- Chooses a typed (font-rendered) or drawn (canvas) signature style.
-
-On submission:
-
-1. `modifyPdf()` bakes all fields into the PDF bytes client-side, producing a new PDF binary.
-2. `sha256()` hashes the resulting bytes to produce a client-side document fingerprint.
-3. The signed PDF (base64) and the original signature image are posted to `POST /api/signatures`.
-
-### 5. Signature submission — `POST /api/signatures`
-
-The server performs the following steps atomically:
-
-| Step | Action |
-|------|--------|
-| 1 | Rate-limit check: 10 requests / 60 s per IP |
-| 2 | Body size guard: max 20 MB |
-| 3 | Validate token against `signature_requests` where `status = 'pending'` — rejects replays |
-| 4 | Fetch the original PDF from the `documents` bucket |
-| 5 | SHA-256 hash the **original** PDF → `original_document_hash` |
-| 6 | SHA-256 hash the **submitted signed** PDF → `document_hash` |
-| 7 | Upload signed PDF to the private `signed-documents` bucket at `{document_id}/{request_id}_signed.pdf` |
-| 8 | Update `documents.latest_signed_pdf_path` |
-| 9 | Insert `signatures` row with both hashes, ip, user-agent, storage path |
-| 10 | Flip `signature_requests.status` → `signed` |
-| 11 | Log `document_signed` audit event |
-| 12 | If all signers are now `signed`: mark document `completed`, email all parties |
-
-### 6. Download — `GET /api/download/[token]`
-
-Any signer can redeem their original token to download the final signed PDF, but only once the document status is `completed` (all parties have signed). The server generates a short-lived (1 hour) Supabase Storage signed URL and redirects.
+The OTS proof is independently verifiable using the [OpenTimestamps client](https://opentimestamps.org/).
 
 ---
 
 ## Security Properties
 
-### What is guaranteed
-
-| Property | Mechanism |
-|----------|-----------|
-| Unguessable signing link | 122-bit random UUID token |
-| One-time use | `status = 'pending'` guard on every write; immediately flipped to `signed` |
-| Token confidentiality | Column revoked from all non-service roles in DB; never returned to client |
-| Document tamper evidence | SHA-256 of both original and signed PDFs stored at signing time |
-| Identity binding | Signer name, email, IP, and user-agent recorded per signature |
-| Audit trail | Append-only `audit_log` table; key events logged with actor, entity, and metadata |
-| Storage isolation | Both `documents` and `signed-documents` buckets are private; access only via server or short-lived signed URLs |
-| Replay protection | Rate limiting + one-time token status transition |
-
-### What is not guaranteed
-
-| Property | Note |
-|----------|------|
-| Asymmetric cryptography | No private key signing; signature is a visual image baked into PDF pixels |
-| Trustless verification | The hash record lives in the same DB the server controls — integrity assumes you trust the storage backend |
-| Timestamping authority | `signed_at` is server-generated; no RFC 3161 TSA stamp |
-| Signer identity verification | Identity relies on email delivery; no government ID or biometric check |
+| Property | Guaranteed | Mechanism |
+|---|---|---|
+| Document not altered after upload | Yes | Original SHA-256 stored at signature time |
+| Signed PDF matches what signer saw | Yes | SHA-256 of signed PDF stored |
+| Signer identity | Probable | Email delivery of OTP code |
+| Tamper-evident evidence record | Yes | HMAC-SHA256 with external key |
+| Timestamp integrity | Yes (after upgrade) | Bitcoin blockchain via OpenTimestamps |
+| Audit log immutability | Yes | RLS: INSERT only, no UPDATE/DELETE |
+| Link expiration | Yes | `expires_at` enforced server-side |
+| Consent recorded | Yes | `consent_given_at` + `consent_text_hash` |
 
 ---
 
-## Audit Events
+## Not in scope (by design)
 
-| Event | Trigger |
-|-------|---------|
-| `document_viewed` | Signer opens `/sign/<token>` |
-| `document_signed` | `POST /api/signatures` succeeds |
-| `document_completed` | All signers have signed |
-| `document_sent` | Owner triggers send |
-
-Metadata includes `token_suffix` (last 8 chars), `signer_email`, `signer_name`, and counts where relevant.
-
----
-
-## Token Lifecycle
-
-```
-gen_random_uuid()  →  [email sent]  →  /sign/<token> viewed
-                                              │
-                                         status = pending
-                                              │
-                                    POST /api/signatures
-                                              │
-                                         status = signed
-                                              │
-                              (if all signed) document = completed
-                                              │
-                              GET /api/download/<token>  (1-hour signed URL)
-```
-
-Once a token is used (`status ≠ pending`), the signing endpoint rejects it. It remains valid indefinitely for download as long as the document is `completed`.
+- **PKI digital signatures** — not required for Simple Electronic Signature (SES) under ESIGN/eIDAS.
+- **Qualified Electronic Signature (QES)** — would require a qualified trust service provider.
+- **Video/biometric identity verification** — beyond MVP scope.

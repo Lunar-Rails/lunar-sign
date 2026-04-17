@@ -1,0 +1,18 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--prefix=/dev/null"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  node_bundler = "esbuild"
+  directory = "netlify/functions"
+
+# Give the OTS upgrade function extra time for calendar HTTP calls.
+[functions."ots-upgrade"]
+  timeout = 26

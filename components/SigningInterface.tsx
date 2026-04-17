@@ -18,6 +18,7 @@ import '@/lib/esigning/configure-client'
 
 import type { FieldType, SignatureStyle, SignerInfo } from '@drvillo/react-browser-e-signing'
 
+import { IntentConfirmDialog } from '@/components/signing/IntentConfirmDialog'
 import { MobileWizardShell } from '@/components/signing/MobileWizardShell'
 import { PdfColumn } from '@/components/signing/PdfColumn'
 import { SigningControlsSidebar } from '@/components/signing/SigningControlsSidebar'
@@ -42,6 +43,12 @@ interface SigningInterfaceProps {
   initialFieldsJson?: string | null
   /** Which signer slot this user belongs to. null = legacy single-signer behavior. */
   signerIndex?: number | null
+  /**
+   * Identifier for the PDF version this page was rendered from. Echoed back
+   * to the server so it can reject stale submissions (another signer signed
+   * between page load and submit). 'original' = no prior signatures.
+   */
+  baseVersion: string
 }
 
 export default function SigningInterface({
@@ -52,6 +59,7 @@ export default function SigningInterface({
   pdfBase64,
   initialFieldsJson,
   signerIndex,
+  baseVersion,
 }: SigningInterfaceProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
@@ -89,6 +97,12 @@ export default function SigningInterface({
   const [submitFieldCount, setSubmitFieldCount] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showIntentDialog, setShowIntentDialog] = useState(false)
+  const [showDeclineDialog, setShowDeclineDialog] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+  const [declining, setDeclining] = useState(false)
+  // Stash validated form state until user confirms intent.
+  const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null)
 
   const [signerInfo, setSignerInfo] = useState<SignerInfo>(() => {
     const [firstName = '', ...rest] = signerName.trim().split(' ')
@@ -167,7 +181,91 @@ export default function SigningInterface({
 
   const showFieldPalette = !templateMode
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const doSubmit = async () => {
+    setLoading(true)
+
+    try {
+      const fieldsForPdf =
+        templateMode && templateStored
+          ? applySignerValuesToPlacements({
+              fields,
+              stored: templateStored,
+              currentSignerIndex,
+              displayName,
+              signerTitle: signerInfo.title,
+              signatureDataUrl: activeSignatureDataUrl ?? '',
+              dateText: fieldPreview.dateText,
+            })
+          : fields
+
+      const signedPdfBytes = await modifyPdf({
+        pdfBytes: new Uint8Array(pdfInput),
+        fields: fieldsForPdf,
+        signer: signerInfo,
+        signatureDataUrl: activeSignatureDataUrl ?? undefined,
+        pageDimensions,
+        dateText: fieldPreview.dateText,
+      })
+
+      const documentHash = await sha256(signedPdfBytes)
+      const signedPdfBase64 = uint8ArrayToBase64({ value: signedPdfBytes })
+
+      const response = await fetch('/api/signatures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          signer_name: displayName,
+          signature_data: activeSignatureDataUrl,
+          signed_pdf_base64: signedPdfBase64,
+          base_version: baseVersion,
+        }),
+      })
+
+      if (response.status === 409) {
+        // Another signer committed a signature between our page load and submit.
+        // Refresh the RSC page so we re-render with the current latest_signed_pdf_path
+        // and a fresh baseVersion; the signer then re-signs on top of the new state.
+        setErrorMessage(
+          'Another signer just signed this document. Reloading with the latest version...'
+        )
+        setLoading(false)
+        setTimeout(() => router.refresh(), 1500)
+        return
+      }
+
+      if (!response.ok) {
+        const errorPayload = await parseJsonResponse({ response })
+        throw new Error(errorPayload.error || 'Failed to sign document')
+      }
+
+      const result = await parseJsonResponse({ response })
+      setSuccess(true)
+      setCompleted(Boolean(result.data?.completed))
+      setSubmitHash(documentHash)
+      setSubmitFieldCount(fields.length)
+      clearFields()
+
+      setTimeout(() => {
+        if (result.data?.completed) {
+          router.push(`/api/download/${token}`)
+        }
+      }, 3000)
+    } catch (error) {
+      console.error('Signing error:', error)
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to sign document. Please try again.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
 
@@ -205,73 +303,31 @@ export default function SigningInterface({
       }
     }
 
-    setLoading(true)
+    // Show intent-to-sign dialog before proceeding.
+    pendingSubmitRef.current = doSubmit
+    setShowIntentDialog(true)
+  }
 
+  const handleDecline = async () => {
+    setDeclining(true)
     try {
-      const fieldsForPdf =
-        templateMode && templateStored
-          ? applySignerValuesToPlacements({
-              fields,
-              stored: templateStored,
-              currentSignerIndex,
-              displayName,
-              signerTitle: signerInfo.title,
-              signatureDataUrl: activeSignatureDataUrl,
-              dateText: fieldPreview.dateText,
-            })
-          : fields
-
-      const signedPdfBytes = await modifyPdf({
-        pdfBytes: new Uint8Array(pdfInput),
-        fields: fieldsForPdf,
-        signer: signerInfo,
-        signatureDataUrl: activeSignatureDataUrl,
-        pageDimensions,
-        dateText: fieldPreview.dateText,
-      })
-
-      const documentHash = await sha256(signedPdfBytes)
-      const signedPdfBase64 = uint8ArrayToBase64({ value: signedPdfBytes })
-
-      const response = await fetch('/api/signatures', {
+      const res = await fetch(`/api/sign/${token}/decline`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          signer_name: displayName,
-          signature_data: activeSignatureDataUrl,
-          signed_pdf_base64: signedPdfBase64,
-        }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: declineReason.trim() || null }),
       })
-
-      if (!response.ok) {
-        const errorPayload = await parseJsonResponse({ response })
-        throw new Error(errorPayload.error || 'Failed to sign document')
+      if (res.ok) {
+        router.push(`/sign/${token}/declined`)
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setErrorMessage((body as { error?: string }).error ?? 'Failed to decline. Please try again.')
+        setShowDeclineDialog(false)
       }
-
-      const result = await parseJsonResponse({ response })
-      setSuccess(true)
-      setCompleted(Boolean(result.data?.completed))
-      setSubmitHash(documentHash)
-      setSubmitFieldCount(fields.length)
-      clearFields()
-
-      setTimeout(() => {
-        if (result.data?.completed) {
-          router.push(`/api/download/${token}`)
-        }
-      }, 3000)
-    } catch (error) {
-      console.error('Signing error:', error)
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Failed to sign document. Please try again.'
-      )
+    } catch {
+      setErrorMessage('Network error. Please try again.')
+      setShowDeclineDialog(false)
     } finally {
-      setLoading(false)
+      setDeclining(false)
     }
   }
 
@@ -336,17 +392,85 @@ export default function SigningInterface({
   )
 
   return (
+    <>
+    <IntentConfirmDialog
+      open={showIntentDialog}
+      onConfirm={() => {
+        setShowIntentDialog(false)
+        if (pendingSubmitRef.current) pendingSubmitRef.current()
+      }}
+      onCancel={() => {
+        setShowIntentDialog(false)
+        pendingSubmitRef.current = null
+      }}
+    />
     <div className="relative min-h-screen bg-lr-bg px-4 py-6 sm:px-6 lg:px-8">
       <div className="fixed right-4 top-4 z-50">
         <ThemeToggle />
       </div>
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-4 rounded-lr-lg border border-lr-border bg-lr-surface px-5 py-4 shadow-lr-card">
-          <h1 className="text-page-title sm:text-2xl">{documentTitle}</h1>
-          <p className="text-body mt-1">
-            Signing as <strong>{displayName}</strong> ({signerEmail})
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-page-title sm:text-2xl">{documentTitle}</h1>
+              <p className="text-body mt-1">
+                Signing as <strong>{displayName}</strong> ({signerEmail})
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDeclineDialog(true)}
+              className="shrink-0 text-lr-sm text-lr-muted underline-offset-2 hover:text-lr-error hover:underline"
+            >
+              Decline to sign
+            </button>
+          </div>
         </div>
+
+        {/* Decline confirmation dialog */}
+        {showDeclineDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-6 shadow-lr-card">
+              <h2 className="font-display text-lr-base font-semibold text-lr-text">
+                Decline to sign?
+              </h2>
+              <p className="mt-2 text-lr-sm text-lr-muted">
+                You are about to decline signing <strong className="text-lr-text">{documentTitle}</strong>. The document will be cancelled and the owner will be notified. This action cannot be undone.
+              </p>
+              <div className="mt-4">
+                <label className="block text-lr-sm font-medium text-lr-text-2 mb-1">
+                  Reason <span className="text-lr-muted font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="e.g. Terms need to be revised"
+                  className="w-full resize-none rounded-lr border border-lr-border bg-lr-bg px-3 py-2 text-lr-sm text-lr-text placeholder:text-lr-muted outline-none focus:border-lr-accent focus:ring-1 focus:ring-lr-accent"
+                />
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowDeclineDialog(false); setDeclineReason('') }}
+                  disabled={declining}
+                  className="flex-1 rounded-lr border border-lr-border px-4 py-2.5 text-lr-sm font-medium text-lr-text hover:bg-lr-surface-2 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDecline}
+                  disabled={declining}
+                  className="flex-1 rounded-lr bg-lr-error px-4 py-2.5 text-lr-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {declining ? 'Declining…' : 'Decline to sign'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isNarrow ? (
           <MobileWizardShell
@@ -411,6 +535,7 @@ export default function SigningInterface({
         )}
       </div>
     </div>
+    </>
   )
 }
 

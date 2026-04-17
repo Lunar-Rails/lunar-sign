@@ -56,6 +56,9 @@ export async function POST(
     const config = getConfig()
     let sentCount = 0
 
+    // Bump expires_at by 30 days from now so the reminded signer has a fresh window.
+    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
     try {
       for (const signer of pendingSigners) {
         const signingUrl = `${config.NEXT_PUBLIC_APP_URL}/sign/${signer.token}`
@@ -67,6 +70,12 @@ export async function POST(
         })
         await sendEmail({ to: signer.signer_email, subject, html })
         sentCount++
+
+        // Extend the signing window so the link doesn't expire on the reminded signer.
+        await serviceSupabase
+          .from('signature_requests')
+          .update({ expires_at: newExpiresAt })
+          .eq('id', signer.id)
       }
     } catch (emailError) {
       console.error('Reminder email error:', emailError)

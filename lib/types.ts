@@ -144,10 +144,16 @@ export interface Signature {
   original_document_hash: string | null
   signature_image_hash: string | null
   evidence_hash: string | null
+  evidence_mac: string | null
+  otp_verified: boolean
   signed_pdf_path: string
   ip_address: string | null
   user_agent: string | null
   signed_at: string
+  ots_proof: string | null
+  ots_pending: boolean
+  ots_upgraded_at: string | null
+  ots_bitcoin_block: number | null
 }
 
 export interface AuditLog {

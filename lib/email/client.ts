@@ -20,10 +20,17 @@ function getTransporter() {
   return transporter
 }
 
+export interface EmailAttachment {
+  filename: string
+  content: Buffer
+  contentType: string
+}
+
 export async function sendEmail(options: {
   to: string
   subject: string
   html: string
+  attachments?: EmailAttachment[]
 }): Promise<boolean> {
   try {
     const transporter = getTransporter()
@@ -34,6 +41,11 @@ export async function sendEmail(options: {
       to: options.to,
       subject: options.subject,
       html: options.html,
+      attachments: options.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     })
 
     return true

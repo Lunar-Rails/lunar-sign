@@ -5,15 +5,37 @@ import { rateLimit } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import { sendEmail } from '@/lib/email/client'
+import { computeEvidenceMac } from '@/lib/esigning/evidence-mac'
+import { appendCertificateOfCompletion } from '@/lib/esigning/certificate'
+import type { CertSignerRecord } from '@/lib/esigning/certificate'
 import {
   documentCompletedOwnerEmail,
   documentCompletedSignerEmail,
+  documentSignedEmail,
 } from '@/lib/email/templates'
 import type {
   Document,
-  SignatureRequest,
   SignatureRequestWithToken,
 } from '@/lib/types'
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024 // 15 MB
+
+interface AllRequestRow {
+  id: string
+  status: string
+  signer_name: string
+  signer_email: string
+  token: string
+}
+
+interface SignatureRow {
+  id: string
+  request_id: string
+  evidence_mac: string | null
+  signed_at: string
+  ip_address: string | null
+  otp_verified: boolean
+}
 
 interface OwnerProfileRow {
   email: string
@@ -43,18 +65,27 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient()
+    const config = getConfig()
     const body = await request.json()
-    const { token, signature_data, signer_name, signed_pdf_base64 } = body
+    const {
+      token,
+      signature_data,
+      signer_name,
+      signed_pdf_base64,
+      base_version,
+    } = body
 
     if (
       typeof token !== 'string' ||
       typeof signer_name !== 'string' ||
       typeof signature_data !== 'string' ||
       typeof signed_pdf_base64 !== 'string' ||
+      typeof base_version !== 'string' ||
       !token ||
       !signer_name ||
       !signature_data ||
-      !signed_pdf_base64
+      !signed_pdf_base64 ||
+      !base_version
     ) {
       return NextResponse.json(
         { error: 'Missing required signing payload' },
@@ -65,7 +96,7 @@ export async function POST(request: NextRequest) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, consent_text_hash, expires_at'
       )
       .eq('token', token)
       .eq('status', 'pending')
@@ -81,6 +112,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const expiresAt = (signatureRequest as unknown as { expires_at?: string | null }).expires_at
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return NextResponse.json(
+        { error: 'This signing link has expired' },
+        { status: 410 }
+      )
+    }
+
+    // Gate: require OTP verification before accepting a signature.
+    const { data: otpRecord } = await supabase
+      .from('signing_otps')
+      .select('verified_at')
+      .eq('request_id', signatureRequest.id)
+      .maybeSingle()
+
+    if (!otpRecord?.verified_at) {
+      return NextResponse.json(
+        { error: 'Identity not verified. Please complete email OTP verification first.' },
+        { status: 403 }
+      )
+    }
+
     const { data: documentRaw } = await supabase
       .from('documents')
       .select('*')
@@ -93,6 +146,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Document not found' },
         { status: 404 }
+      )
+    }
+
+    // Optimistic concurrency: reject if another signer updated the document
+    // between the time this client loaded the signing page and submitted.
+    // 'original' is the sentinel for a document that has not been signed yet.
+    const currentBase = document.latest_signed_pdf_path ?? 'original'
+    if (currentBase !== base_version) {
+      return NextResponse.json(
+        {
+          error:
+            'Another signer updated this document. Please reload to sign the latest version.',
+          code: 'STALE_BASE',
+        },
+        { status: 409 }
       )
     }
 
@@ -131,23 +199,38 @@ export async function POST(request: NextRequest) {
       .update(Buffer.from(signature_data))
       .digest('hex')
 
-    // Pre-compute signed_at so it's identical in the DB row and the evidence hash.
+    // Pre-compute signed_at so it's identical in the DB row and the evidence MAC.
     const signedAt = new Date().toISOString()
 
-    // Evidence hash: canonical commit over all signing event fields.
-    // Format: each field on its own line, ordered deterministically.
-    // Re-computing this from the DB later proves the record hasn't been tampered with.
-    const evidenceInput = [
-      signatureRequest.signer_email,
-      signer_name,
-      signatureImageHash,
-      originalDocumentHash,
-      signedDocumentHash,
-      signedAt,
-    ].join('\n')
+    const consentTextHash = (signatureRequest as unknown as { consent_text_hash?: string | null }).consent_text_hash ?? null
+
+    // HMAC-SHA256 over canonical signing event — keyed with EVIDENCE_HMAC_KEY.
+    // Also dual-write the legacy plain SHA-256 evidence_hash for one release
+    // so any existing verification tooling continues to work during the rollout.
+    const evidenceMac = computeEvidenceMac(
+      {
+        signerEmail: signatureRequest.signer_email,
+        signerName: signer_name,
+        signatureImageHash,
+        originalDocumentHash,
+        signedDocumentHash,
+        signedAt,
+        consentTextHash,
+        otpVerified: true, // guaranteed true — gated above
+      },
+      config.EVIDENCE_HMAC_KEY
+    )
+    // Legacy: plain SHA-256 evidence hash (kept for one release, then removed).
     const evidenceHash = crypto
       .createHash('sha256')
-      .update(evidenceInput)
+      .update([
+        signatureRequest.signer_email,
+        signer_name,
+        signatureImageHash,
+        originalDocumentHash,
+        signedDocumentHash,
+        signedAt,
+      ].join('\n'))
       .digest('hex')
 
     const uploadPath = `${document.id}/${signatureRequest.id}_signed.pdf`
@@ -188,7 +271,10 @@ export async function POST(request: NextRequest) {
       document_hash: signedDocumentHash,
       original_document_hash: originalDocumentHash,
       signature_image_hash: signatureImageHash,
-      evidence_hash: evidenceHash,
+      evidence_hash: evidenceHash,   // legacy plain SHA-256, kept for one release
+      evidence_mac: evidenceMac,     // HMAC-SHA256 with external key
+      otp_verified: true,            // gated — only reachable after OTP verification
+      ots_pending: true,             // flag for OpenTimestamps cron pickup
       signed_pdf_path: uploadPath,
       ip_address: ip === 'unknown' ? null : ip,
       user_agent: userAgent,
@@ -226,20 +312,113 @@ export async function POST(request: NextRequest) {
 
     const { data: allRequestsRaw } = await supabase
       .from('signature_requests')
-      .select('id, status, signer_name, signer_email')
+      .select('id, status, signer_name, signer_email, token')
       .eq('document_id', document.id)
 
-    const allRequests = (allRequestsRaw ?? []) as SignatureRequest[]
+    const allRequests = (allRequestsRaw ?? []) as AllRequestRow[]
 
-    const allSigned = allRequests.every((req) => req.status === 'signed')
+    const allSigned =
+      allRequests.length > 0 && allRequests.every((req) => req.status === 'signed')
+
+    // Resolve owner profile once; reused for both partial- and completion-emails.
+    const { data: ownerProfileRaw } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', document.uploaded_by)
+      .single()
+
+    const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
 
     let completed = false
     if (allSigned) {
+      const completedAt = new Date().toISOString()
+
+      // ── Certificate of Completion ────────────────────────────────────
+      // Best-effort: a failure must never block the completion transition.
+      let certificatePdfBytes: Buffer | null = null
+      let certificatePdfPath: string | null = null
+      let finalDocumentHash: string | null = null
+
+      try {
+        // Fetch all signature records for this document to populate the CoC.
+        const { data: sigRowsRaw } = await supabase
+          .from('signatures')
+          .select('id, request_id, evidence_mac, signed_at, ip_address, otp_verified')
+          .in('request_id', allRequests.map((r) => r.id))
+
+        const sigRows = (sigRowsRaw ?? []) as SignatureRow[]
+
+        // Build per-signer records, joining on allRequests for name/email.
+        const certSigners: CertSignerRecord[] = allRequests.map((req) => {
+          const sig = sigRows.find((s) => s.request_id === req.id)
+          return {
+            signatureId: sig?.id ?? '',
+            signerName: req.signer_name,
+            signerEmail: req.signer_email,
+            signedAt: sig?.signed_at ?? completedAt,
+            ipAddress: sig?.ip_address ?? null,
+            evidenceMac: sig?.evidence_mac ?? '',
+            otpVerified: sig?.otp_verified ?? false,
+          }
+        })
+
+        // Download the latest signed PDF (has every signer's ink layer).
+        // NOTE: `document` was fetched BEFORE this request's own upload, so
+        // `document.latest_signed_pdf_path` is stale and points at the previous
+        // signer's PDF. The freshly-uploaded `uploadPath` is by definition the
+        // most up-to-date PDF (it was built on top of the previous signer's
+        // ink layer client-side and just persisted on line ~253).
+        const latestPath = uploadPath
+        const { data: latestPdfData, error: latestErr } = await supabase.storage
+          .from('signed-documents')
+          .download(latestPath)
+
+        if (!latestErr && latestPdfData) {
+          const latestPdfBytes = Buffer.from(await latestPdfData.arrayBuffer())
+
+          certificatePdfBytes = await appendCertificateOfCompletion(latestPdfBytes, {
+            documentTitle: document.title,
+            documentId: document.id,
+            originalDocumentHash,
+            finalDocumentHash: crypto
+              .createHash('sha256')
+              .update(latestPdfBytes)
+              .digest('hex'),
+            signers: certSigners,
+            generatedAt: completedAt,
+            appUrl: config.NEXT_PUBLIC_APP_URL,
+          })
+
+          finalDocumentHash = crypto
+            .createHash('sha256')
+            .update(certificatePdfBytes)
+            .digest('hex')
+
+          certificatePdfPath = `${document.id}/certificate.pdf`
+          const { error: certUploadErr } = await supabase.storage
+            .from('signed-documents')
+            .upload(certificatePdfPath, certificatePdfBytes, {
+              contentType: 'application/pdf',
+              upsert: true,
+            })
+          if (certUploadErr) {
+            console.error('Certificate upload error:', certUploadErr)
+            certificatePdfPath = null
+            finalDocumentHash = null
+          }
+        }
+      } catch (certErr) {
+        console.error('Certificate of completion error:', certErr)
+      }
+
+      // ── Mark document completed ─────────────────────────────────────
       const completeResult = await supabase
         .from('documents')
         .update({
           status: 'completed',
-          completed_at: new Date().toISOString(),
+          completed_at: completedAt,
+          ...(certificatePdfPath ? { certificate_pdf_path: certificatePdfPath } : {}),
+          ...(finalDocumentHash ? { final_document_hash: finalDocumentHash } : {}),
         })
         .eq('id', document.id)
       const { error: completeError } = completeResult
@@ -251,18 +430,22 @@ export async function POST(request: NextRequest) {
 
         await logAudit(null, 'document_completed', 'document', document.id, {
           total_signers: allRequests.length,
+          has_certificate: !!certificatePdfPath,
         })
 
+        // Completion emails — failures here must not fail the request.
         try {
-          const config = getConfig()
-
-          const { data: ownerProfileRaw } = await supabase
-            .from('profiles')
-            .select('email, full_name')
-            .eq('id', document.uploaded_by)
-            .single()
-
-          const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
+          // Attach the certificate PDF if it fits within the size limit.
+          const pdfAttachment =
+            certificatePdfBytes && certificatePdfBytes.length <= MAX_ATTACHMENT_BYTES
+              ? [
+                  {
+                    filename: `${document.title.replace(/[^a-zA-Z0-9-_ ]/g, '')}_signed.pdf`,
+                    content: certificatePdfBytes,
+                    contentType: 'application/pdf',
+                  },
+                ]
+              : undefined
 
           if (ownerProfile) {
             const downloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/documents/${document.id}/download`
@@ -271,19 +454,37 @@ export async function POST(request: NextRequest) {
               documentTitle: document.title,
               downloadUrl,
             })
-            await sendEmail({ to: ownerProfile.email, subject, html })
+            await sendEmail({ to: ownerProfile.email, subject, html, attachments: pdfAttachment })
           }
 
           for (const req of allRequests) {
+            const signerDownloadUrl = `${config.NEXT_PUBLIC_APP_URL}/api/download/${req.token}`
             const { subject, html } = documentCompletedSignerEmail({
               signerName: req.signer_name,
               documentTitle: document.title,
+              downloadUrl: signerDownloadUrl,
             })
-            await sendEmail({ to: req.signer_email, subject, html })
+            await sendEmail({ to: req.signer_email, subject, html, attachments: pdfAttachment })
           }
         } catch (emailError) {
           console.error('Completion email error:', emailError)
         }
+      }
+    } else if (ownerProfile) {
+      // Partial signing: notify the owner of this specific signature.
+      // Skipped when the signature also completes the document (owner gets the
+      // completion email instead - no double-notify).
+      try {
+        const documentUrl = `${config.NEXT_PUBLIC_APP_URL}/documents/${document.id}`
+        const { subject, html } = documentSignedEmail({
+          ownerName: ownerProfile.full_name,
+          documentTitle: document.title,
+          signerName: signer_name,
+          documentUrl,
+        })
+        await sendEmail({ to: ownerProfile.email, subject, html })
+      } catch (emailError) {
+        console.error('Partial signing email error:', emailError)
       }
     }
 

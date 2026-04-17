@@ -139,25 +139,23 @@ describe('hydrateForSigner', () => {
     expect(out.find((f) => f.id === 'f2')?.value).toBeUndefined()
   })
 
-  it('signer 0: only S1 fields start empty, others show persisted values', () => {
+  it('signer 0: keeps creator + S1 fields, drops S2 fields so the shared preview does not leak', () => {
     const out = hydrateForSigner([creatorField, signer1Field, signer2Field], 0)
-    // creator field: shows its value
     expect(out.find((f) => f.id === 'f1')?.value).toBe('Acme')
-    // S1 field (matches): value cleared so signer can fill
+    // S1 field kept, empty so library overlay shows the current signer's preview
     expect(out.find((f) => f.id === 's1')?.value).toBeUndefined()
-    // S2 field (other signer): shows persisted value (undefined here since none set)
-    expect(out.find((f) => f.id === 's2')?.value).toBeUndefined()
-    // all locked
+    // S2 field dropped entirely — avoids the library painting S1's preview into S2's slot
+    expect(out.find((f) => f.id === 's2')).toBeUndefined()
     expect(out.every((f) => f.locked)).toBe(true)
   })
 
-  it('signer 1: only S2 fields start empty', () => {
+  it('signer 1: keeps only S2 fields among signer-assigned fields', () => {
     const stored: StoredField[] = [
       { ...signer1Field, value: 'already-signed' },
       signer2Field,
     ]
     const out = hydrateForSigner(stored, 1)
-    expect(out.find((f) => f.id === 's1')?.value).toBe('already-signed')
+    expect(out.find((f) => f.id === 's1')).toBeUndefined()
     expect(out.find((f) => f.id === 's2')?.value).toBeUndefined()
   })
 })
@@ -311,7 +309,7 @@ describe('applySignerValuesToPlacements', () => {
     expect(out.find((f) => f.id === 'a1')?.value).toBe('Pat Doe')
   })
 
-  it('slot mode: only applies values for current signer index', () => {
+  it('slot mode: only applies values for current signer index; other-signer fields are not in the placement set at all', () => {
     const stored: StoredField[] = [
       { ...signer1Field, value: 'prev-signed' },
       signer2Field,
@@ -326,9 +324,9 @@ describe('applySignerValuesToPlacements', () => {
       signatureDataUrl: 'data:image/png;base64,yy',
       dateText: 'Feb 1',
     })
-    // S1's field stays untouched (prev-signed value)
-    expect(out.find((f) => f.id === 's1')?.value).toBe('prev-signed')
-    // S2's fullName gets current signer's name
+    // S1's field was dropped by hydrateForSigner — its signature is already burned into
+    // the base PDF S2 is signing on top of; modifyPdf must not redraw it.
+    expect(out.find((f) => f.id === 's1')).toBeUndefined()
     expect(out.find((f) => f.id === 's2')?.value).toBe('Jane Smith')
   })
 })

@@ -19,12 +19,16 @@ type SigningOutcome =
   | { kind: 'deleted' }
   | { kind: 'revoked'; documentTitle: string }
   | { kind: 'already_signed' }
+  | { kind: 'needs_consent' }
+  | { kind: 'needs_otp' }
+  | { kind: 'expired' }
   | {
       kind: 'ready'
       signatureRequest: SignatureRequestWithToken
       document: Document
       pdfBase64: string
       signerIndex: number | null
+      baseVersion: string
     }
 
 export default async function SigningPage({ params }: SigningPageProps) {
@@ -36,7 +40,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, signer_index'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, signer_index, consent_given_at, expires_at'
       )
       .eq('token', token)
       .single()
@@ -62,11 +66,30 @@ export default async function SigningPage({ params }: SigningPageProps) {
           document.status === 'cancelled' ||
           signatureRequest.status === 'cancelled'
 
+        const expiresAt = (signatureRequest as unknown as { expires_at?: string | null }).expires_at
+        const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false
+
         if (isRevoked) {
           outcome = { kind: 'revoked', documentTitle: document.title }
         } else if (signatureRequest.status !== 'pending') {
           outcome = { kind: 'already_signed' }
+        } else if (isExpired) {
+          outcome = { kind: 'expired' }
+        } else if (!(signatureRequest as unknown as { consent_given_at?: string | null }).consent_given_at) {
+          outcome = { kind: 'needs_consent' }
         } else {
+          // Check OTP verification — only gate when a code has been sent but not yet verified.
+          const { data: otpRow } = await supabase
+            .from('signing_otps')
+            .select('verified_at')
+            .eq('request_id', signatureRequest.id)
+            .maybeSingle()
+
+          // If no OTP record exists yet, we send one from the OTP page.
+          // If a record exists but is unverified, the signer must complete OTP.
+          if (otpRow !== undefined && !otpRow?.verified_at) {
+            outcome = { kind: 'needs_otp' }
+          } else {
           let pdfPath = document.file_path
           if (document.latest_signed_pdf_path) {
             pdfPath = document.latest_signed_pdf_path
@@ -98,8 +121,10 @@ export default async function SigningPage({ params }: SigningPageProps) {
               document,
               pdfBase64,
               signerIndex: (signatureRequest as unknown as { signer_index?: number | null }).signer_index ?? null,
+              baseVersion: document.latest_signed_pdf_path ?? 'original',
             }
           }
+          } // close OTP else block
         }
       }
     }
@@ -118,6 +143,29 @@ export default async function SigningPage({ params }: SigningPageProps) {
 
   if (outcome.kind === 'already_signed') {
     redirect(`/sign/${token}/already-signed`)
+  }
+
+  if (outcome.kind === 'needs_consent') {
+    redirect(`/sign/${token}/consent`)
+  }
+
+  if (outcome.kind === 'needs_otp') {
+    redirect(`/sign/${token}/otp`)
+  }
+
+  if (outcome.kind === 'expired') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-lr-bg px-4">
+        <div className="w-full max-w-md rounded-lr-lg border border-lr-border bg-lr-surface p-8 text-center shadow-lr-card">
+          <h1 className="font-display text-lr-xl font-semibold text-lr-text">
+            Signing link expired
+          </h1>
+          <p className="mt-4 text-lr-sm text-lr-muted">
+            This signing link has expired. Please contact the document owner to request a new link.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (outcome.kind === 'revoked') {
@@ -153,6 +201,7 @@ export default async function SigningPage({ params }: SigningPageProps) {
       pdfBase64={outcome.pdfBase64}
       initialFieldsJson={initialFieldsJson}
       signerIndex={outcome.signerIndex}
+      baseVersion={outcome.baseVersion}
     />
   )
 }

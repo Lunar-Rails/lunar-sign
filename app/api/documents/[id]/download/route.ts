@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { canAccessDocument } from '@/lib/authorization'
 
 export async function GET(
@@ -50,10 +51,19 @@ export async function GET(
       )
     }
 
-    // Generate signed URL for latest signed PDF
-    const { data: signedUrl, error: urlError } = await supabase.storage
+    // Prefer the certificate PDF (with CoC page) when available; fall back to
+    // latest signed PDF for documents completed before this feature shipped.
+    const downloadPath =
+      (document as unknown as { certificate_pdf_path?: string | null }).certificate_pdf_path ||
+      document.latest_signed_pdf_path
+
+    // Authorization was already enforced via canAccessDocument; use the service
+    // client for storage so company members and admins (not just the uploader)
+    // can download. The bucket's RLS policy only covers `uploaded_by = auth.uid()`.
+    const service = getServiceClient()
+    const { data: signedUrl, error: urlError } = await service.storage
       .from('signed-documents')
-      .createSignedUrl(document.latest_signed_pdf_path, 3600)
+      .createSignedUrl(downloadPath, 3600)
 
     if (urlError || !signedUrl) {
       console.error('Signed URL error:', urlError)

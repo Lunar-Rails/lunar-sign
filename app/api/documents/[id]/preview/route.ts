@@ -20,7 +20,7 @@ export async function GET(
 
     const { data: document } = await supabase
       .from('documents')
-      .select('id, title, file_path, uploaded_by')
+      .select('id, title, file_path, uploaded_by, status, latest_signed_pdf_path')
       .eq('id', documentId)
       .maybeSingle()
 
@@ -35,10 +35,18 @@ export async function GET(
     if (!hasDocumentAccess)
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+    // Show the most recently signed PDF once signing is under way, so the
+    // dashboard preview always reflects current progress (e.g. 1 of 2 signed).
+    // Drafts never have a signed artifact; fall back to the original upload.
+    const useSignedArtifact =
+      document.status !== 'draft' && Boolean(document.latest_signed_pdf_path)
+
     const service = getServiceClient()
-    const { data: pdfBlob, error: downloadError } = await service.storage
-      .from('documents')
-      .download(document.file_path)
+    const { data: pdfBlob, error: downloadError } = useSignedArtifact
+      ? await service.storage
+          .from('signed-documents')
+          .download(document.latest_signed_pdf_path as string)
+      : await service.storage.from('documents').download(document.file_path)
 
     if (downloadError || !pdfBlob) {
       console.error('Document preview download error:', downloadError)
