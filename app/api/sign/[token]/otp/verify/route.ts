@@ -39,7 +39,7 @@ export async function POST(
 
     const { data: reqRaw } = await supabase
       .from('signature_requests')
-      .select('id, document_id, signer_email, status')
+      .select('id, document_id, signer_email, status, expires_at')
       .eq('token', token)
       .single()
 
@@ -47,6 +47,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid signing link' }, { status: 404 })
     if (reqRaw.status !== 'pending')
       return NextResponse.json({ error: 'Signing request is no longer active' }, { status: 400 })
+
+    const expiresAt = (reqRaw as unknown as { expires_at?: string | null }).expires_at
+    if (expiresAt && new Date(expiresAt) < new Date())
+      return NextResponse.json({ error: 'This signing link has expired' }, { status: 410 })
 
     const { data: otpRaw } = await supabase
       .from('signing_otps')

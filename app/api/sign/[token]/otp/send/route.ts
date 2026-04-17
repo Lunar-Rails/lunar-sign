@@ -27,7 +27,7 @@ export async function POST(
 
     const { data: reqRaw } = await supabase
       .from('signature_requests')
-      .select('id, document_id, signer_name, signer_email, status, consent_given_at')
+      .select('id, document_id, signer_name, signer_email, status, consent_given_at, expires_at')
       .eq('token', token)
       .single()
 
@@ -35,6 +35,11 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid signing link' }, { status: 404 })
     if (reqRaw.status !== 'pending')
       return NextResponse.json({ error: 'Signing request is no longer active' }, { status: 400 })
+
+    const expiresAt = (reqRaw as unknown as { expires_at?: string | null }).expires_at
+    if (expiresAt && new Date(expiresAt) < new Date())
+      return NextResponse.json({ error: 'This signing link has expired' }, { status: 410 })
+
     if (!reqRaw.consent_given_at)
       return NextResponse.json({ error: 'Consent required before OTP' }, { status: 400 })
 
@@ -50,7 +55,7 @@ export async function POST(
 
     const code = generateOtpCode()
     const codeHash = hashOtpCode(reqRaw.id, code)
-    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString()
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString()
 
     // Upsert replaces any previous unsent/unverified code.
     const { error: upsertErr } = await supabase
@@ -60,7 +65,7 @@ export async function POST(
           request_id: reqRaw.id,
           code_hash: codeHash,
           sent_to: reqRaw.signer_email,
-          expires_at: expiresAt,
+          expires_at: otpExpiresAt,
           verified_at: null,
           attempts: 0,
           created_at: new Date().toISOString(),

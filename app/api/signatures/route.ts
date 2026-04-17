@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, consent_text_hash'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, consent_text_hash, expires_at'
       )
       .eq('token', token)
       .eq('status', 'pending')
@@ -108,6 +108,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid or already used signature token' },
         { status: 400 }
+      )
+    }
+
+    const expiresAt = (signatureRequest as unknown as { expires_at?: string | null }).expires_at
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return NextResponse.json(
+        { error: 'This signing link has expired' },
+        { status: 410 }
       )
     }
 
