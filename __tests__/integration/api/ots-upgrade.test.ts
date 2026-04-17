@@ -60,7 +60,7 @@ describe('POST /api/internal/ots/upgrade', () => {
         queue: [
           // Phase 1 fetch (unstamped)
           {
-            data: [{ id: sigId, document_id: docId, evidence_mac: 'a'.repeat(64) }],
+            data: [{ id: sigId, evidence_mac: 'a'.repeat(64), signature_requests: { document_id: docId } }],
             error: null,
           },
           // Phase 1 update (store proof)
@@ -93,7 +93,7 @@ describe('POST /api/internal/ots/upgrade', () => {
           { data: [], error: null },
           // Phase 2 fetch (has proof, pending)
           {
-            data: [{ id: sigId, document_id: docId, ots_proof: Buffer.from('pending-proof') }],
+            data: [{ id: sigId, ots_proof: '\\x' + Buffer.from('pending-proof').toString('hex'), signature_requests: { document_id: docId } }],
             error: null,
           },
           // Phase 2 update (confirmed)

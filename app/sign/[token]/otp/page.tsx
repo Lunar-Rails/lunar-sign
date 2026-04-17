@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, ShieldCheck } from 'lucide-react'
 
@@ -9,8 +9,8 @@ interface OtpPageProps {
 }
 
 export default function OtpPage({ params }: OtpPageProps) {
+  const { token } = use(params)
   const router = useRouter()
-  const [token, setToken] = useState<string | null>(null)
   const [digits, setDigits] = useState<string[]>(Array(6).fill(''))
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -19,12 +19,8 @@ export default function OtpPage({ params }: OtpPageProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
-    params.then(({ token: t }) => {
-      setToken(t)
-      sendCode(t)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    sendCode(token)
+  }, [token])
 
   async function sendCode(tok: string) {
     setSending(true)
@@ -69,7 +65,7 @@ export default function OtpPage({ params }: OtpPageProps) {
   }
 
   async function handleVerify(code: string) {
-    if (!token || verifying) return
+    if (verifying) return
     setVerifying(true)
     setError(null)
     try {
@@ -147,8 +143,8 @@ export default function OtpPage({ params }: OtpPageProps) {
         <div className="mt-6 text-center">
           <button
             type="button"
-            disabled={sending || !token}
-            onClick={() => token && sendCode(token)}
+            disabled={sending}
+            onClick={() => sendCode(token)}
             className="text-lr-sm text-lr-accent underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             {sending ? 'Sending…' : 'Resend code'}

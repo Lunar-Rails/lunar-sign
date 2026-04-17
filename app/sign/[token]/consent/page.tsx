@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck } from 'lucide-react'
 import { CONSENT_HEADING, CONSENT_PARAGRAPHS } from '@/lib/legal/consent-copy'
@@ -10,20 +10,15 @@ interface ConsentPageProps {
 }
 
 export default function ConsentPage({ params }: ConsentPageProps) {
+  const { token } = use(params)
   const router = useRouter()
-  const [token, setToken] = useState<string | null>(null)
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Resolve the token from the promise on mount
-  if (token === null) {
-    params.then(({ token: t }) => setToken(t))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreed || !token) return
+    if (!agreed) return
 
     setSubmitting(true)
     setError(null)
@@ -81,7 +76,7 @@ export default function ConsentPage({ params }: ConsentPageProps) {
 
           <button
             type="submit"
-            disabled={!agreed || submitting || token === null}
+            disabled={!agreed || submitting}
             className="w-full rounded-lr bg-lr-accent px-4 py-2.5 text-lr-sm font-semibold text-white hover:bg-lr-accent-hover disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-lr-base"
           >
             {submitting ? 'Recording consent…' : 'I Agree — Continue to Document'}

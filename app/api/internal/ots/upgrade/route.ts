@@ -8,10 +8,21 @@ const BATCH_SIZE = 10
 
 interface SigRow {
   id: string
-  document_id: string | null
   evidence_mac: string | null
-  ots_proof: Buffer | null
+  ots_proof: string | null
   ots_pending: boolean
+  signature_requests: { document_id: string | null } | null
+}
+
+/** Encode a Buffer as a hex string for Supabase bytea columns. */
+function toByteaHex(buf: Buffer): string {
+  return '\\x' + buf.toString('hex')
+}
+
+/** Decode a Supabase bytea hex string ("\x...") back to a Buffer. */
+function fromByteaHex(value: string): Buffer {
+  const hex = value.startsWith('\\x') ? value.slice(2) : value
+  return Buffer.from(hex, 'hex')
 }
 
 export async function POST(request: NextRequest) {
@@ -32,15 +43,20 @@ export async function POST(request: NextRequest) {
 
     // ── Phase 1: stamp new signatures ──────────────────────────────────────
     // Signatures where ots_pending=true but ots_proof is null need initial stamping.
-    const { data: unstamped } = await supabase
+    const { data: unstamped, error: unstampedErr } = await supabase
       .from('signatures')
-      .select('id, document_id, evidence_mac')
+      .select('id, evidence_mac, signature_requests(document_id)')
       .eq('ots_pending', true)
       .is('ots_proof', null)
-      .order('created_at', { ascending: true })
+      .order('signed_at', { ascending: true })
       .limit(BATCH_SIZE)
 
-    for (const row of (unstamped ?? []) as SigRow[]) {
+    if (unstampedErr) {
+      console.error('OTS phase-1 query failed:', unstampedErr)
+      results.errors++
+    }
+
+    for (const row of (unstamped ?? []) as unknown as SigRow[]) {
       try {
         // Use the evidence_mac (HMAC) as the content to timestamp —
         // it's the canonical fingerprint of the signing event.
@@ -49,12 +65,14 @@ export async function POST(request: NextRequest) {
 
         const proofBytes = await stampHash(hexHash, config.OTS_CALENDAR_URLS)
 
-        await supabase
+        const { error: updateErr } = await supabase
           .from('signatures')
-          .update({ ots_proof: proofBytes })
+          .update({ ots_proof: toByteaHex(proofBytes) })
           .eq('id', row.id)
+        if (updateErr) throw updateErr
 
-        await logAudit(null, 'ots_stamped', 'document', row.document_id ?? '', {
+        const documentId = row.signature_requests?.document_id ?? ''
+        await logAudit(null, 'ots_stamped', 'document', documentId, {
           signature_id: row.id,
         })
 
@@ -67,36 +85,40 @@ export async function POST(request: NextRequest) {
 
     // ── Phase 2: upgrade pending proofs ────────────────────────────────────
     // Signatures that have a proof but are still pending Bitcoin confirmation.
-    const { data: pendingUpgrade } = await supabase
+    const { data: pendingUpgrade, error: pendingErr } = await supabase
       .from('signatures')
-      .select('id, document_id, ots_proof')
+      .select('id, ots_proof, signature_requests(document_id)')
       .eq('ots_pending', true)
       .not('ots_proof', 'is', null)
-      .order('created_at', { ascending: true })
+      .order('signed_at', { ascending: true })
       .limit(BATCH_SIZE)
 
-    for (const row of (pendingUpgrade ?? []) as SigRow[]) {
+    if (pendingErr) {
+      console.error('OTS phase-2 query failed:', pendingErr)
+      results.errors++
+    }
+
+    for (const row of (pendingUpgrade ?? []) as unknown as SigRow[]) {
       try {
         if (!row.ots_proof) continue
 
-        const proofBuf = Buffer.isBuffer(row.ots_proof)
-          ? row.ots_proof
-          : Buffer.from(row.ots_proof)
-
+        const proofBuf = fromByteaHex(row.ots_proof)
         const { proofBytes, confirmed, bitcoinBlock } = await upgradeProof(proofBuf)
+        const documentId = row.signature_requests?.document_id ?? ''
 
         if (confirmed && bitcoinBlock !== undefined) {
-          await supabase
+          const { error: updateErr } = await supabase
             .from('signatures')
             .update({
-              ots_proof: proofBytes,
+              ots_proof: toByteaHex(proofBytes),
               ots_pending: false,
               ots_upgraded_at: new Date().toISOString(),
               ots_bitcoin_block: bitcoinBlock,
             })
             .eq('id', row.id)
+          if (updateErr) throw updateErr
 
-          await logAudit(null, 'ots_confirmed', 'document', row.document_id ?? '', {
+          await logAudit(null, 'ots_confirmed', 'document', documentId, {
             signature_id: row.id,
             bitcoin_block: bitcoinBlock,
           })
@@ -105,10 +127,11 @@ export async function POST(request: NextRequest) {
         } else {
           // Update the proof bytes even if not confirmed (the calendar may have
           // added more attestation data).
-          await supabase
+          const { error: updateErr } = await supabase
             .from('signatures')
-            .update({ ots_proof: proofBytes })
+            .update({ ots_proof: toByteaHex(proofBytes) })
             .eq('id', row.id)
+          if (updateErr) throw updateErr
 
           results.phase2_pending++
         }

@@ -15,8 +15,10 @@ const input: CertificateInput = {
   originalDocumentHash: 'a'.repeat(64),
   finalDocumentHash: 'b'.repeat(64),
   generatedAt: new Date('2026-04-17T12:00:00Z').toISOString(),
+  appUrl: 'https://app.example.com',
   signers: [
     {
+      signatureId: 'sig-aaa-111',
       signerName: 'Alice Example',
       signerEmail: 'alice@example.com',
       signedAt: new Date('2026-04-17T10:00:00Z').toISOString(),
@@ -25,6 +27,7 @@ const input: CertificateInput = {
       otpVerified: true,
     },
     {
+      signatureId: 'sig-bbb-222',
       signerName: 'Bob Example',
       signerEmail: 'bob@example.com',
       signedAt: new Date('2026-04-17T11:00:00Z').toISOString(),
@@ -66,6 +69,13 @@ describe('appendCertificateOfCompletion', () => {
       signers: [{ ...input.signers[0], ipAddress: null }],
     }
     const result = await appendCertificateOfCompletion(original, inputNoIp)
+    await expect(PDFDocument.load(result)).resolves.toBeTruthy()
+  })
+
+  it('includes OTS section with verify URLs and produces a valid PDF', async () => {
+    const original = await minimalPdf()
+    // The OTS section generates QR codes — ensure it doesn't throw and still produces a valid PDF.
+    const result = await appendCertificateOfCompletion(original, input)
     await expect(PDFDocument.load(result)).resolves.toBeTruthy()
   })
 })

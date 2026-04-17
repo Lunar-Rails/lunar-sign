@@ -1,6 +1,8 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import QRCode from 'qrcode'
 
 export interface CertSignerRecord {
+  signatureId: string
   signerName: string
   signerEmail: string
   signedAt: string
@@ -16,6 +18,7 @@ export interface CertificateInput {
   finalDocumentHash: string
   signers: CertSignerRecord[]
   generatedAt: string
+  appUrl: string
 }
 
 /**
@@ -101,6 +104,74 @@ export async function appendCertificateOfCompletion(
     y -= 4
   }
 
+  hRule()
+  y -= 6
+
+  // ── Blockchain Timestamp (OpenTimestamps) ─────────────────────────────
+  line('Blockchain Timestamp (OpenTimestamps)', 11, bold)
+  y -= 2
+  line(
+    'Each signature is independently anchored to the Bitcoin blockchain via OpenTimestamps, providing a tamper-proof timestamp that is verifiable without relying on Lunar Sign.',
+    8, regular, gray, 10
+  )
+  y -= 6
+
+  // Pre-generate all QR code buffers (one per signer) before drawing.
+  const QR_SIZE = 60
+  const qrResults: Array<{ url: string; pngBuf: Buffer | null }> = await Promise.all(
+    input.signers.map(async (s) => {
+      const url = `${input.appUrl}/verify/${s.signatureId}`
+      try {
+        const pngBuf = await QRCode.toBuffer(url, { type: 'png', width: 120, margin: 1 })
+        return { url, pngBuf: Buffer.from(pngBuf) }
+      } catch {
+        return { url, pngBuf: null }
+      }
+    })
+  )
+
+  for (let i = 0; i < input.signers.length; i++) {
+    const s = input.signers[i]
+    const { url, pngBuf } = qrResults[i]
+
+    if (y < margin + 80) break // guard against overflow
+
+    // Snapshot y before drawing text so the QR is top-aligned with this row.
+    const rowTopY = y
+
+    // Text occupies the left column, leaving QR_SIZE + 8px gap on the right.
+    const textMaxWidth = contentWidth - QR_SIZE - 18
+    const drawLine = (text: string, size: number, font = regular, color = rgb(0, 0, 0)) => {
+      if (y < margin + 60) return
+      page.drawText(text, { x: margin + 10, y, size, font, color, maxWidth: textMaxWidth })
+      y -= size + 5
+    }
+
+    drawLine(s.signerName, 9, bold, rgb(0.15, 0.15, 0.15))
+    drawLine('Verify timestamp:', 7.5, regular, gray)
+    drawLine(url, 7, mono, rgb(0.2, 0.2, 0.2))
+
+    // Draw QR code top-aligned with this signer row.
+    if (pngBuf) {
+      try {
+        const qrImage = await doc.embedPng(pngBuf)
+        page.drawImage(qrImage, {
+          x: width - margin - QR_SIZE,
+          y: rowTopY - QR_SIZE,
+          width: QR_SIZE,
+          height: QR_SIZE,
+        })
+      } catch {
+        // If QR embedding fails, the URL text is still present.
+      }
+    }
+
+    // Ensure y advances at least past the QR image height.
+    const rowBottomY = rowTopY - QR_SIZE - 6
+    if (y > rowBottomY) y = rowBottomY
+  }
+
+  y -= 6
   hRule()
   y -= 6
 

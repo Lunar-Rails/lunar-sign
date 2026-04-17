@@ -5,9 +5,11 @@ const PUBLIC_ROUTES = [
   '/login',
   '/auth',
   '/sign',
+  '/verify',
   '/api/signatures',
   '/api/download',
   '/api/internal/ots',
+  '/api/verify',
 ]
 
 function isPublicRoute(path: string) {

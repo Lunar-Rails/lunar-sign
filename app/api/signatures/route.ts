@@ -29,6 +29,7 @@ interface AllRequestRow {
 }
 
 interface SignatureRow {
+  id: string
   request_id: string
   evidence_mac: string | null
   signed_at: string
@@ -342,7 +343,7 @@ export async function POST(request: NextRequest) {
         // Fetch all signature records for this document to populate the CoC.
         const { data: sigRowsRaw } = await supabase
           .from('signatures')
-          .select('request_id, evidence_mac, signed_at, ip_address, otp_verified')
+          .select('id, request_id, evidence_mac, signed_at, ip_address, otp_verified')
           .in('request_id', allRequests.map((r) => r.id))
 
         const sigRows = (sigRowsRaw ?? []) as SignatureRow[]
@@ -351,6 +352,7 @@ export async function POST(request: NextRequest) {
         const certSigners: CertSignerRecord[] = allRequests.map((req) => {
           const sig = sigRows.find((s) => s.request_id === req.id)
           return {
+            signatureId: sig?.id ?? '',
             signerName: req.signer_name,
             signerEmail: req.signer_email,
             signedAt: sig?.signed_at ?? completedAt,
@@ -361,7 +363,12 @@ export async function POST(request: NextRequest) {
         })
 
         // Download the latest signed PDF (has every signer's ink layer).
-        const latestPath = document.latest_signed_pdf_path ?? uploadPath
+        // NOTE: `document` was fetched BEFORE this request's own upload, so
+        // `document.latest_signed_pdf_path` is stale and points at the previous
+        // signer's PDF. The freshly-uploaded `uploadPath` is by definition the
+        // most up-to-date PDF (it was built on top of the previous signer's
+        // ink layer client-side and just persisted on line ~253).
+        const latestPath = uploadPath
         const { data: latestPdfData, error: latestErr } = await supabase.storage
           .from('signed-documents')
           .download(latestPath)
@@ -379,6 +386,7 @@ export async function POST(request: NextRequest) {
               .digest('hex'),
             signers: certSigners,
             generatedAt: completedAt,
+            appUrl: config.NEXT_PUBLIC_APP_URL,
           })
 
           finalDocumentHash = crypto
