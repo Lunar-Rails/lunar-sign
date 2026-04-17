@@ -111,6 +111,22 @@ export function documentCompleteSignerEmail(params: {
   return documentCompletedSignerEmail(params)
 }
 
+export function signingOtpEmail(params: {
+  signerName: string
+  documentTitle: string
+  otpCode: string
+}): { subject: string; html: string } {
+  const subject = `Your signing code: ${params.otpCode}`
+  const html = renderEmail('signing-otp', {
+    subject,
+    preheader: `Your one-time code for ${params.documentTitle} — expires in 15 minutes`,
+    signerName: params.signerName,
+    documentTitle: params.documentTitle,
+    otpCode: params.otpCode,
+  })
+  return { subject, html }
+}
+
 export function userInvitationEmail(params: {
   inviteeEmail: string
   inviterName: string

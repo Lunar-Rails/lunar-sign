@@ -114,6 +114,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         {
           data: {
             id: docId,
@@ -147,6 +148,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         {
           data: { id: docId, title: 'T', uploaded_by: 'u1', latest_signed_pdf_path: null },
           error: null,
@@ -183,6 +185,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         {
           data: {
             id: docId,
@@ -192,12 +195,13 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
-        { data: null, error: null },
-        { data: null, error: null },
-        { data: null, error: null },
-        { data: [{ status: 'signed' }, { status: 'signed' }], error: null },
-        { data: { email: 'o@x.com', full_name: 'Owner' }, error: null },
-        { data: null, error: null },
+        { data: null, error: null }, // doc update
+        { data: null, error: null }, // sig insert
+        { data: null, error: null }, // req update
+        { data: [{ status: 'signed' }, { status: 'signed' }], error: null }, // allRequests
+        { data: { email: 'o@x.com', full_name: 'Owner' }, error: null },   // owner profile
+        { data: [], error: null },                                            // sig records for CoC
+        { data: null, error: null },                                          // doc complete update
       ],
     })
     getServiceClient.mockReturnValue(client)
@@ -220,6 +224,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         { data: { id: docId, title: 'T', uploaded_by: 'u1' }, error: null },
       ],
     })
@@ -247,6 +252,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         { data: { id: docId, title: 'T', uploaded_by: 'u1' }, error: null },
       ],
       storageUploadError: { message: 'fail' },
@@ -273,6 +279,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         { data: { id: docId, title: 'T', uploaded_by: 'u1' }, error: null },
         { data: null, error: null },
         { data: null, error: null },
@@ -313,6 +320,7 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         { data: { id: docId, title: 'NDA', uploaded_by: 'u1' }, error: null },
         { data: null, error: null },
         { data: null, error: null },
@@ -347,10 +355,11 @@ describe('POST /api/signatures', () => {
           },
           error: null,
         },
+        { data: { verified_at: new Date().toISOString() }, error: null }, // OTP verified
         { data: { id: docId, title: 'Contract', uploaded_by: 'u1' }, error: null },
-        { data: null, error: null },
-        { data: null, error: null },
-        { data: null, error: null },
+        { data: null, error: null }, // doc update (latest_signed_pdf_path)
+        { data: null, error: null }, // sig insert
+        { data: null, error: null }, // req update
         {
           data: [
             {
@@ -371,7 +380,8 @@ describe('POST /api/signatures', () => {
           error: null,
         },
         { data: { email: 'owner@x.com', full_name: 'Owner' }, error: null },
-        { data: null, error: null },
+        { data: [], error: null },   // sig records for CoC
+        { data: null, error: null }, // doc complete update
       ],
     })
     getServiceClient.mockReturnValue(client)

@@ -111,6 +111,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Gate: require OTP verification before accepting a signature.
+    const { data: otpRecord } = await supabase
+      .from('signing_otps')
+      .select('verified_at')
+      .eq('request_id', signatureRequest.id)
+      .maybeSingle()
+
+    if (!otpRecord?.verified_at) {
+      return NextResponse.json(
+        { error: 'Identity not verified. Please complete email OTP verification first.' },
+        { status: 403 }
+      )
+    }
+
     const { data: documentRaw } = await supabase
       .from('documents')
       .select('*')
@@ -193,7 +207,7 @@ export async function POST(request: NextRequest) {
         signedDocumentHash,
         signedAt,
         consentTextHash,
-        otpVerified: false, // will be updated to true in OTP gate commit
+        otpVerified: true, // guaranteed true — gated above
       },
       config.EVIDENCE_HMAC_KEY
     )
@@ -250,6 +264,7 @@ export async function POST(request: NextRequest) {
       signature_image_hash: signatureImageHash,
       evidence_hash: evidenceHash,   // legacy plain SHA-256, kept for one release
       evidence_mac: evidenceMac,     // HMAC-SHA256 with external key
+      otp_verified: true,            // gated — only reachable after OTP verification
       ots_pending: true,             // flag for OpenTimestamps cron pickup
       signed_pdf_path: uploadPath,
       ip_address: ip === 'unknown' ? null : ip,

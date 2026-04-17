@@ -114,6 +114,7 @@ export function createQueuedSupabaseMock(options: {
       return {
         select: () => filterAfterSelect(),
         insert: () => insertChain(),
+        upsert: () => insertChain(),
         update: () => updateChain(),
         delete: () => updateOrDeleteChain(),
       }
