@@ -193,7 +193,7 @@ export default function SigningInterface({
               currentSignerIndex,
               displayName,
               signerTitle: signerInfo.title,
-              signatureDataUrl: activeSignatureDataUrl,
+              signatureDataUrl: activeSignatureDataUrl ?? '',
               dateText: fieldPreview.dateText,
             })
           : fields
@@ -202,7 +202,7 @@ export default function SigningInterface({
         pdfBytes: new Uint8Array(pdfInput),
         fields: fieldsForPdf,
         signer: signerInfo,
-        signatureDataUrl: activeSignatureDataUrl,
+        signatureDataUrl: activeSignatureDataUrl ?? undefined,
         pageDimensions,
         dateText: fieldPreview.dateText,
       })
