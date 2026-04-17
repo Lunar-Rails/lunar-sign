@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { canAccessDocument } from '@/lib/authorization'
+import { getConfig } from '@/lib/config'
+import { computeEvidenceMac } from '@/lib/esigning/evidence-mac'
 import crypto from 'crypto'
 
 export interface SignerVerificationResult {
@@ -11,7 +13,10 @@ export interface SignerVerificationResult {
   signed_at: string | null
   /** SHA-256 of the stored signed PDF re-downloaded from storage matches document_hash */
   pdf_integrity: 'verified' | 'tampered' | 'no_signature'
-  /** Recomputed evidence_hash matches stored value */
+  /**
+   * HMAC-SHA256 evidence_mac verified with EVIDENCE_HMAC_KEY (preferred).
+   * Falls back to plain SHA-256 evidence_hash for legacy rows without evidence_mac.
+   */
   evidence_integrity: 'verified' | 'tampered' | 'no_hash'
 }
 
@@ -47,11 +52,14 @@ export async function GET(
         `id,
          signer_email,
          signer_name,
+         consent_text_hash,
          signatures (
            document_hash,
            original_document_hash,
            signature_image_hash,
            evidence_hash,
+           evidence_mac,
+           otp_verified,
            signed_pdf_path,
            signed_at
          )`
@@ -99,25 +107,52 @@ export async function GET(
         }
       }
 
-      // 2. Evidence integrity — recompute from the stored fields.
+      // 2. Evidence integrity.
+      // Prefer HMAC evidence_mac (new rows) over legacy plain SHA-256 evidence_hash.
       let evidenceIntegrity: SignerVerificationResult['evidence_integrity'] = 'no_hash'
+      const config = getConfig()
       if (
-        sig.evidence_hash &&
         sig.signature_image_hash &&
         sig.original_document_hash &&
         sig.document_hash &&
         sig.signed_at
       ) {
-        const evidenceInput = [
-          row.signer_email,
-          row.signer_name,
-          sig.signature_image_hash,
-          sig.original_document_hash,
-          sig.document_hash,
-          sig.signed_at,
-        ].join('\n')
-        const recomputed = crypto.createHash('sha256').update(evidenceInput).digest('hex')
-        evidenceIntegrity = recomputed === sig.evidence_hash ? 'verified' : 'tampered'
+        if (sig.evidence_mac) {
+          // New path: HMAC-SHA256 with external key.
+          const recomputedMac = computeEvidenceMac(
+            {
+              signerEmail: row.signer_email,
+              signerName: row.signer_name,
+              signatureImageHash: sig.signature_image_hash,
+              originalDocumentHash: sig.original_document_hash,
+              signedDocumentHash: sig.document_hash,
+              signedAt: sig.signed_at,
+              consentTextHash: (row as { consent_text_hash?: string | null }).consent_text_hash ?? null,
+              otpVerified: Boolean(sig.otp_verified),
+            },
+            config.EVIDENCE_HMAC_KEY
+          )
+          try {
+            evidenceIntegrity = crypto.timingSafeEqual(
+              Buffer.from(recomputedMac, 'hex'),
+              Buffer.from(sig.evidence_mac, 'hex')
+            ) ? 'verified' : 'tampered'
+          } catch {
+            evidenceIntegrity = 'tampered'
+          }
+        } else if (sig.evidence_hash) {
+          // Legacy path: plain SHA-256.
+          const evidenceInput = [
+            row.signer_email,
+            row.signer_name,
+            sig.signature_image_hash,
+            sig.original_document_hash,
+            sig.document_hash,
+            sig.signed_at,
+          ].join('\n')
+          const recomputed = crypto.createHash('sha256').update(evidenceInput).digest('hex')
+          evidenceIntegrity = recomputed === sig.evidence_hash ? 'verified' : 'tampered'
+        }
       }
 
       signers.push({

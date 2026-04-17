@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { getConfig } from '@/lib/config'
 import { sendEmail } from '@/lib/email/client'
+import { computeEvidenceMac } from '@/lib/esigning/evidence-mac'
 import {
   documentCompletedOwnerEmail,
   documentCompletedSignerEmail,
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient()
+    const config = getConfig()
     const body = await request.json()
     const {
       token,
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest) {
     const { data: signatureRequestRaw } = await supabase
       .from('signature_requests')
       .select(
-        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at'
+        'id, document_id, signer_name, signer_email, requested_by, status, token, signed_at, created_at, consent_text_hash'
       )
       .eq('token', token)
       .eq('status', 'pending')
@@ -162,23 +164,38 @@ export async function POST(request: NextRequest) {
       .update(Buffer.from(signature_data))
       .digest('hex')
 
-    // Pre-compute signed_at so it's identical in the DB row and the evidence hash.
+    // Pre-compute signed_at so it's identical in the DB row and the evidence MAC.
     const signedAt = new Date().toISOString()
 
-    // Evidence hash: canonical commit over all signing event fields.
-    // Format: each field on its own line, ordered deterministically.
-    // Re-computing this from the DB later proves the record hasn't been tampered with.
-    const evidenceInput = [
-      signatureRequest.signer_email,
-      signer_name,
-      signatureImageHash,
-      originalDocumentHash,
-      signedDocumentHash,
-      signedAt,
-    ].join('\n')
+    const consentTextHash = (signatureRequest as unknown as { consent_text_hash?: string | null }).consent_text_hash ?? null
+
+    // HMAC-SHA256 over canonical signing event — keyed with EVIDENCE_HMAC_KEY.
+    // Also dual-write the legacy plain SHA-256 evidence_hash for one release
+    // so any existing verification tooling continues to work during the rollout.
+    const evidenceMac = computeEvidenceMac(
+      {
+        signerEmail: signatureRequest.signer_email,
+        signerName: signer_name,
+        signatureImageHash,
+        originalDocumentHash,
+        signedDocumentHash,
+        signedAt,
+        consentTextHash,
+        otpVerified: false, // will be updated to true in OTP gate commit
+      },
+      config.EVIDENCE_HMAC_KEY
+    )
+    // Legacy: plain SHA-256 evidence hash (kept for one release, then removed).
     const evidenceHash = crypto
       .createHash('sha256')
-      .update(evidenceInput)
+      .update([
+        signatureRequest.signer_email,
+        signer_name,
+        signatureImageHash,
+        originalDocumentHash,
+        signedDocumentHash,
+        signedAt,
+      ].join('\n'))
       .digest('hex')
 
     const uploadPath = `${document.id}/${signatureRequest.id}_signed.pdf`
@@ -219,7 +236,9 @@ export async function POST(request: NextRequest) {
       document_hash: signedDocumentHash,
       original_document_hash: originalDocumentHash,
       signature_image_hash: signatureImageHash,
-      evidence_hash: evidenceHash,
+      evidence_hash: evidenceHash,   // legacy plain SHA-256, kept for one release
+      evidence_mac: evidenceMac,     // HMAC-SHA256 with external key
+      ots_pending: true,             // flag for OpenTimestamps cron pickup
       signed_pdf_path: uploadPath,
       ip_address: ip === 'unknown' ? null : ip,
       user_agent: userAgent,
@@ -273,7 +292,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     const ownerProfile = ownerProfileRaw as OwnerProfileRow | null
-    const config = getConfig()
 
     let completed = false
     if (allSigned) {
