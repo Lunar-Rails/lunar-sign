@@ -21,7 +21,11 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().transform(normalizeAppUrl),
   // 64-character hex string used to HMAC-SHA256 the signing evidence record.
   // Generate: openssl rand -hex 32
-  EVIDENCE_HMAC_KEY: z.string().regex(/^[0-9a-f]{64}$/, 'Must be 64 hex characters'),
+  // Optional at build time — validated at request time in computeEvidenceMac.
+  EVIDENCE_HMAC_KEY: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/, 'Must be 64 hex characters')
+    .optional(),
   // Comma-separated OTS calendar URLs (defaults work without this env var).
   OTS_CALENDAR_URLS: z.string().optional(),
   // Shared secret matched by /api/internal/ots/upgrade against x-cron-secret header.

@@ -29,7 +29,8 @@ export interface EvidenceMacInput {
   otpVerified: boolean
 }
 
-export function computeEvidenceMac(input: EvidenceMacInput, hmacKey: string): string {
+export function computeEvidenceMac(input: EvidenceMacInput, hmacKey: string | undefined): string {
+  if (!hmacKey) throw new Error('EVIDENCE_HMAC_KEY is not set. Generate with: openssl rand -hex 32')
   const canonical = [
     input.signerEmail,
     input.signerName,
@@ -45,7 +46,8 @@ export function computeEvidenceMac(input: EvidenceMacInput, hmacKey: string): st
   return crypto.createHmac('sha256', keyBytes).update(canonical).digest('hex')
 }
 
-export function verifyEvidenceMac(input: EvidenceMacInput, hmacKey: string, stored: string): boolean {
+export function verifyEvidenceMac(input: EvidenceMacInput, hmacKey: string | undefined, stored: string): boolean {
+  if (!hmacKey) throw new Error('EVIDENCE_HMAC_KEY is not set. Generate with: openssl rand -hex 32')
   const expected = computeEvidenceMac(input, hmacKey)
   return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(stored, 'hex'))
 }

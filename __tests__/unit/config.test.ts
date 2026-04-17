@@ -54,13 +54,14 @@ describe('lib/config', () => {
     expect(() => getConfig()).toThrow('Invalid environment configuration')
   })
 
-  it('getConfig throws when EVIDENCE_HMAC_KEY is missing', async () => {
+  it('getConfig succeeds when EVIDENCE_HMAC_KEY is missing (validated at call site)', async () => {
     delete process.env.EVIDENCE_HMAC_KEY
     const { getConfig } = await import('@/lib/config')
-    expect(() => getConfig()).toThrow('Invalid environment configuration')
+    expect(() => getConfig()).not.toThrow()
+    expect(getConfig().EVIDENCE_HMAC_KEY).toBeUndefined()
   })
 
-  it('getConfig throws when EVIDENCE_HMAC_KEY is wrong length', async () => {
+  it('getConfig throws when EVIDENCE_HMAC_KEY is wrong format', async () => {
     process.env.EVIDENCE_HMAC_KEY = 'tooshort'
     const { getConfig } = await import('@/lib/config')
     expect(() => getConfig()).toThrow('Invalid environment configuration')
