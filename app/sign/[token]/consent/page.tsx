@@ -28,12 +28,15 @@ export default function ConsentPage({ params }: ConsentPageProps) {
 
     try {
       const res = await fetch(`/api/sign/${token}/consent`, { method: 'POST' })
-      if (res.ok || res.redirected) {
-        router.push(`/sign/${token}`)
-      } else {
+      if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setError((body as { error?: string }).error || 'Failed to record consent. Please try again.')
+        return
       }
+
+      const body = await res.json().catch(() => ({}))
+      const nextUrl = (body as { nextUrl?: string }).nextUrl || `/sign/${token}`
+      router.push(nextUrl)
     } catch {
       setError('Network error. Please try again.')
     } finally {

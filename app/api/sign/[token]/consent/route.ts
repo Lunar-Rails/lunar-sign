@@ -41,10 +41,9 @@ export async function POST(
     if (expiresAt && new Date(expiresAt) < new Date())
       return NextResponse.json({ error: 'This signing link has expired' }, { status: 410 })
 
-    // Idempotent — if consent already given, redirect through.
+    // Idempotent — if consent already given, return next path.
     if (requestRaw.consent_given_at) {
-      const config = getConfig()
-      return NextResponse.redirect(`${config.NEXT_PUBLIC_APP_URL}/sign/${token}`)
+      return NextResponse.json({ ok: true, nextUrl: `/sign/${token}` })
     }
 
     const config = getConfig()
@@ -68,7 +67,7 @@ export async function POST(
       consent_text_hash: consentTextHash,
     })
 
-    return NextResponse.redirect(`${config.NEXT_PUBLIC_APP_URL}/sign/${token}`)
+    return NextResponse.json({ ok: true, nextUrl: `/sign/${token}` })
   } catch (error) {
     console.error('Consent route error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
