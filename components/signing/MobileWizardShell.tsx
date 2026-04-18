@@ -149,7 +149,7 @@ export function MobileWizardShell({
 
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             className="w-full"
             onClick={() => setMobileWizardStep(1)}
           >
