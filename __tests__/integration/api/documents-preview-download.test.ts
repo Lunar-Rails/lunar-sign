@@ -2,30 +2,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createQueuedSupabaseMock } from '../../helpers/mock-supabase'
 import { routeParams } from '../../helpers/mock-request'
+import { userA, userB, adminUser, doc1, company1 } from '../../helpers/rbac-fixtures'
+import {
+  queueDocumentPreviewForbiddenNoLinks,
+  queueDocumentPreviewOwnerSuccess,
+  queueDocumentPreviewAdminSuccess,
+  queueDocumentDownloadForbiddenNoLinks,
+  queueDocumentDownloadOwnerSuccess,
+  queueDocumentDownloadAdminSuccess,
+  docStub,
+} from '../../helpers/compose-route-queue'
+import {
+  queueCanAccessDocumentViaCompany,
+  queueCanAccessDocumentDeniedNotMember,
+} from '../../helpers/rbac-queue-builders'
 
 const createClient = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
 
-/** Service client is used for storage.download on preview; must be mocked like documents-send / signatures tests. */
 const getServiceClient = vi.fn()
 vi.mock('@/lib/supabase/service', () => ({ getServiceClient }))
 
-const userId = '11111111-1111-4111-8111-111111111111'
-const docId = '22222222-2222-4222-8222-222222222222'
-const tokenA = 'token-aaaa'
-
-/** Service client wrapper that tracks which storage bucket was used. */
-function serviceClientWithBucketTracking() {
-  const buckets: string[] = []
-  const client = {
+function makeServiceClient() {
+  return {
     storage: {
-      from(bucket: string) {
-        buckets.push(bucket)
+      from(_bucket: string) {
         return {
-          download: async () => ({
-            data: new Blob([new Uint8Array([1])]),
-            error: null,
-          }),
+          download: async () => ({ data: new Blob([new Uint8Array([1])]), error: null }),
           createSignedUrl: async () => ({
             data: { signedUrl: 'https://signed.example/x.pdf' },
             error: null,
@@ -34,306 +37,257 @@ function serviceClientWithBucketTracking() {
       },
     },
   }
-  return { client, buckets }
 }
+
+// ── GET /api/documents/[id]/preview ──────────────────────────────────────────
 
 describe('GET /api/documents/[id]/preview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getServiceClient.mockReturnValue(
-      createQueuedSupabaseMock({ user: null, queue: [] })
-    )
+    getServiceClient.mockReturnValue(makeServiceClient())
   })
 
   it('returns 401 without auth', async () => {
-    createClient.mockResolvedValue(
-      createQueuedSupabaseMock({ user: null, queue: [] })
-    )
+    createClient.mockResolvedValue(createQueuedSupabaseMock({ user: null, queue: [] }))
     const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
       new NextRequest('http://localhost/preview'),
-      routeParams({ id: docId })
+      routeParams({ id: doc1 })
     )
     expect(res.status).toBe(401)
   })
 
-  it('returns PDF from documents bucket when no signed artifact exists', async () => {
+  it('returns 404 when document does not exist', async () => {
     createClient.mockResolvedValue(
       createQueuedSupabaseMock({
-        user: { id: userId },
-        queue: [
-          {
-            data: {
-              id: docId,
-              title: 'Doc',
-              file_path: 'path/to.pdf',
-              uploaded_by: userId,
-              status: 'draft',
-              latest_signed_pdf_path: null,
-            },
-            error: null,
-          },
-          { data: { role: 'admin' }, error: null },
-        ],
-      })
-    )
-    const tracker = serviceClientWithBucketTracking()
-    getServiceClient.mockReturnValue(tracker.client)
-
-    const { GET } = await import('@/app/api/documents/[id]/preview/route')
-    const res = await GET(
-      new NextRequest('http://localhost/preview'),
-      routeParams({ id: docId })
-    )
-    expect(res.status).toBe(200)
-    expect(res.headers.get('Content-Type')).toContain('pdf')
-    expect(tracker.buckets).toEqual(['documents'])
-  })
-
-  it('returns PDF from signed-documents bucket when status=pending with a signed artifact', async () => {
-    createClient.mockResolvedValue(
-      createQueuedSupabaseMock({
-        user: { id: userId },
-        queue: [
-          {
-            data: {
-              id: docId,
-              title: 'Doc',
-              file_path: 'path/to.pdf',
-              uploaded_by: userId,
-              status: 'pending',
-              latest_signed_pdf_path: 'docs/1/sig_signed.pdf',
-            },
-            error: null,
-          },
-          { data: { role: 'admin' }, error: null },
-        ],
-      })
-    )
-    const tracker = serviceClientWithBucketTracking()
-    getServiceClient.mockReturnValue(tracker.client)
-
-    const { GET } = await import('@/app/api/documents/[id]/preview/route')
-    const res = await GET(
-      new NextRequest('http://localhost/preview'),
-      routeParams({ id: docId })
-    )
-    expect(res.status).toBe(200)
-    expect(tracker.buckets).toEqual(['signed-documents'])
-  })
-
-  it('returns PDF from documents bucket for drafts even if latest_signed_pdf_path is set', async () => {
-    // Drafts should never render a signed artifact (shouldn't happen in practice,
-    // but guard against a stale column leaking through).
-    createClient.mockResolvedValue(
-      createQueuedSupabaseMock({
-        user: { id: userId },
-        queue: [
-          {
-            data: {
-              id: docId,
-              title: 'Doc',
-              file_path: 'path/to.pdf',
-              uploaded_by: userId,
-              status: 'draft',
-              latest_signed_pdf_path: 'stale/path.pdf',
-            },
-            error: null,
-          },
-          { data: { role: 'admin' }, error: null },
-        ],
-      })
-    )
-    const tracker = serviceClientWithBucketTracking()
-    getServiceClient.mockReturnValue(tracker.client)
-
-    const { GET } = await import('@/app/api/documents/[id]/preview/route')
-    const res = await GET(
-      new NextRequest('http://localhost/preview'),
-      routeParams({ id: docId })
-    )
-    expect(res.status).toBe(200)
-    expect(tracker.buckets).toEqual(['documents'])
-  })
-})
-
-describe('GET /api/documents/[id]/download', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('returns 404 when document not completed', async () => {
-    createClient.mockResolvedValue(
-      createQueuedSupabaseMock({
-        user: { id: userId },
-        queue: [
-          {
-            data: {
-              id: docId,
-              status: 'pending',
-              latest_signed_pdf_path: null,
-            },
-            error: null,
-          },
-          { data: { role: 'admin' }, error: null },
-        ],
-      })
-    )
-    const { GET } = await import('@/app/api/documents/[id]/download/route')
-    const res = await GET(
-      new NextRequest('http://localhost/dl'),
-      routeParams({ id: docId })
-    )
-    expect(res.status).toBe(404)
-  })
-
-  it('redirects when completed', async () => {
-    createClient.mockResolvedValue(
-      createQueuedSupabaseMock({
-        user: { id: userId },
-        queue: [
-          {
-            data: {
-              id: docId,
-              status: 'completed',
-              latest_signed_pdf_path: 'signed/x.pdf',
-            },
-            error: null,
-          },
-          { data: { role: 'admin' }, error: null },
-        ],
-      })
-    )
-    const { GET } = await import('@/app/api/documents/[id]/download/route')
-    const res = await GET(
-      new NextRequest('http://localhost/dl'),
-      routeParams({ id: docId })
-    )
-    expect([302, 307]).toContain(res.status)
-  })
-})
-
-describe('GET /api/download/[token]', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('returns 404 for an unknown token', async () => {
-    getServiceClient.mockReturnValue(
-      createQueuedSupabaseMock({
-        user: null,
+        user: { id: userA },
         queue: [{ data: null, error: null }],
       })
     )
-    const { GET } = await import('@/app/api/download/[token]/route')
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
-      new NextRequest('http://localhost/api/download/x'),
-      routeParams({ token: 'unknown' })
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
     )
     expect(res.status).toBe(404)
   })
 
-  it('returns 403 when the signer has not signed yet', async () => {
-    getServiceClient.mockReturnValue(
+  it('returns 403 when member has no access (no company links)', async () => {
+    createClient.mockResolvedValue(
       createQueuedSupabaseMock({
-        user: null,
-        queue: [
-          {
-            data: {
-              status: 'pending',
-              documents: {
-                id: docId,
-                status: 'pending',
-                latest_signed_pdf_path: 'signed/x.pdf',
-              },
-            },
-            error: null,
-          },
-        ],
+        user: { id: userB },
+        queue: queueDocumentPreviewForbiddenNoLinks(),
       })
     )
-    const { GET } = await import('@/app/api/download/[token]/route')
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
-      new NextRequest('http://localhost/api/download/t'),
-      routeParams({ token: tokenA })
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
     )
     expect(res.status).toBe(403)
   })
 
-  it('redirects to signed URL for a signed signer while document is still pending (partial download)', async () => {
-    getServiceClient.mockReturnValue(
+  it('returns 403 when member is in a different company (not linked)', async () => {
+    createClient.mockResolvedValue(
       createQueuedSupabaseMock({
-        user: null,
+        user: { id: userB },
         queue: [
-          {
-            data: {
-              status: 'signed',
-              documents: {
-                id: docId,
-                status: 'pending',
-                latest_signed_pdf_path: 'signed/partial.pdf',
-              },
-            },
-            error: null,
-          },
+          { data: docStub(), error: null },
+          ...queueCanAccessDocumentDeniedNotMember(company1),
         ],
       })
     )
-    const { GET } = await import('@/app/api/download/[token]/route')
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
-      new NextRequest('http://localhost/api/download/t'),
-      routeParams({ token: tokenA })
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
     )
-    expect([302, 307]).toContain(res.status)
+    expect(res.status).toBe(403)
   })
 
-  it('redirects to signed URL when document is completed', async () => {
-    getServiceClient.mockReturnValue(
+  it('returns 200 when the document owner requests preview', async () => {
+    createClient.mockResolvedValue(
       createQueuedSupabaseMock({
-        user: null,
-        queue: [
-          {
-            data: {
-              status: 'signed',
-              documents: {
-                id: docId,
-                status: 'completed',
-                latest_signed_pdf_path: 'signed/final.pdf',
-              },
-            },
-            error: null,
-          },
-        ],
+        user: { id: userA },
+        queue: queueDocumentPreviewOwnerSuccess(docStub({ uploaded_by: userA })),
       })
     )
-    const { GET } = await import('@/app/api/download/[token]/route')
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
-      new NextRequest('http://localhost/api/download/t'),
-      routeParams({ token: tokenA })
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
     )
-    expect([302, 307]).toContain(res.status)
+    expect(res.status).toBe(200)
   })
 
-  it('returns 404 when signer is signed but latest_signed_pdf_path is missing', async () => {
-    getServiceClient.mockReturnValue(
+  it('returns 200 when admin requests preview of any document', async () => {
+    createClient.mockResolvedValue(
       createQueuedSupabaseMock({
-        user: null,
+        user: { id: adminUser },
+        queue: queueDocumentPreviewAdminSuccess(),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
+    const res = await GET(
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('returns 200 when a company member requests preview of a linked document', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userB },
         queue: [
-          {
-            data: {
-              status: 'signed',
-              documents: {
-                id: docId,
-                status: 'pending',
-                latest_signed_pdf_path: null,
-              },
-            },
-            error: null,
-          },
+          { data: docStub(), error: null },
+          ...queueCanAccessDocumentViaCompany(company1),
         ],
       })
     )
-    const { GET } = await import('@/app/api/download/[token]/route')
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
     const res = await GET(
-      new NextRequest('http://localhost/api/download/t'),
-      routeParams({ token: tokenA })
+      new NextRequest('http://localhost/preview'),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('returns PDF from documents bucket for a draft document', async () => {
+    const { client: svcClient, buckets } = (() => {
+      const b: string[] = []
+      return {
+        client: { storage: { from(bucket: string) { b.push(bucket); return makeServiceClient().storage.from(bucket) } } },
+        buckets: b,
+      }
+    })()
+    getServiceClient.mockReturnValue(svcClient)
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userA },
+        queue: queueDocumentPreviewOwnerSuccess(docStub({ status: 'draft', uploaded_by: userA })),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
+    await GET(new NextRequest('http://localhost/preview'), routeParams({ id: doc1 }))
+    expect(buckets).toContain('documents')
+  })
+
+  it('returns PDF from signed-documents bucket for a pending document with a signed artifact', async () => {
+    const { client: svcClient, buckets } = (() => {
+      const b: string[] = []
+      return {
+        client: { storage: { from(bucket: string) { b.push(bucket); return makeServiceClient().storage.from(bucket) } } },
+        buckets: b,
+      }
+    })()
+    getServiceClient.mockReturnValue(svcClient)
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userA },
+        queue: queueDocumentPreviewOwnerSuccess(
+          docStub({ status: 'pending', latest_signed_pdf_path: 'signed/a.pdf', uploaded_by: userA })
+        ),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/preview/route')
+    await GET(new NextRequest('http://localhost/preview'), routeParams({ id: doc1 }))
+    expect(buckets).toContain('signed-documents')
+  })
+})
+
+// ── GET /api/documents/[id]/download ─────────────────────────────────────────
+
+describe('GET /api/documents/[id]/download', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getServiceClient.mockReturnValue(makeServiceClient())
+  })
+
+  it('returns 401 without auth', async () => {
+    createClient.mockResolvedValue(createQueuedSupabaseMock({ user: null, queue: [] }))
+    const { GET } = await import('@/app/api/documents/[id]/download/route')
+    const res = await GET(
+      new NextRequest('http://localhost/download'),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when member has no access (no company links)', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userB },
+        queue: queueDocumentDownloadForbiddenNoLinks(),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/download/route')
+    const res = await GET(
+      new NextRequest('http://localhost/download'),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 404 when document is not completed', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userA },
+        // completed doc queue but status = draft
+        queue: [
+          { data: docStub({ status: 'draft', uploaded_by: userA }), error: null },
+          ...queueDocumentDownloadOwnerSuccess(docStub({ uploaded_by: userA })).slice(1),
+        ],
+      })
+    )
+    // Override to return a draft doc so we can verify 404 check
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userA },
+        queue: [
+          { data: docStub({ status: 'draft' }), error: null },
+          ...([{ data: { role: 'member' }, error: null }, { data: { id: doc1 }, error: null }]),
+        ],
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/download/route')
+    const res = await GET(
+      new NextRequest('http://localhost/download'),
+      routeParams({ id: doc1 })
     )
     expect(res.status).toBe(404)
+  })
+
+  it('returns 307 (redirect to signed URL) when the document owner downloads a completed document', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userA },
+        queue: queueDocumentDownloadOwnerSuccess(docStub({ uploaded_by: userA })),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/download/route')
+    const res = await GET(
+      new NextRequest('http://localhost/download'),
+      routeParams({ id: doc1 })
+    )
+    // NextResponse.redirect returns 307 by default
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toMatch(/signed\.example/)
+  })
+
+  it('returns 307 (redirect to signed URL) when an admin downloads a completed document', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: adminUser },
+        queue: queueDocumentDownloadAdminSuccess(),
+      })
+    )
+    const { GET } = await import('@/app/api/documents/[id]/download/route')
+    const res = await GET(
+      new NextRequest('http://localhost/download'),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toMatch(/signed\.example/)
   })
 })

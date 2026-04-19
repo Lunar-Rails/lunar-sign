@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, FileX2 } from 'lucide-react'
 import {
-  SigningComplete,
   modifyPdf,
   sha256,
   useFieldPlacement,
@@ -19,6 +18,7 @@ import type { SignerInfo } from '@drvillo/react-browser-e-signing'
 
 import { IntentConfirmDialog } from '@/components/signing/IntentConfirmDialog'
 import { DeclineDialog } from '@/components/signing/DeclineDialog'
+import { SigningCompletePanel } from '@/components/signing/SigningCompletePanel'
 import { MobileWizardShell } from '@/components/signing/MobileWizardShell'
 import { PdfColumn } from '@/components/signing/PdfColumn'
 import { SigningControlsSidebar } from '@/components/signing/SigningControlsSidebar'
@@ -303,7 +303,7 @@ export default function SigningInterface({
         <main className="flex flex-1 items-center justify-center px-4 py-10">
           <div className="mx-auto w-full max-w-3xl">
             <SignerStepper currentStep={3} done />
-            <SigningComplete
+            <SigningCompletePanel
               signerName={displayName}
               fieldCount={submitFieldCount}
               signedAt={new Date().toISOString()}

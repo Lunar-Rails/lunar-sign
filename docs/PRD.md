@@ -1,169 +1,171 @@
 # Document Signing Portal – Product Requirements
 
-This document desscribes the functional requirements for Lunar Sign, an internal document e-signing system used by my company - Lunar Rails.
+This document describes the functional requirements for **Lunar Sign**, an internal document e-signing system used by Lunar Rails.
 
+For **authorization behavior** (roles, companies, admin scope), see [RBAC.md](./RBAC.md).
 
-## 2. Goals
+---
 
-Delevop the Basic Workflow Summary
-System workflow should be:
-1.  1   User logs in
-2.  2   Upload document
-3.  3   Add signers
-4.  4   Send document
-5.  5   Signers receive email
-6.  6   Sign document
-7.  7   Final signed PDF generated
-8.  8   Stored in Supabase Storage
-9.  9   Sent to all parties
+## 1. Goals
 
-## 3. Non-goals (MVP)
+End-to-end workflow:
 
+1. User signs in
+2. User uploads a document (and may associate it with one or more **companies** / workspaces)
+3. User adds signers and (where applicable) prepares fields
+4. User sends the document for signing
+5. Signers receive email with a secure link
+6. Signers complete identity checks and sign
+7. Final signed PDF is produced and stored
+8. Notifications go to relevant parties
+9. Users can download completed documents and review audit history
 
-Optional Future Features (Phase 2) To be Added later, not now:
+---
 
-Company branding
-Templates
-Bulk send
-Approval workflow before signing
-Multi-company accounts
-API integration
-WhatsApp notifications
-Payment per document
-KYC / OTP signing
-Reminder emails for unsigned documents
-Google Drive storage integration
-Signing link expiration
-Manager role (intermediate permissions between admin and member)
-Document retraction / cancellation
-Sequential signing workflows
+## 2. Non-goals (not required for current product)
 
+Features intentionally **out of scope** unless listed elsewhere as implemented:
 
-## 4. Target users
-Document Owner (User)- this is the authenticated user. He wants to get documents signed
-Signing Parties - they want to sign documents sent to them
+- Per-customer white-label **company branding** of the signing experience
+- **Bulk** send to large recipient lists / campaign-style sending
+- Multi-step **approval workflow** before signing (routing, approvers)
+- Public **HTTP API** for external systems to drive signing (beyond normal app + Supabase)
+- **WhatsApp** or non-email primary notification channels
+- **Payment** or billing per document
+- **Google Drive** (or other cloud) as the system of record for PDFs
+- **Sequential** signing order enforcement (signing is parallel; ordering is not a first-class rule)
+- A **“manager”** role with permissions between global admin and member (only `admin` and `member` exist today)
 
+---
 
-#MVP
+## 3. Target users
 
-1. User Authentication & Access
-Objective: Only authorized users can access the portal.
-Requirements:
-*   •   Google login (OAuth)
-*   •   Role-based access:
-    *   ◦   Admin
-    *   ◦   Member
-*   •   Each user can only see their own documents
-*   •   Secure session logout
+| User | Description |
+|------|-------------|
+| **Portal user** | Authenticated employee (`profiles`): uploads documents, manages templates, sends for signature, downloads results. |
+| **Signing party** | External signer: no portal account; accesses signing via **token link**, completes **consent** and **email OTP** (where enabled), signs or declines. |
+| **Admin** | Authenticated user with `profiles.role = 'admin'`: user/company administration and system-wide views. See [RBAC.md](./RBAC.md). |
 
-2. Document Upload
-Objective: Users upload documents to be signed.
-Requirements:
-*   •   Upload PDF documents
-*   •   Enter document name
-*   •   Add document description (optional)
-*   •   Store original document
-*   •   Generate document ID
-*   •   Document status:
-    *   ◦   Draft
-    *   ◦   Pending
-    *   ◦   Completed
+---
 
-3. Add Signing Parties
-Objective: User can define who needs to sign.
-Requirements:
-*   •   Add 1 or multiple signing parties
-*   •   Capture for each signer:
-    *   ◦   Full Name
-    *   ◦   Email Address
-*   •   Each signer receives unique secure link
-*   •   Signers do not need login
+## 4. Functional requirements (current product)
 
-4. Notifications
-Objective: Notify signing parties and users about signing events.
-Requirements:
-*   •   Email notification when document is sent
-*   •   Email when document is signed
-*   •   Email to all parties when signing completed
+### 4.1 User authentication and access
 
-5. Signing Process
-Objective: Signers sign document digitally.
-Requirements:
-*   •   Sign via:
-    *   ◦   Draw signature
-    *   ◦   Type signature
-    *   ◦   Upload signature
-*   •   Capture:
-    *   ◦   Full Name
-    *   ◦   Signature
-    *   ◦   Signature Date (auto timestamp)
-    *   ◦   IP Address (optional)
-*   •   Lock document after signing
-*   •   Maintain audit trail:
-    *   ◦   Sent date
-    *   ◦   Viewed date
-    *   ◦   Signed date
+**Objective:** Only authorized people use the employee portal.
 
-6. Completed Document Access
-Objective: Signed document accessible to all parties.
-Requirements:
-*   •   Generate final signed PDF
-*   •   Email signed copy to all signing parties
-*   •   User can download signed document
-*   •   Maintain version history
-*   •   Store signed document permanently
+**Requirements:**
 
-7. Dashboard
-Objective: User can manage documents.
-Dashboard should show:
-*   •   Draft Documents
-*   •   Sent Documents
-*   •   Pending Signatures
-*   •   Completed Documents
-*   •   Cancelled Documents
-*   •   Search documents
-*   •   Filter by date / status
+- Sign-in via **Google OAuth** (Supabase Auth), with access limited to the intended organization (e.g. company domain), as configured in deployment.
+- Two **portal roles**: `admin` and `member` on `profiles` (see [RBAC.md](./RBAC.md)).
+- **Document and template visibility** are **not** limited to “only documents I uploaded.” A user sees any document or template they are allowed to access under the **company-linked sharing model** and **ownership rules** enforced by the app and database (RLS). Global **admins** can access all documents/templates per current rules.
+- Session lifecycle and sign-out behavior match the deployed auth configuration.
 
-8. Audit Trail (Important for Compliance)
-Each document must store:
-*   •   Uploaded by
-*   •   Upload date
-*   •   Sent date
-*   •   Signer email
-*   •   Viewed timestamp
-*   •   Signed timestamp
-*   •   IP address (optional)
-*   •   Document hash
+### 4.2 Companies (workspaces)
 
-#POST-MVP
+**Objective:** Organize users and shared access.
 
+**Requirements:**
 
-*These requirements will be implemented after the MVP has been developed and validated. Leaving them here for context*
+- **Companies** exist as first-class entities (name, slug, etc.).
+- **Membership** links users to companies. **Adding, removing, and listing members** is restricted to **global admins**—there is **no** separate “company admin” role that only manages one company (see [RBAC.md](./RBAC.md)).
+- Documents and templates may be **linked** to one or more companies; access for **members** follows those links plus membership.
 
-9. Retract / Cancel Document
-Objective: User can retract incorrectly sent documents.
-Requirements:
-*   •   Retract allowed only before all parties sign
-*   •   Retracted document status = Cancelled
-*   •   Notify all signers document is cancelled
-*   •   Prevent further signing
+### 4.3 Templates
 
+**Objective:** Reusable contract PDFs and field layouts.
 
-10. Google Drive Storage Integration
-Objective: Store signed documents automatically.
-Requirements:
-*   •   Connect user Google account
-*   •   Store signed documents in Google Drive
-*   •   Folder structure:
-    *   ◦   Document Signing Portal
-    *   ◦   Completed Documents
-    *   ◦   Draft Documents
-*   •   Save:
-    *   ◦   Original document
-    *   ◦   Signed document
-    *   ◦   Audit log
+**Requirements:**
 
+- Users can create and edit **templates** subject to access rules (creator and/or company-linked access).
+- Templates can be linked to companies analogously to documents.
 
+### 4.4 Document upload
 
+**Objective:** Store an original PDF and metadata for a signing workflow.
 
+**Requirements:**
 
+- Upload **PDF** files with validation (type, size limits per deployment).
+- Capture **title** and optional **description**.
+- Associate the document with **zero or more** companies the uploader is allowed to use; uploads validate **membership** for selected companies.
+- Persist storage paths and document identifiers; support **soft delete** where implemented.
+
+### 4.5 Document lifecycle and status
+
+**Objective:** Track progress from draft through completion or cancellation.
+
+**Requirements:**
+
+- Status values include at least: **draft**, **pending**, **completed**, **cancelled** (exact set per schema).
+- **Send for signing** transitions from draft when business rules are satisfied (signers, fields, etc.).
+- **Revocation / cancel** of an in-flight request: pending documents may be **cancelled** by users who **can access** the document (including company-linked access and global admin), with effects on signature requests per implementation.
+
+### 4.6 Signing parties
+
+**Objective:** Collect signatures from people without portal accounts.
+
+**Requirements:**
+
+- One or more **signature requests** per document (name, email, unique **token** link).
+- Signers **do not** log into the employee portal.
+- **Legal defensibility** features (as implemented): consent capture, **email OTP** verification where required, optional **decline** with reason, **expiry** and reminder behavior per deployment and schema.
+
+### 4.7 Notifications
+
+**Objective:** Inform users and signers at key events.
+
+**Requirements:**
+
+- Email (or configured channel) when documents are **sent** for signing.
+- Email when signers **complete** or when the document is **fully signed**.
+- **Reminder** emails for pending signatures where the product exposes that action.
+
+### 4.8 Signing process
+
+**Objective:** Capture legally meaningful signatures and integrity data.
+
+**Requirements:**
+
+- Supported capture modes as implemented in the signing UI (draw, type, upload image, etc.).
+- Store signature-related metadata (e.g. hash, timestamps, IP/user agent where collected).
+- Maintain an **audit trail** of relevant events (see 4.10).
+
+### 4.9 Completed document access
+
+**Objective:** Distribute the final artifact.
+
+**Requirements:**
+
+- Produce a **final** or latest signed PDF per workflow rules.
+- **Download** paths for document owners and signers (token-based download where applicable).
+- **Certificate of completion** or equivalent summary where implemented.
+
+### 4.10 Audit trail
+
+**Objective:** Support operational and compliance review.
+
+**Requirements:**
+
+- Record state-changing actions (upload, send, sign, decline, cancel, role changes, etc.) in an **append-only** audit log with actor, entity, and metadata as implemented.
+
+### 4.11 Dashboard and navigation
+
+**Objective:** Find and act on documents and templates.
+
+**Requirements:**
+
+- List documents with filters appropriate to the deployment (e.g. **all accessible** vs **per-company** view).
+- Search and status summaries as implemented.
+- **Admin** section for global administrators only (user management, invitations, cross-company views as implemented).
+
+---
+
+## 5. Deferred / future enhancements
+
+*Examples of capabilities that may be expanded later; not commitments.*
+
+- Deeper **retraction** workflows and richer cancellation notifications to all parties
+- **Drive** or external archive integrations
+- **Stricter** multi-tenant isolation or **company-scoped** admin roles (not present today)
+- Additional **roles** or fine-grained permissions

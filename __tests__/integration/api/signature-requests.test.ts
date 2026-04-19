@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueuedSupabaseMock } from '../../helpers/mock-supabase'
 import { jsonRequest } from '../../helpers/mock-request'
+import { userA, userB, adminUser, doc1 } from '../../helpers/rbac-fixtures'
+import {
+  queueSignatureRequestPostForbiddenNoLinks,
+  queueSignatureRequestDeleteForbiddenNoLinks,
+  docStub,
+} from '../../helpers/compose-route-queue'
+import {
+  queueCanAccessDocumentAdmin,
+  queueCanAccessDocumentDeniedNotMember,
+} from '../../helpers/rbac-queue-builders'
 
 const logAudit = vi.fn()
 vi.mock('@/lib/audit', () => ({ logAudit }))
@@ -16,8 +26,8 @@ vi.mock('crypto', async (importOriginal) => {
   return { ...mod, randomUUID: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
 })
 
-const userId = '11111111-1111-4111-8111-111111111111'
-const docId = '22222222-2222-4222-8222-222222222222'
+const userId = userA
+const docId = doc1
 
 async function loadRoute() {
   return import('@/app/api/signature-requests/route')
@@ -75,6 +85,45 @@ describe('signature-requests', () => {
         })
       )
       expect(res.status).toBe(404)
+    })
+
+    it('returns 403 when member has no access to the document (no company links)', async () => {
+      createClient.mockResolvedValue(
+        createQueuedSupabaseMock({
+          user: { id: userB },
+          queue: queueSignatureRequestPostForbiddenNoLinks(docStub({ status: 'draft' })),
+        })
+      )
+      const { POST } = await loadRoute()
+      const res = await POST(
+        jsonRequest('http://localhost/api/signature-requests', {
+          document_id: docId,
+          signer_name: 'A',
+          signer_email: 'a@b.co',
+        })
+      )
+      expect(res.status).toBe(403)
+    })
+
+    it('returns 403 when member is in a different company (not linked to doc)', async () => {
+      createClient.mockResolvedValue(
+        createQueuedSupabaseMock({
+          user: { id: userB },
+          queue: [
+            { data: docStub({ status: 'draft' }), error: null },
+            ...queueCanAccessDocumentDeniedNotMember(),
+          ],
+        })
+      )
+      const { POST } = await loadRoute()
+      const res = await POST(
+        jsonRequest('http://localhost/api/signature-requests', {
+          document_id: docId,
+          signer_name: 'A',
+          signer_email: 'a@b.co',
+        })
+      )
+      expect(res.status).toBe(403)
     })
 
     it('returns 201 and creates request with signer_index = 0 when no existing signers', async () => {
@@ -175,6 +224,22 @@ describe('signature-requests', () => {
         })
       )
       expect(res.status).toBe(401)
+    })
+
+    it('returns 400 when member has no access to the document (no links → access denied + non-draft path)', async () => {
+      const reqId = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
+      // DELETE returns 400 when "no access OR not draft" per route handler
+      createClient.mockResolvedValue(
+        createQueuedSupabaseMock({
+          user: { id: userB },
+          queue: queueSignatureRequestDeleteForbiddenNoLinks(docStub({ status: 'draft' })),
+        })
+      )
+      const { DELETE } = await loadRoute()
+      const res = await DELETE(
+        jsonRequest('http://localhost/api/signature-requests', { request_id: reqId })
+      )
+      expect(res.status).toBe(400)
     })
 
     it('removes signer when document draft and accessible', async () => {

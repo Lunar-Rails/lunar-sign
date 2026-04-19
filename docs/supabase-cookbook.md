@@ -15,14 +15,14 @@ Step-by-step guide to configure a Supabase project for Lunar Sign, including Goo
 1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
 2. Click **New Project**
 3. Fill in:
-   - **Name:** `lunar-sign`
-   - **Database Password:** generate a strong password and save it in your password manager
-   - **Region:** choose the closest to your team (e.g. `eu-west-1` for Europe)
+  - **Name:** `lunar-sign`
+  - **Database Password:** generate a strong password and save it in your password manager
+  - **Region:** choose the closest to your team (e.g. `eu-west-1` for Europe)
 4. Click **Create new project** and wait for provisioning (~2 minutes)
 5. Once ready, go to **Project Settings > API** (or use the Connect dialog)
 6. Copy these values — you'll need them shortly:
-   - **Project URL** (e.g. `https://abcdefg.supabase.co`)
-   - **Publishable Key** (starts with `sb_publishable_...`) or the legacy `anon` key
+  - **Project URL** (e.g. `https://abcdefg.supabase.co`)
+  - **Publishable Key** (starts with `sb_publishable_...`) or the legacy `anon` key
 
 ---
 
@@ -32,18 +32,18 @@ Step-by-step guide to configure a Supabase project for Lunar Sign, including Goo
 
 1. Go to the [Google Auth Platform console](https://console.cloud.google.com/auth/overview) in your GCP project
 2. If not done already, configure the **Audience**:
-   - Go to [Audience](https://console.cloud.google.com/auth/audience)
-   - Set **User type** to **Internal** (restricts sign-in to your Google Workspace domain only — this is what you want for an internal tool)
+  - Go to [Audience](https://console.cloud.google.com/auth/audience)
+  - Set **User type** to **Internal** (restricts sign-in to your Google Workspace domain only — this is what you want for an internal tool)
 3. Configure **Data Access (Scopes)**:
-   - Go to [Data Access](https://console.cloud.google.com/auth/scopes)
-   - Ensure these scopes are present:
-     - `openid` (add manually if missing)
-     - `.../auth/userinfo.email` (added by default)
-     - `.../auth/userinfo.profile` (added by default)
-   - Do **not** add sensitive or restricted scopes — they trigger a lengthy verification process
+  - Go to [Data Access](https://console.cloud.google.com/auth/scopes)
+  - Ensure these scopes are present:
+    - `openid` (add manually if missing)
+    - `.../auth/userinfo.email` (added by default)
+    - `.../auth/userinfo.profile` (added by default)
+  - Do **not** add sensitive or restricted scopes — they trigger a lengthy verification process
 4. (Optional) Configure **Branding**:
-   - Go to [Branding](https://console.cloud.google.com/auth/branding)
-   - Set app name to "Lunar Sign" and upload a logo
+  - Go to [Branding](https://console.cloud.google.com/auth/branding)
+  - Set app name to "Lunar Sign" and upload a logo
 
 ### 2.2 Create OAuth Client ID
 
@@ -51,11 +51,11 @@ Step-by-step guide to configure a Supabase project for Lunar Sign, including Goo
 2. Choose **Web application** as the application type
 3. Name it `Lunar Sign`
 4. Under **Authorized JavaScript origins**, add:
-   - `http://localhost:3000` (for local development)
-   - Your production URL when known (e.g. `https://lunar-sign.vercel.app`)
+  - `http://localhost:3000` (for local development)
+  - Your production URL when known (e.g. `https://lunar-sign.vercel.app`)
 5. Under **Authorized redirect URIs**, add:
-   - Your Supabase callback URL — find it in Supabase Dashboard > **Authentication > Providers > Google**. It looks like `https://<project-ref>.supabase.co/auth/v1/callback`
-   - `http://127.0.0.1:54321/auth/v1/callback` (for Supabase local dev, if you use it)
+  - Your Supabase callback URL — find it in Supabase Dashboard > **Authentication > Providers > Google**. It looks like `https://<project-ref>.supabase.co/auth/v1/callback`
+  - `http://127.0.0.1:54321/auth/v1/callback` (for Supabase local dev, if you use it)
 6. Click **Create**
 7. Copy the **Client ID** and **Client Secret**
 
@@ -71,8 +71,8 @@ Step-by-step guide to configure a Supabase project for Lunar Sign, including Goo
 1. In Supabase Dashboard, go to **Authentication > URL Configuration**
 2. Set **Site URL** to `http://localhost:3000` (change to production URL before deploying)
 3. Under **Redirect URLs**, add:
-   - `http://localhost:3000/auth/callback`
-   - Your production callback (e.g. `https://lunar-sign.vercel.app/auth/callback`)
+  - `http://localhost:3000/auth/callback`
+  - Your production callback (e.g. `https://lunar-sign.vercel.app/auth/callback`)
 4. Click **Save**
 
 ---
@@ -391,7 +391,7 @@ Get these values from **Supabase Dashboard > Project Settings > API** (or the Co
 
 Create three files under `lib/supabase/`:
 
-**`lib/supabase/client.ts`** — for Client Components (runs in the browser):
+`**lib/supabase/client.ts`** — for Client Components (runs in the browser):
 
 ```typescript
 import { createBrowserClient } from '@supabase/ssr'
@@ -404,7 +404,7 @@ export function createClient() {
 }
 ```
 
-**`lib/supabase/server.ts`** — for Server Components, Server Actions, and Route Handlers:
+`**lib/supabase/server.ts**` — for Server Components, Server Actions, and Route Handlers:
 
 ```typescript
 import { createServerClient } from '@supabase/ssr'
@@ -437,7 +437,7 @@ export async function createClient() {
 }
 ```
 
-**`lib/supabase/proxy.ts`** — session refresh logic used by the Next.js proxy:
+`**lib/supabase/proxy.ts**` — session refresh logic used by the Next.js proxy:
 
 ```typescript
 import { createServerClient } from '@supabase/ssr'
@@ -659,10 +659,12 @@ await supabase.auth.signOut()
 
 In Vercel Dashboard > your project > **Settings > Environment Variables**, add:
 
-| Variable | Value |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://your-project-ref.supabase.co` |
+
+| Variable                               | Value                                   |
+| -------------------------------------- | --------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | `https://your-project-ref.supabase.co`  |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` (or your anon key) |
+
 
 ### 9.2 Update Supabase redirect URLs
 
@@ -683,15 +685,15 @@ In Vercel Dashboard > your project > **Settings > Environment Variables**, add:
 
 After completing all steps, verify the setup works:
 
-- [ ] **Supabase project** is running and accessible at your project URL
-- [ ] **Google OAuth provider** is enabled in Supabase Dashboard > Authentication > Providers
-- [ ] **Tables exist** — check in Supabase Dashboard > Table Editor: `profiles`, `documents`, `signature_requests`, `signatures`, `audit_log`
-- [ ] **Storage buckets exist** — check in Supabase Dashboard > Storage: `documents`, `signed-documents`
-- [ ] **RLS is enabled** on all tables — each table should show a shield icon in the Table Editor
-- [ ] **Environment variables** are set in `.env.local`
-- [ ] **First sign-in** works — navigate to `http://localhost:3000`, get redirected to `/login`, click "Sign in with Google", complete the OAuth flow, get redirected back to the app
-- [ ] **Profile auto-created** — after first sign-in, check `profiles` table in Supabase; your row should exist with your Google name and email
-- [ ] **Admin bootstrap** — run the admin promotion SQL from step 3.3 with your email
+- **Supabase project** is running and accessible at your project URL
+- **Google OAuth provider** is enabled in Supabase Dashboard > Authentication > Providers
+- **Tables exist** — check in Supabase Dashboard > Table Editor: `profiles`, `documents`, `signature_requests`, `signatures`, `audit_log`
+- **Storage buckets exist** — check in Supabase Dashboard > Storage: `documents`, `signed-documents`
+- **RLS is enabled** on all tables — each table should show a shield icon in the Table Editor
+- **Environment variables** are set in `.env.local`
+- **First sign-in** works — navigate to `http://localhost:3000`, get redirected to `/login`, click "Sign in with Google", complete the OAuth flow, get redirected back to the app
+- **Profile auto-created** — after first sign-in, check `profiles` table in Supabase; your row should exist with your Google name and email
+- **Admin bootstrap** — run the admin promotion SQL from step 3.3 with your email
 
 ---
 
@@ -702,3 +704,4 @@ After completing all steps, verify the setup works:
 - [Supabase Next.js client setup](https://supabase.com/ui/docs/nextjs/client)
 - [Supabase Storage access control](https://supabase.com/docs/guides/storage/security/access-control)
 - [Official Next.js auth example (source)](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+

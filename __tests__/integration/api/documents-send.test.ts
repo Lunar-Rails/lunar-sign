@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createQueuedSupabaseMock } from '../../helpers/mock-supabase'
 import { routeParams } from '../../helpers/mock-request'
+import { userA, userB, adminUser, doc1 } from '../../helpers/rbac-fixtures'
+import { queueDocumentSendForbiddenNoLinks, docStub } from '../../helpers/compose-route-queue'
+import { queueCanAccessDocumentViaCompany } from '../../helpers/rbac-queue-builders'
 
 const logAudit = vi.fn()
 vi.mock('@/lib/audit', () => ({ logAudit }))
@@ -19,8 +22,9 @@ vi.mock('nodemailer', () => ({
   },
 }))
 
-const userId = '11111111-1111-4111-8111-111111111111'
-const docId = '22222222-2222-4222-8222-222222222222'
+// Keep legacy IDs to avoid breaking existing tests in this file.
+const userId = userA
+const docId = doc1
 
 async function loadPost() {
   const { POST } = await import('@/app/api/documents/[id]/send/route')
@@ -283,5 +287,58 @@ describe('POST /api/documents/[id]/send', () => {
       docId,
       expect.objectContaining({ signer_count: 1 })
     )
+  })
+
+  // ── RBAC: 403 when member has no access ──────────────────────────────────
+
+  it('returns 403 when member has no access to the document (no company links)', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userB },
+        queue: queueDocumentSendForbiddenNoLinks(docStub({ status: 'draft' })),
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/send', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when a company member (with access) sends a doc with no signers', async () => {
+    getServiceClient.mockReturnValue(
+      createQueuedSupabaseMock({ user: null, queue: [{ data: [], error: null }] })
+    )
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userB },
+        queue: [
+          { data: docStub({ status: 'draft' }), error: null }, // doc fetch
+          ...queueCanAccessDocumentViaCompany(),
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/send', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 403 when an admin sends a non-existent document', async () => {
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: adminUser },
+        queue: [{ data: null, error: null }], // doc not found
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(
+      new NextRequest('http://localhost/api/documents/x/send', { method: 'POST' }),
+      routeParams({ id: docId })
+    )
+    expect(res.status).toBe(404)
   })
 })
