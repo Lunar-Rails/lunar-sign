@@ -112,21 +112,30 @@ Numbering: **MUST** = blocking, **SHOULD** = strong, **COULD** = nice-to-have.
 ### 4.3 Email stubbing
 8. **MUST** stub `lib/email/client.ts` so no SMTP connection is opened.
    Strategy: at runtime, when `E2E_TEST_MODE=true`, the email module
-   appends every `sendEmail(...)` call into a Postgres table
-   `e2e_email_inbox(id, to, subject, html, sent_at)` instead of dispatching.
-9. **MUST** expose a test-only API route `GET /api/test/inbox?to=<email>`
-   gated on `E2E_TEST_MODE=true`, returning the captured emails as JSON.
-   The route is a 404 when the env flag is unset.
-10. **MUST** provide a Playwright fixture `inbox` with helpers:
-    `inbox.waitFor({ to, subjectMatches, timeoutMs })`,
-    `inbox.list({ to })`, `inbox.clear()`.
+   appends every `sendEmail(...)` call as a single JSON line to a
+   plain text file at `test-results/e2e-inbox.log` (JSON-lines format,
+   one email per line: `{ id, to, subject, html, sentAt }`).
+   The file is created on first write and truncated by `globalSetup`
+   before each suite run.
+9. **MUST** provide a Playwright fixture `inbox` (TypeScript helper
+   that reads the file directly from the test process — no API route
+   needed) with helpers:
+   `inbox.waitFor({ to, subjectMatches, timeoutMs })`,
+   `inbox.list({ to })`,
+   `inbox.clear()`.
+   Polling reads the file with bounded backoff until the predicate
+   matches or the timeout expires.
+10. **MUST NOT** add any database table, migration, or HTTP route for
+    email capture. Zero production-code surface area.
 
 ### 4.4 OpenTimestamps stubbing
 11. **MUST** stub the OpenTimestamps module (`lib/esigning/timestamps.ts`)
     when `E2E_TEST_MODE=true` so that **no HTTP request to a calendar
-    server is issued**. The stub records every invocation
-    (`{ fnName, args, timestamp }`) into an in-memory log exposed via
-    `GET /api/test/ots-log` (env-gated).
+    server is issued**. The stub appends every invocation
+    (`{ fnName, args, calledAt }`) as a JSON line to
+    `test-results/e2e-ots.log`. The test process reads the file
+    directly via an `ots` Playwright fixture. Truncated by
+    `globalSetup` before each suite run. No DB table, no HTTP route.
 12. **MUST** assert in the journey test that `stampHash` was called
     **exactly once per finalized signed PDF**, with the SHA-256 of the
     document, **after** all signers have signed (timing assertion via the
@@ -351,8 +360,8 @@ For each numbered step the test MUST assert all of the following.
     helpers/
       auth.ts                    (programmatic Supabase auth + storageState)
       db.ts                      (typed Supabase admin client + truncation)
-      inbox.ts                   (email inbox fixture)
-      ots.ts                     (OTS stub log fixture)
+      inbox.ts                   (reads test-results/e2e-inbox.log)
+      ots.ts                     (reads test-results/e2e-ots.log)
       audit.ts                   (per-test audit log writer)
       selectors.ts               (high-level page objects: TemplateBuilder,
                                   DocumentDraft, SignPage)
@@ -362,33 +371,30 @@ For each numbered step the test MUST assert all of the following.
   (`creator`, `inbox`, `ots`, `db`, `audit`) so individual specs stay
   declarative.
 - A new env flag **`E2E_TEST_MODE`** (server) + **`NEXT_PUBLIC_E2E_TEST_MODE`**
-  (client) gates all stubbing and test-only routes. Both default to off
-  (production safety).
+  (client) gates all stubbing. Both default to off (production safety).
 
 ### Data / schema changes
-- New table `e2e_email_inbox(id uuid pk, to text, subject text, html text,
-  sent_at timestamptz default now())` created by a **new migration that
-  is no-op when `E2E_TEST_MODE` is false**, OR — preferred — created in
-  Playwright's `globalSetup` against the local Supabase only, never
-  shipped in `supabase/migrations/`. (Decision: globalSetup-managed,
-  zero footprint in production migrations.)
-- No changes to existing domain schemas.
+- **None.** Email capture and OTS call recording are file-based
+  (JSON-lines under `test-results/`); no DB tables, no migrations.
 
 ### API changes / contracts
-- New **test-only** routes (404 unless `E2E_TEST_MODE=true`):
-  - `GET /api/test/inbox` — list captured emails (filter by `to`).
-  - `DELETE /api/test/inbox` — clear captured emails.
-  - `GET /api/test/ots-log` — list OTS stub invocations.
-  - `DELETE /api/test/ots-log` — clear the log.
-- These routes live under `app/api/test/` and the route handlers all
-  share a single `assertTestModeOrNotFound()` guard.
+- **No new HTTP routes.** Email inbox and OTS call log are read by
+  test fixtures directly from `test-results/e2e-inbox.log` and
+  `test-results/e2e-ots.log` in the same process / filesystem.
+- The only production-code change is inside `lib/email/client.ts`
+  and `lib/esigning/timestamps.ts`: a single early branch
+  `if (process.env.E2E_TEST_MODE === 'true') { appendJsonLine(...); return ... }`
+  guarded so it cannot run in production.
 
 ### Security / permissions
-- **Critical**: every test-only surface (routes, signature affordance,
-  email inbox, OTS stub) **MUST** be gated by `E2E_TEST_MODE`. A unit
-  test in `__tests__/` should assert each route returns 404 when the
-  flag is false. The flag must NOT be readable from a request header or
-  cookie — only from process env.
+- **Critical**: every test-only surface (signature affordance, email
+  file-stub, OTS file-stub) **MUST** be gated by `E2E_TEST_MODE` /
+  `NEXT_PUBLIC_E2E_TEST_MODE`. The flag is read **only from
+  `process.env`** at module/runtime — never from a request header,
+  cookie, query string, or any user-controlled input.
+- Unit tests assert that with the flag unset, the real SMTP transport
+  is constructed and the real OTS calendar code path runs (no file
+  write).
 - The Supabase service-role key is used only by the helpers, never
   exposed to the browser. `.env.e2e` is gitignored.
 
@@ -406,8 +412,8 @@ For each numbered step the test MUST assert all of the following.
 ## 7. Rollout plan
 
 ### Feature flagging
-- `E2E_TEST_MODE` env var defaults to unset → all stubbing and test-only
-  routes are inert. No production impact.
+- `E2E_TEST_MODE` env var defaults to unset → all stubbing is inert
+  (real SMTP, real OTS calendars). No production impact.
 
 ### Migration / backfill
 - None — schema unchanged.
@@ -438,8 +444,10 @@ For each numbered step the test MUST assert all of the following.
 ### Scope
 - This PRD *is* the test plan. The deliverable is a test harness.
 - In addition:
-  - Unit tests in `__tests__/` for the gating helpers (`assertTestModeOrNotFound`,
-    the email inbox writer, the OTS stub recorder).
+  - Unit tests in `__tests__/` for the gating in `lib/email/client.ts`
+    and `lib/esigning/timestamps.ts`: when `E2E_TEST_MODE` is unset
+    the file-write branch is *not* taken and the real transport /
+    real calendar code path runs (mocked at the module boundary).
   - The new code itself is exercised exclusively via the harness it
     creates, plus those unit tests.
 
@@ -448,8 +456,11 @@ For each numbered step the test MUST assert all of the following.
       Supabase and passes.
 - [ ] The journey test asserts every item in § 4.9 (each as a separate
       `expect`).
-- [ ] `app/api/test/*` routes return 404 when `E2E_TEST_MODE` is unset
-      (asserted by unit test).
+- [ ] With `E2E_TEST_MODE` unset, `lib/email/client.ts` opens an SMTP
+      transport (mocked) and `lib/esigning/timestamps.ts` invokes the
+      OTS calendar code path (mocked) — i.e. the file-stub branch is
+      never taken (asserted by unit test).
+- [ ] No `app/api/test/*` routes exist (file-based stubs only).
 - [ ] No real network calls leave the process during the suite (verified
       by Playwright `route` allowlist).
 - [ ] On forced failure (e.g. break the journey in source), the audit
@@ -469,12 +480,15 @@ For each numbered step the test MUST assert all of the following.
 ### Tasks (planning-level)
 1. **M1 — Foundations** (env, runner, local Supabase orchestration).
    - Add `.env.e2e.example`, gitignore real file.
-   - `globalSetup` boots local Supabase, applies migrations, creates
-     `e2e_email_inbox` table.
+   - `globalSetup` boots local Supabase, applies migrations,
+     truncates / creates the JSON-lines stub files
+     (`test-results/e2e-inbox.log`, `test-results/e2e-ots.log`).
    - Wire `pnpm test:e2e` to run journey + public + canvas.
 2. **M2 — Stubs**.
-   - Email transport stub + `app/api/test/inbox` routes + unit test.
-   - OTS stub + `app/api/test/ots-log` routes + unit test.
+   - Email transport file-stub branch in `lib/email/client.ts`
+     + unit test.
+   - OTS file-stub branch in `lib/esigning/timestamps.ts`
+     + unit test.
    - `NEXT_PUBLIC_E2E_TEST_MODE`-gated signature submission affordance.
    - Network allowlist guard.
 3. **M3 — Helpers & fixtures**.
@@ -507,10 +521,10 @@ For each numbered step the test MUST assert all of the following.
   **Mitigation:** the stub injects via the *same* submission code path
   as the real component, only bypassing the canvas drawing. The
   separate canvas suite covers the drawing path.
-- **Risk:** Test-only routes accidentally shipped to prod.
-  **Mitigation:** unit test asserting 404 when env unset; PR-time
-  review checklist; routes under a unique `app/api/test/` namespace
-  for easy auditability.
+- **Risk:** File-stub branch accidentally activated in production.
+  **Mitigation:** the branch is a single `if (process.env.E2E_TEST_MODE === 'true')`
+  early return; unit test asserts the real code path runs when the
+  env is unset; the env is never read from request input.
 - **Risk:** Local Supabase boot is slow and flakes.
   **Mitigation:** `globalSetup` waits with bounded backoff and
   surfaces a clear error on timeout; reuse running instance when
@@ -520,7 +534,6 @@ For each numbered step the test MUST assert all of the following.
   e2e README; lint guard in M7 (CI grep against `e2e/**/*.spec.ts`).
 
 ### Open questions
-- None blocking. (Email inbox storage strategy resolved: in-Postgres
-  via globalSetup-created table, never shipped as a production
-  migration.)
+- None blocking. (Email & OTS capture: file-based JSON-lines under
+  `test-results/`. No DB tables, no HTTP routes.)
 
