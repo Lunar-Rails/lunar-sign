@@ -13,9 +13,17 @@ export interface SignerFieldsPanelProps {
   updateField: (fieldId: string, partial: Partial<FieldPlacement>) => void
   /** Which signer slot is active. null = legacy single-signer (show all signer text fields). */
   signerIndex?: number | null
+  /** Highlights the row matching the guided-flow target on the PDF. */
+  activeFieldId?: string | null
 }
 
-export function SignerFieldsPanel({ stored, fields, updateField, signerIndex }: SignerFieldsPanelProps) {
+export function SignerFieldsPanel({
+  stored,
+  fields,
+  updateField,
+  signerIndex,
+  activeFieldId,
+}: SignerFieldsPanelProps) {
   const textSignerFields = stored.filter((s) => {
     if (s.type !== 'text') return false
     const idx = resolveSignerIndex(s)
@@ -37,8 +45,16 @@ export function SignerFieldsPanel({ stored, fields, updateField, signerIndex }: 
         {textSignerFields.map((s) => {
           const placement = fields.find((f) => f.id === s.id)
           const label = s.label?.trim() || 'Text'
+          const isActive = activeFieldId != null && s.id === activeFieldId
           return (
-            <li key={s.id}>
+            <li
+              key={s.id}
+              className={
+                isActive
+                  ? 'rounded-lr border border-lr-accent/40 bg-lr-accent-dim p-3 shadow-lr-glow-accent'
+                  : undefined
+              }
+            >
               <Label className="text-caption" htmlFor={`signer-text-${s.id}`}>
                 {label}
               </Label>
