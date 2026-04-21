@@ -88,8 +88,12 @@ export function hydrateForSigner(
         label: f.label,
         locked: true,
         // Current signer's fields start empty so the library overlay shows the preview;
-        // creator fields display their persisted value.
-        value: isCurrentSigner ? undefined : (f.value ?? undefined),
+        // creator fields display their persisted value. Date is auto-filled (read-only UX).
+        value: isCurrentSigner
+          ? f.type === 'date'
+            ? new Date().toLocaleDateString()
+            : undefined
+          : (f.value ?? undefined),
       }
     })
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, FileX2 } from 'lucide-react'
+import { Download, Lock, FileX2, Printer } from 'lucide-react'
 import {
   modifyPdf,
   sha256,
@@ -20,21 +20,23 @@ import { IntentConfirmDialog } from '@/components/signing/IntentConfirmDialog'
 import { DeclineDialog } from '@/components/signing/DeclineDialog'
 import { SigningCompletePanel } from '@/components/signing/SigningCompletePanel'
 import { MobileWizardShell } from '@/components/signing/MobileWizardShell'
-import { PdfColumn } from '@/components/signing/PdfColumn'
+import { PdfColumn, type PdfColumnHandle } from '@/components/signing/PdfColumn'
 import { SigningControlsSidebar } from '@/components/signing/SigningControlsSidebar'
+import { SignatureModal } from '@/components/signing/SignatureModal'
+import { Button } from '@/components/ui/button'
 import { SignerAppHeader } from '@/components/signer/SignerAppHeader'
 import { SignerStepper } from '@/components/signer/SignerStepper'
 import { SignerFooter } from '@/components/signer/SignerFooter'
 import { SignerStateCard } from '@/components/signer/SignerStateCard'
-import { SignatureBlock } from '@/components/signer/SignatureBlock'
-import { SignerDetailsBlock } from '@/components/signer/SignerDetailsBlock'
 import {
   applySignerValuesToPlacements,
   hydrateForSigner,
   parseFieldMetadataJson,
   resolveSignerIndex,
 } from '@/lib/field-metadata'
+import { getPendingGuideSteps } from '@/lib/signer-field-guide'
 import { useNarrowSigningLayout } from '@/hooks/useSigningState'
+import { useSignerFieldGuide } from '@/hooks/useSignerFieldGuide'
 
 type MobileWizardStep = 1 | 2
 
@@ -68,6 +70,8 @@ export default function SigningInterface({
 }: SigningInterfaceProps) {
   const router = useRouter()
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
+  const pdfColumnRef = useRef<PdfColumnHandle | null>(null)
+  const prevGuideStepKeyRef = useRef<string>('')
 
   const templateStored = useMemo(() => {
     if (!initialFieldsJson?.trim()) return null
@@ -106,6 +110,13 @@ export default function SigningInterface({
 
   const [activeSignatureDataUrl, setActiveSignatureDataUrl] = useState<string | null>(null)
 
+  const guidedSigningEnabled = Boolean(templateStored && templateStored.length > 0)
+  const guide = useSignerFieldGuide({
+    fields,
+    hasSignatureDataUrl: Boolean(activeSignatureDataUrl),
+  })
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false)
+
   const displayName = useMemo(() => {
     const composed = `${signerInfo.firstName} ${signerInfo.lastName}`.trim()
     return composed || signerName
@@ -140,6 +151,46 @@ export default function SigningInterface({
     }),
     [activeSignatureDataUrl, displayName, signerInfo.title]
   )
+
+  useEffect(() => {
+    if (!templateStored?.length || !fields.length) return
+    for (const s of templateStored) {
+      const idx = resolveSignerIndex(s)
+      const isMy = currentSignerIndex != null ? idx === currentSignerIndex : idx !== null
+      if (!isMy) continue
+      if (s.type === 'fullName') {
+        const f = fields.find((x) => x.id === s.id)
+        if (f && f.value !== displayName) updateField(s.id, { value: displayName })
+      }
+      if (s.type === 'title') {
+        const f = fields.find((x) => x.id === s.id)
+        const t = signerInfo.title ?? ''
+        if (f && f.value !== t) updateField(s.id, { value: t })
+      }
+    }
+  }, [templateStored, fields, displayName, signerInfo.title, currentSignerIndex, updateField])
+
+  useEffect(() => {
+    if (!guidedSigningEnabled || !guide.started || !guide.currentStep) return
+    const key = `${guide.currentStep.kind}-${guide.currentStep.fieldId}`
+    if (prevGuideStepKeyRef.current === key) return
+    prevGuideStepKeyRef.current = key
+    scrollToPage(guide.currentStep.pageIndex)
+  }, [guidedSigningEnabled, guide.started, guide.currentStep, scrollToPage])
+
+  const handleGuideNext = useCallback(() => {
+    const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
+    if (pending.length === 0) return
+    const targetId = pending.length > 1 ? pending[1].fieldId : pending[0].fieldId
+    pdfColumnRef.current?.scrollFieldIntoView(targetId)
+  }, [fields, activeSignatureDataUrl])
+
+  const handleSignatureFieldClick = useCallback(() => {
+    if (!guidedSigningEnabled || !guide.started) return
+    const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
+    if (pending[0]?.kind !== 'signature') return
+    setSignatureModalOpen(true)
+  }, [guidedSigningEnabled, guide.started, fields, activeSignatureDataUrl])
 
   const isNarrow = useNarrowSigningLayout()
   const [mobileWizardStep, setMobileWizardStep] = useState<MobileWizardStep>(1)
@@ -251,6 +302,18 @@ export default function SigningInterface({
     e.preventDefault()
     setErrorMessage(null)
 
+    if (guidedSigningEnabled) {
+      const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
+      if (pending.length > 0 && !guide.started) {
+        setErrorMessage('Press Start on the document to begin.')
+        return
+      }
+      if (pending.length > 0) {
+        setErrorMessage('Complete every field on the document before signing.')
+        return
+      }
+    }
+
     if (!activeSignatureDataUrl) { setErrorMessage('Please provide a signature'); return }
     if (!displayName.trim()) { setErrorMessage('Please enter your full name'); return }
     if (!pdfInput.length) { setErrorMessage('Document is not loaded yet'); return }
@@ -328,6 +391,7 @@ export default function SigningInterface({
 
   const pdfColumn = (
     <PdfColumn
+      ref={pdfColumnRef}
       viewerContainerRef={viewerContainerRef}
       pdfDataForViewer={pdfDataForViewer}
       numPages={numPages}
@@ -352,7 +416,41 @@ export default function SigningInterface({
         if (isScrollMode) scrollToPage(pageIndex)
         else setSinglePageIndex(pageIndex)
       }}
+      guided={guidedSigningEnabled}
+      guideStarted={guide.started}
+      activeFieldId={guide.activeFieldId}
+      isGuideComplete={guide.isGuideComplete}
+      onGuideStart={guide.start}
+      onGuideNext={handleGuideNext}
+      onSignatureFieldClick={guidedSigningEnabled ? handleSignatureFieldClick : undefined}
     />
+  )
+
+  const headerToolbarActions = (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-lr-muted hover:text-lr-text"
+        aria-label="Download document"
+        onClick={() => {
+          window.open(`/api/download/${token}`, '_blank', 'noopener,noreferrer')
+        }}
+      >
+        <Download className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-lr-muted hover:text-lr-text"
+        aria-label="Print"
+        onClick={() => window.print()}
+      >
+        <Printer className="size-4" />
+      </Button>
+    </>
   )
 
   return (
@@ -376,8 +474,17 @@ export default function SigningInterface({
         onCancel={() => setShowDeclineDialog(false)}
       />
 
+      {guidedSigningEnabled && (
+        <SignatureModal
+          open={signatureModalOpen}
+          onOpenChange={setSignatureModalOpen}
+          displayName={displayName}
+          onAccept={(url) => setActiveSignatureDataUrl(url)}
+        />
+      )}
+
       <div className="flex min-h-screen flex-col bg-lr-bg">
-        <SignerAppHeader subtitle="Secure signing session" />
+        <SignerAppHeader subtitle="Secure signing session" actions={headerToolbarActions} />
 
         <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-7xl">
@@ -439,6 +546,13 @@ export default function SigningInterface({
                 completed={completed}
                 onSubmit={handleSubmit}
                 signerIndex={currentSignerIndex}
+                guided={guidedSigningEnabled}
+                guideStarted={guide.started}
+                guidePendingCount={guide.pendingCount}
+                isGuideComplete={guide.isGuideComplete}
+                activeTextFieldId={
+                  guide.currentStep?.kind === 'text' ? guide.currentStep.fieldId : null
+                }
               />
             ) : (
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -457,6 +571,13 @@ export default function SigningInterface({
                   completed={completed}
                   onSubmit={handleSubmit}
                   signerIndex={currentSignerIndex}
+                  guided={guidedSigningEnabled}
+                  guideStarted={guide.started}
+                  guidePendingCount={guide.pendingCount}
+                  isGuideComplete={guide.isGuideComplete}
+                  activeTextFieldId={
+                    guide.currentStep?.kind === 'text' ? guide.currentStep.fieldId : null
+                  }
                 />
               </div>
             )}

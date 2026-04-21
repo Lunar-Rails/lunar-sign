@@ -1,10 +1,26 @@
 'use client'
 
-import { useEffect, useState, type RefObject } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
 import { FieldOverlay, PdfPageNavigator, PdfViewer } from '@drvillo/react-browser-e-signing'
 import type { FieldPlacement, PdfTextContent, SignatureFieldPreview, TextLine } from '@drvillo/react-browser-e-signing'
 
+import { FieldNavigationCta } from '@/components/signing/FieldNavigationCta'
+import { cn } from '@/lib/utils'
+
 const LOAD_WATCHDOG_MS = 6000
+
+export type PdfColumnHandle = {
+  scrollFieldIntoView: (fieldId: string) => void
+}
 
 export interface PdfColumnProps {
   viewerContainerRef: RefObject<HTMLDivElement | null>
@@ -28,27 +44,48 @@ export interface PdfColumnProps {
   isLoading: boolean
   pdfErrorMessage: string | null
   onPageChange: (pageIndex: number) => void
+  /** Guided signing: edge CTA, DOM ids, field highlight, signature click. */
+  guided?: boolean
+  guideStarted?: boolean
+  activeFieldId?: string | null
+  isGuideComplete?: boolean
+  onGuideStart?: () => void
+  onGuideNext?: () => void
+  onSignatureFieldClick?: (fieldId: string) => void
 }
 
-export function PdfColumn({
-  viewerContainerRef,
-  pdfDataForViewer,
-  numPages,
-  scale,
-  setScale,
-  handleDocumentLoadSuccess,
-  setPageDimension,
-  pageMode,
-  viewerPageIndex,
-  fields,
-  onUpdateField,
-  preview,
-  onPageTextContent,
-  textLinesByPage,
-  isLoading,
-  pdfErrorMessage,
-  onPageChange,
-}: PdfColumnProps) {
+export const PdfColumn = forwardRef<PdfColumnHandle, PdfColumnProps>(function PdfColumn(
+  {
+    viewerContainerRef,
+    pdfDataForViewer,
+    numPages,
+    scale,
+    setScale,
+    handleDocumentLoadSuccess,
+    setPageDimension,
+    pageMode,
+    viewerPageIndex,
+    fields,
+    onUpdateField,
+    preview,
+    onPageTextContent,
+    textLinesByPage,
+    isLoading,
+    pdfErrorMessage,
+    onPageChange,
+    guided = false,
+    guideStarted = false,
+    activeFieldId = null,
+    isGuideComplete = false,
+    onGuideStart,
+    onGuideNext,
+    onSignatureFieldClick,
+  },
+  ref
+) {
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const [ctaOffsetPx, setCtaOffsetPx] = useState<number | null>(null)
+
   const hasLoaded = numPages > 0
   const stuck = useLoadWatchdog({
     armed: !!pdfDataForViewer && !hasLoaded && !pdfErrorMessage,
@@ -56,9 +93,102 @@ export function PdfColumn({
     resetKey: pdfDataForViewer,
   })
 
+  const updateCtaPosition = useCallback(() => {
+    if (!guided || !guideStarted || !activeFieldId || !viewerContainerRef.current || !cardRef.current) {
+      if (guided && !guideStarted) setCtaOffsetPx(null)
+      return
+    }
+    const el = viewerContainerRef.current.querySelector(`[data-field-id="${activeFieldId}"]`)
+    if (!el) {
+      setCtaOffsetPx(null)
+      return
+    }
+    const fieldRect = el.getBoundingClientRect()
+    const cardRect = cardRef.current.getBoundingClientRect()
+    const top = fieldRect.top - cardRect.top + fieldRect.height / 2
+    setCtaOffsetPx(top)
+  }, [guided, guideStarted, activeFieldId, viewerContainerRef])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollFieldIntoView: (fieldId: string) => {
+        const root = viewerContainerRef.current
+        if (!root) return
+        const el = root.querySelector(`[data-field-id="${fieldId}"]`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      },
+    }),
+    [viewerContainerRef]
+  )
+
+  useLayoutEffect(() => {
+    updateCtaPosition()
+  }, [updateCtaPosition, fields, numPages, viewerPageIndex, scale])
+
+  useEffect(() => {
+    if (!guided) return
+    const el = viewerContainerRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateCtaPosition, { passive: true })
+    window.addEventListener('resize', updateCtaPosition)
+    return () => {
+      el.removeEventListener('scroll', updateCtaPosition)
+      window.removeEventListener('resize', updateCtaPosition)
+    }
+  }, [guided, updateCtaPosition, viewerContainerRef])
+
+  useLayoutEffect(() => {
+    const container = viewerContainerRef.current
+    if (!container) return
+    const pages = container.querySelectorAll('[data-slot="pdf-viewer-page"]')
+    pages.forEach((pageEl, pageIndex) => {
+      const overlay = pageEl.querySelector('[data-slot="field-overlay"]')
+      if (!overlay) return
+      const nodes = overlay.querySelectorAll('[data-slot="signature-field"]')
+      const pageFields = fields.filter((f) => f.pageIndex === pageIndex)
+      nodes.forEach((node, i) => {
+        const f = pageFields[i]
+        if (!f || !(node instanceof HTMLElement)) return
+        node.setAttribute('data-field-id', f.id)
+        const isActive = Boolean(activeFieldId && f.id === activeFieldId)
+        node.setAttribute('data-active', isActive ? 'true' : 'false')
+      })
+    })
+  }, [fields, numPages, activeFieldId, viewerContainerRef])
+
+  useEffect(() => {
+    if (!guided || !onSignatureFieldClick) return
+    const el = viewerContainerRef.current
+    if (!el) return
+    const handler = (event: MouseEvent) => {
+      const t = event.target as HTMLElement | null
+      if (!t) return
+      const slot = t.closest('[data-slot="signature-field"]')
+      if (!slot || !(slot instanceof HTMLElement)) return
+      if (slot.getAttribute('data-field-type') !== 'signature') return
+      const id = slot.getAttribute('data-field-id')
+      if (!id) return
+      event.preventDefault()
+      event.stopPropagation()
+      onSignatureFieldClick(id)
+    }
+    el.addEventListener('click', handler, true)
+    return () => el.removeEventListener('click', handler, true)
+  }, [guided, onSignatureFieldClick, viewerContainerRef, fields])
+
   return (
-    <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-3 shadow-lr-card sm:p-4">
-      <div ref={viewerContainerRef} className="h-[70vh] overflow-auto">
+    <div ref={cardRef} className="relative rounded-lr-lg border border-lr-border bg-lr-surface p-3 shadow-lr-card sm:p-4">
+      {guided && onGuideStart && onGuideNext && (
+        <FieldNavigationCta
+          started={guideStarted}
+          isGuideComplete={isGuideComplete}
+          ctaOffsetPx={ctaOffsetPx}
+          onStart={onGuideStart}
+          onNext={onGuideNext}
+        />
+      )}
+      <div ref={viewerContainerRef} className={cn('h-[70vh] overflow-auto', guided && 'pl-2 sm:pl-3')}>
         <PdfViewer
           pdfData={pdfDataForViewer}
           numPages={numPages}
@@ -111,7 +241,7 @@ export function PdfColumn({
       )}
     </div>
   )
-}
+})
 
 function useLoadWatchdog({
   armed,

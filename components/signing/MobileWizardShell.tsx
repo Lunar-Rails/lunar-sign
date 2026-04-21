@@ -29,6 +29,12 @@ export interface MobileWizardShellProps {
   completed: boolean
   onSubmit: (e: React.FormEvent) => void
   signerIndex?: number | null
+  /** Single-column guided layout (no stepper). */
+  guided?: boolean
+  guideStarted?: boolean
+  guidePendingCount?: number
+  isGuideComplete?: boolean
+  activeTextFieldId?: string | null
 }
 
 const STEPS = [
@@ -53,14 +59,77 @@ export function MobileWizardShell({
   completed,
   onSubmit,
   signerIndex,
+  guided = false,
+  guideStarted = false,
+  guidePendingCount = 0,
+  isGuideComplete = false,
+  activeTextFieldId = null,
 }: MobileWizardShellProps) {
   const showTitle = templateStored
     ? templateStored.some((f) => f.type === 'title')
     : true
 
+  if (guided) {
+    return (
+      <div className="space-y-4">
+        {pdfColumn}
+
+        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
+          <p className="text-section-label mb-2">Progress</p>
+          {!guideStarted ? (
+            <p className="text-body text-lr-muted">
+              Tap <span className="font-medium text-lr-text">Start</span> on the document, then complete each field.
+              Tap the signature area to sign.
+            </p>
+          ) : isGuideComplete ? (
+            <p className="text-body text-lr-success">All required fields are complete. Submit when ready.</p>
+          ) : (
+            <p className="text-body text-lr-muted">
+              <span className="font-display font-semibold tabular-nums text-lr-text">{guidePendingCount}</span> field
+              {guidePendingCount === 1 ? '' : 's'} left.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
+          <SignerDetailsBlock signerInfo={signerInfo} onSignerInfoChange={onSignerInfoChange} showTitle={showTitle} />
+        </div>
+
+        {templateStored && (
+          <SignerFieldsPanel
+            stored={templateStored}
+            fields={fields}
+            updateField={updateField}
+            signerIndex={signerIndex ?? null}
+            activeFieldId={activeTextFieldId}
+          />
+        )}
+
+        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <p className="text-body text-lr-muted">Submit when every field on the document is complete.</p>
+            {errorMessage && (
+              <p className="rounded-lr border border-lr-error/30 bg-lr-error/10 px-3 py-2 text-caption text-lr-error">
+                {errorMessage}
+              </p>
+            )}
+            <Button type="submit" disabled={loading} className="w-full gap-2">
+              <Lock size={14} />
+              {loading ? 'Signing…' : 'Sign Document'}
+            </Button>
+            {completed && (
+              <p className="text-caption text-lr-muted text-center">
+                All signers completed. Redirecting to download…
+              </p>
+            )}
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
-      {/* Step indicator */}
       <nav className="mb-4" aria-label="Signing steps">
         <ol className="flex list-none items-start justify-center gap-6 text-caption">
           {STEPS.map(({ step, label }) => {
@@ -81,7 +150,12 @@ export function MobileWizardShell({
                 >
                   {isComplete ? <Check size={14} strokeWidth={2.5} /> : step}
                 </span>
-                <span className={cn('text-micro', isActive ? 'text-lr-text' : isComplete ? 'text-lr-accent' : 'text-lr-muted')}>
+                <span
+                  className={cn(
+                    'text-micro',
+                    isActive ? 'text-lr-text' : isComplete ? 'text-lr-accent' : 'text-lr-muted'
+                  )}
+                >
                   {label}
                 </span>
               </li>
@@ -90,7 +164,6 @@ export function MobileWizardShell({
         </ol>
       </nav>
 
-      {/* Step 1: Details + document */}
       {mobileWizardStep === 1 && (
         <div className="space-y-4">
           {pdfColumn}
@@ -108,17 +181,12 @@ export function MobileWizardShell({
             />
           )}
 
-          <Button
-            type="button"
-            className="w-full"
-            onClick={() => setMobileWizardStep(2)}
-          >
+          <Button type="button" className="w-full" onClick={() => setMobileWizardStep(2)}>
             Continue to sign
           </Button>
         </div>
       )}
 
-      {/* Step 2: Signature + submit */}
       {mobileWizardStep === 2 && (
         <div className="space-y-4">
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
@@ -127,9 +195,7 @@ export function MobileWizardShell({
 
           <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
             <form onSubmit={onSubmit} className="space-y-4">
-              <p className="text-body text-lr-muted">
-                Review your signature and submit the signed document.
-              </p>
+              <p className="text-body text-lr-muted">Review your signature and submit the signed document.</p>
               {errorMessage && (
                 <p className="rounded-lr border border-lr-error/30 bg-lr-error/10 px-3 py-2 text-caption text-lr-error">
                   {errorMessage}
@@ -147,12 +213,7 @@ export function MobileWizardShell({
             </form>
           </div>
 
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={() => setMobileWizardStep(1)}
-          >
+          <Button type="button" variant="secondary" className="w-full" onClick={() => setMobileWizardStep(1)}>
             Back to details
           </Button>
         </div>
