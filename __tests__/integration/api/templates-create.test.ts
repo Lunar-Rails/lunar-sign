@@ -74,4 +74,52 @@ describe('POST /api/templates', () => {
     expect(body.error).toMatch(/Signer 2/)
     expect(body.missing_signer_indexes).toEqual([1])
   })
+
+  it('creates document type from document_type_name and attaches to template', async () => {
+    const typeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const templateId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        queue: [
+          { data: null, error: null },
+          { data: { id: typeId }, error: null },
+          {
+            data: {
+              id: templateId,
+              title: 'Lease',
+              document_type_id: typeId,
+            },
+            error: null,
+          },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const form = new FormData()
+    form.set('title', 'Lease')
+    form.set('file', new File([Buffer.from('%PDF')], 'a.pdf', { type: 'application/pdf' }))
+    form.set('document_type_name', 'Lease Agreement')
+    form.set(
+      'field_metadata',
+      JSON.stringify([
+        {
+          id: 'signer-1',
+          type: 'signature',
+          pageIndex: 0,
+          xPercent: 10,
+          yPercent: 10,
+          widthPercent: 20,
+          heightPercent: 5,
+          label: 'Sig',
+          forSigner: true,
+          signerIndex: 0,
+        },
+      ])
+    )
+    const res = await POST(formDataRequest('http://localhost/api/templates', form))
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.data.template.document_type_id).toBe(typeId)
+  })
 })

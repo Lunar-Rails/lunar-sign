@@ -9,12 +9,15 @@ export interface Company {
 }
 
 export interface TemplateEditorSidebarData {
+  editorMode: 'create' | 'edit'
   title: string
   setTitle: (v: string) => void
   description: string
   setDescription: (v: string) => void
   documentTypeId: string | null
   setDocumentTypeId: (v: string | null) => void
+  newDocumentTypeName: string
+  setNewDocumentTypeName: (v: string) => void
   documentTypes: DocumentType[]
   companies: Company[]
   selectedCompanyIds: string[]

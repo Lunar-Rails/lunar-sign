@@ -6,6 +6,34 @@ import { Mail, KeyRound } from 'lucide-react'
 import { SignerShell } from '@/components/signer/SignerShell'
 import { SignerStepper } from '@/components/signer/SignerStepper'
 
+/** One in-flight POST per token so React Strict Mode (double mount) does not send two emails. */
+const otpSendByToken = new Map<string, Promise<{ ok: boolean; error?: string }>>()
+
+function requestOtpSend(tok: string): Promise<{ ok: boolean; error?: string }> {
+  const existing = otpSendByToken.get(tok)
+  if (existing) return existing
+
+  const promise = (async (): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/sign/${tok}/otp/send`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok)
+        return {
+          ok: false,
+          error: (body as { error?: string }).error ?? 'Failed to send code.',
+        }
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'Network error. Please try again.' }
+    }
+  })().finally(() => {
+    otpSendByToken.delete(tok)
+  })
+
+  otpSendByToken.set(tok, promise)
+  return promise
+}
+
 interface OtpClientProps {
   token: string
   signerEmail: string
@@ -22,7 +50,22 @@ export function OtpClient({ token, signerEmail }: OtpClientProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
-    sendCode(token)
+    let cancelled = false
+    void (async () => {
+      setSending(true)
+      setError(null)
+      const result = await requestOtpSend(token)
+      if (cancelled) return
+      if (!result.ok) setError(result.error ?? 'Failed to send code.')
+      else {
+        setSent(true)
+        setCooldown(30)
+      }
+      setSending(false)
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   useEffect(() => {
@@ -34,20 +77,13 @@ export function OtpClient({ token, signerEmail }: OtpClientProps) {
   async function sendCode(tok: string) {
     setSending(true)
     setError(null)
-    try {
-      const res = await fetch(`/api/sign/${tok}/otp/send`, { method: 'POST' })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError((body as { error?: string }).error ?? 'Failed to send code.')
-      } else {
-        setSent(true)
-        setCooldown(30)
-      }
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setSending(false)
+    const result = await requestOtpSend(tok)
+    if (!result.ok) setError(result.error ?? 'Failed to send code.')
+    else {
+      setSent(true)
+      setCooldown(30)
     }
+    setSending(false)
   }
 
   function handleDigitChange(index: number, value: string) {

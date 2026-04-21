@@ -9,7 +9,7 @@ export const DocumentCompanyIdsSchema = z.object({
   companyIds: z.array(z.string().uuid('Invalid company ID')).default([]),
 })
 
-const DocumentTypeNameSchema = z
+export const DocumentTypeNameSchema = z
   .string()
   .trim()
   .min(1, 'Document type name is required')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Invitation, UserRole } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,10 @@ export function InvitationsTable({ initialInvitations }: InvitationsTableProps) 
   const [invitations, setInvitations] = useState<InvitationWithCompanies[]>(initialInvitations)
   const [error, setError] = useState<string | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setInvitations(initialInvitations)
+  }, [initialInvitations])
 
   const sortedInvitations = useMemo(
     () => [...invitations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),

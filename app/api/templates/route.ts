@@ -4,8 +4,10 @@ import { randomUUID } from 'crypto'
 import { logAudit } from '@/lib/audit'
 import { isMemberOfCompany } from '@/lib/authorization'
 import { createClient } from '@/lib/supabase/server'
+import { resolveOrCreateDocumentTypeIdByName } from '@/lib/resolve-document-type-by-name'
 import {
   DocumentCompanyIdsSchema,
+  DocumentTypeNameSchema,
   DocumentUploadSchema,
   FieldMetadataSchema,
 } from '@/lib/schemas'
@@ -139,6 +141,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
     const fieldMetadataRaw = formData.get('field_metadata') as string | null
     const documentTypeIdRaw = formData.get('document_type_id') as string | null
+    const documentTypeNameRaw = formData.get('document_type_name') as string | null
 
     const companyIdsInput = formData
       .getAll('companyIds')
@@ -233,6 +236,26 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       documentTypeId = dt.id
+    } else if (documentTypeNameRaw && documentTypeNameRaw.trim()) {
+      const nameValidation = DocumentTypeNameSchema.safeParse(
+        documentTypeNameRaw.trim()
+      )
+      if (!nameValidation.success) {
+        const msg =
+          nameValidation.error.issues[0]?.message || 'Invalid document type name'
+        return NextResponse.json({ error: msg }, { status: 400 })
+      }
+      const resolved = await resolveOrCreateDocumentTypeIdByName(
+        supabase,
+        user.id,
+        nameValidation.data
+      )
+      if (!resolved.ok)
+        return NextResponse.json(
+          { error: resolved.error },
+          { status: resolved.status }
+        )
+      documentTypeId = resolved.id
     }
 
     const templateId = randomUUID()

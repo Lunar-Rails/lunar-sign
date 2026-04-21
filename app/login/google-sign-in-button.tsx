@@ -3,6 +3,13 @@
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 
+function getRedirectUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (appUrl) return `${appUrl.replace(/\/+$/, '')}/auth/callback`
+  if (typeof window !== 'undefined') return `${window.location.origin}/auth/callback`
+  return '/auth/callback'
+}
+
 export default function GoogleSignInButton() {
   const handleSignIn = async () => {
     const supabase = createClient()
@@ -10,7 +17,7 @@ export default function GoogleSignInButton() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+        redirectTo: getRedirectUrl(),
       },
     })
   }

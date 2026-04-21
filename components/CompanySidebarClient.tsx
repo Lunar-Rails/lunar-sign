@@ -250,15 +250,30 @@ export default function CompanySidebarClient({
                   />
                 </DetailRow>
                 <DetailRow label="Type">
-                  <LrSelect
-                    options={[
-                      { value: '__none__', label: 'None' },
-                      ...editorData.documentTypes.map((dt) => ({ value: dt.id, label: dt.name })),
-                    ]}
-                    value={editorData.documentTypeId ?? '__none__'}
-                    onChange={(v) => editorData.setDocumentTypeId(v === '__none__' ? null : v as string)}
-                    className="h-8 text-caption"
-                  />
+                  {editorData.documentTypes.length === 0 &&
+                  editorData.editorMode === 'create' ? (
+                    <Input
+                      value={editorData.newDocumentTypeName}
+                      onChange={(e) => editorData.setNewDocumentTypeName(e.target.value)}
+                      placeholder="e.g. Contract"
+                      className="h-8 text-caption bg-lr-bg border-lr-border"
+                    />
+                  ) : (
+                    <LrSelect
+                      options={[
+                        { value: '__none__', label: 'None' },
+                        ...editorData.documentTypes.map((dt) => ({
+                          value: dt.id,
+                          label: dt.name,
+                        })),
+                      ]}
+                      value={editorData.documentTypeId ?? '__none__'}
+                      onChange={(v) =>
+                        editorData.setDocumentTypeId(v === '__none__' ? null : (v as string))
+                      }
+                      className="h-8 text-caption"
+                    />
+                  )}
                 </DetailRow>
                 {editorData.companies.length > 0 && (
                   <DetailRow label="Companies">

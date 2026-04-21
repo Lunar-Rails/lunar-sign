@@ -108,4 +108,23 @@ describe('POST /api/sign/[token]/consent', () => {
     // logAudit should NOT be called again
     expect(logAudit).not.toHaveBeenCalled()
   })
+
+  it('returns 500 when consent persistence fails', async () => {
+    getServiceClient.mockReturnValue(
+      createQueuedSupabaseMock({
+        user: null,
+        queue: [
+          {
+            data: { id: reqId, document_id: docId, signer_email: 's@x.com', status: 'pending', consent_given_at: null },
+            error: null,
+          },
+          { data: null, error: { message: 'db unavailable' } },
+        ],
+      })
+    )
+    const POST = await loadPost()
+    const res = await POST(makeRequest(), { params: Promise.resolve({ token }) })
+    expect(res.status).toBe(500)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
 })

@@ -25,11 +25,16 @@ export async function POST(
     const { token } = await params
     const supabase = getServiceClient()
 
-    const { data: requestRaw } = await supabase
+    const { data: requestRaw, error: requestError } = await supabase
       .from('signature_requests')
       .select('id, document_id, signer_email, status, consent_given_at, expires_at')
       .eq('token', token)
       .single()
+
+    if (requestError) {
+      console.error('Consent lookup error:', requestError)
+      return NextResponse.json({ error: 'Failed to validate signing link' }, { status: 500 })
+    }
 
     if (!requestRaw)
       return NextResponse.json({ error: 'Invalid signing link' }, { status: 404 })
@@ -55,10 +60,15 @@ export async function POST(
 
     const now = new Date().toISOString()
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('signature_requests')
       .update({ consent_given_at: now, consent_text_hash: consentTextHash })
       .eq('id', requestRaw.id)
+
+    if (updateError) {
+      console.error('Consent update error:', updateError)
+      return NextResponse.json({ error: 'Failed to record consent' }, { status: 500 })
+    }
 
     await logAudit(null, 'consent_given', 'document', requestRaw.document_id, {
       token_suffix: token.slice(-8),

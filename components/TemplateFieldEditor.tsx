@@ -12,7 +12,11 @@ import {
   normalizeStoredFields,
   validateSignerFieldAssignments,
 } from '@/lib/field-metadata'
-import { DocumentUploadSchema, DocumentCompanyIdsSchema } from '@/lib/schemas'
+import {
+  DocumentCompanyIdsSchema,
+  DocumentTypeNameSchema,
+  DocumentUploadSchema,
+} from '@/lib/schemas'
 import type { Company, DocumentType, StoredField } from '@/lib/types'
 import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 
@@ -134,6 +138,7 @@ export function TemplateFieldEditor({
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription ?? '')
   const [documentTypeId, setDocumentTypeId] = useState<string | null>(initialDocumentTypeId)
+  const [newDocumentTypeName, setNewDocumentTypeName] = useState('')
   const [signerCount, setSignerCount] = useState<1 | 2>(
     initialSignerCount >= 2 ? 2 : 1
   )
@@ -268,18 +273,32 @@ export function TemplateFieldEditor({
 
   useEffect(() => {
     setSidebarData({
+      editorMode: mode,
       title,
       setTitle,
       description,
       setDescription,
       documentTypeId,
       setDocumentTypeId,
+      newDocumentTypeName,
+      setNewDocumentTypeName,
       documentTypes,
       companies,
       selectedCompanyIds,
       onCompanyToggle: handleCompanyToggle,
     })
-  }, [title, description, documentTypeId, selectedCompanyIds, documentTypes, companies, handleCompanyToggle, setSidebarData])
+  }, [
+    mode,
+    title,
+    description,
+    documentTypeId,
+    newDocumentTypeName,
+    selectedCompanyIds,
+    documentTypes,
+    companies,
+    handleCompanyToggle,
+    setSidebarData,
+  ])
 
   useEffect(() => {
     return () => setSidebarData(null)
@@ -348,6 +367,19 @@ export function TemplateFieldEditor({
       return
     }
 
+    if (mode === 'create' && documentTypes.length === 0) {
+      const trimmed = newDocumentTypeName.trim()
+      if (trimmed) {
+        const nameCheck = DocumentTypeNameSchema.safeParse(trimmed)
+        if (!nameCheck.success) {
+          setError(
+            nameCheck.error.issues[0]?.message ?? 'Invalid document type name'
+          )
+          return
+        }
+      }
+    }
+
     const fieldMetadata = storedFieldsFromPlacements({ fields, signerIndexById })
     if (fieldMetadata.length === 0) {
       setError('Place at least one field on the document')
@@ -376,7 +408,12 @@ export function TemplateFieldEditor({
         formData.append('file', file)
         formData.append('field_metadata', JSON.stringify(fieldMetadata))
         formData.append('signer_count', String(signerCount))
-        if (documentTypeId) formData.append('document_type_id', documentTypeId)
+        if (documentTypes.length === 0) {
+          const trimmed = newDocumentTypeName.trim()
+          if (trimmed) formData.append('document_type_name', trimmed)
+        } else if (documentTypeId) {
+          formData.append('document_type_id', documentTypeId)
+        }
         companyValidation.data.companyIds.forEach((id) => formData.append('companyIds', id))
 
         const res = await fetch('/api/templates', { method: 'POST', body: formData })
