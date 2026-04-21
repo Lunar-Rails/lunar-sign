@@ -45,7 +45,7 @@ export function FieldNavigationCta({
             onClick={onStart}
           >
             <PenLine className="size-4 shrink-0" aria-hidden />
-            <span className="text-micro font-semibold normal-case text-white">Start</span>
+            <span className="font-display text-caption font-semibold text-white">Start</span>
           </Button>
         ) : (
           <Button
