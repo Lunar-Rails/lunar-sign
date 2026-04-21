@@ -6,6 +6,7 @@ const PUBLIC_ROUTES = [
   '/auth',
   '/sign',
   '/verify',
+  '/api/sign/',
   '/api/signatures',
   '/api/download',
   '/api/internal/ots',

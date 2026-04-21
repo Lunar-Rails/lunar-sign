@@ -81,13 +81,13 @@ export default async function SigningPage({ params }: SigningPageProps) {
         } else if (!(signatureRequest as unknown as { consent_given_at?: string | null }).consent_given_at) {
           outcome = { kind: 'needs_consent' }
         } else {
-          // Check OTP verification — only gate when a code has been sent but not yet verified.
           const { data: otpRow } = await supabase
             .from('signing_otps')
             .select('verified_at')
             .eq('request_id', signatureRequest.id)
             .maybeSingle()
 
+          // Check OTP verification — only gate when a code has been sent but not yet verified.
           // If no OTP record exists yet, we send one from the OTP page.
           // If a record exists but is unverified, the signer must complete OTP.
           if (otpRow !== undefined && !otpRow?.verified_at) {
