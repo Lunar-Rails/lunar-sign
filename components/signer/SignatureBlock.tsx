@@ -12,7 +12,7 @@ export function SignatureBlock({ displayName, onSignatureDataUrl }: SignatureBlo
     <div>
       <p className="text-section-label mb-2">Your signature</p>
       <p className="text-caption text-lr-muted mb-3">This will appear on the signed document.</p>
-      <SignatureCaptureForm displayName={displayName} onSignatureDataUrl={onSignatureDataUrl} showFontPicker />
+      <SignatureCaptureForm displayName={displayName} onSignatureDataUrl={onSignatureDataUrl} />
     </div>
   )
 }

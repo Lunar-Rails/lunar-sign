@@ -36,7 +36,7 @@ export function SignatureModal({ open, onOpenChange, displayName, onAccept }: Si
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md border-lr-border bg-lr-surface">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Signature</DialogTitle>
           <DialogDescription asChild>
@@ -49,7 +49,6 @@ export function SignatureModal({ open, onOpenChange, displayName, onAccept }: Si
         <SignatureCaptureForm
           displayName={displayName}
           onSignatureDataUrl={setDraftUrl}
-          showFontPicker
         />
 
         <p className="text-caption text-lr-muted leading-relaxed">

@@ -3,17 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadSignatureFont, SignaturePad, useSignatureRenderer } from '@drvillo/react-browser-e-signing'
 import type { SignatureStyle } from '@drvillo/react-browser-e-signing'
-import { SIGNATURE_FONTS } from '@drvillo/react-browser-e-signing'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 const DEFAULT_SIGNATURE_FONT = 'Homemade Apple'
 
@@ -21,15 +12,12 @@ export interface SignatureCaptureFormProps {
   displayName: string
   /** Called whenever the effective signature image changes (typed or drawn). */
   onSignatureDataUrl: (dataUrl: string | null) => void
-  /** When false, typed tab is disabled until a name is present. */
-  showFontPicker?: boolean
   className?: string
 }
 
 export function SignatureCaptureForm({
   displayName,
   onSignatureDataUrl,
-  showFontPicker = true,
   className,
 }: SignatureCaptureFormProps) {
   const [mode, setMode] = useState<'typed' | 'drawn'>('typed')
@@ -79,23 +67,6 @@ export function SignatureCaptureForm({
         </TabsList>
 
         <TabsContent value="typed" className="space-y-3">
-          {showFontPicker && (
-            <div>
-              <Label className="text-caption text-lr-muted">Font</Label>
-              <Select value={typedFont} onValueChange={setTypedFont}>
-                <SelectTrigger className="mt-1 w-full">
-                  <SelectValue placeholder="Choose font" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIGNATURE_FONTS.map((font) => (
-                    <SelectItem key={font} value={font}>
-                      {font}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <div className="flex min-h-24 items-center justify-center rounded-lr border border-lr-border bg-lr-bg/60 p-4">
             {isRendering ? (
               <span className="text-caption text-lr-muted">Rendering…</span>
