@@ -15,21 +15,18 @@ interface InvitationCompanyRow {
 export async function GET(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') ?? ''
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
 
   if (!supabaseUrl || !supabaseKey)
-    return NextResponse.redirect(
-      new URL('/login?error=missing-supabase-config', request.url)
-    )
+    return NextResponse.redirect(new URL(`${appUrl}/login?error=missing-supabase-config`))
 
   if (!code)
-    return NextResponse.redirect(
-      new URL('/login?error=auth-code-error', request.url)
-    )
+    return NextResponse.redirect(new URL(`${appUrl}/login?error=auth-code-error`))
 
   const redirectResponse = NextResponse.redirect(
-    new URL('/documents', request.url)
+    new URL(`${appUrl}/documents`)
   )
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -50,9 +47,7 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error)
-    return NextResponse.redirect(
-      new URL('/login?error=auth-code-error', request.url)
-    )
+    return NextResponse.redirect(new URL(`${appUrl}/login?error=auth-code-error`))
 
   const {
     data: { user },
