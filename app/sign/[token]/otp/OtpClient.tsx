@@ -6,12 +6,16 @@ import { Mail, KeyRound } from 'lucide-react'
 import { SignerShell } from '@/components/signer/SignerShell'
 import { SignerStepper } from '@/components/signer/SignerStepper'
 
-/** One in-flight POST per token so React Strict Mode (double mount) does not send two emails. */
+/**
+ * Dedupe + cache layer: in-flight requests are shared (Strict Mode double-mount),
+ * and successful results are kept so later remounts don't re-fire the POST.
+ * Only explicit resends (force=true) bypass a cached success.
+ */
 const otpSendByToken = new Map<string, Promise<{ ok: boolean; error?: string }>>()
 
-function requestOtpSend(tok: string): Promise<{ ok: boolean; error?: string }> {
+function requestOtpSend(tok: string, force = false): Promise<{ ok: boolean; error?: string }> {
   const existing = otpSendByToken.get(tok)
-  if (existing) return existing
+  if (existing && !force) return existing
 
   const promise = (async (): Promise<{ ok: boolean; error?: string }> => {
     try {
@@ -26,8 +30,9 @@ function requestOtpSend(tok: string): Promise<{ ok: boolean; error?: string }> {
     } catch {
       return { ok: false, error: 'Network error. Please try again.' }
     }
-  })().finally(() => {
-    otpSendByToken.delete(tok)
+  })().then((result) => {
+    if (!result.ok) otpSendByToken.delete(tok)
+    return result
   })
 
   otpSendByToken.set(tok, promise)
@@ -77,7 +82,7 @@ export function OtpClient({ token, signerEmail }: OtpClientProps) {
   async function sendCode(tok: string) {
     setSending(true)
     setError(null)
-    const result = await requestOtpSend(tok)
+    const result = await requestOtpSend(tok, true)
     if (!result.ok) setError(result.error ?? 'Failed to send code.')
     else {
       setSent(true)

@@ -6,23 +6,22 @@ import { generateOtpCode, hashOtpCode, OTP_TTL_MINUTES } from '@/lib/esigning/ot
 import { sendEmail } from '@/lib/email/client'
 import { signingOtpEmail } from '@/lib/email/templates'
 
-// Production: 1 send per minute per IP. Development: disabled for local testing.
-const sendRateLimiter = rateLimit({ windowMs: 60_000, max: 1 })
+const sendRateLimiter = rateLimit({ windowMs: 60_000, max: 5 })
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const { token } = await params
+
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip')?.trim() ||
-      'unknown'
+      null
 
-    if (process.env.NODE_ENV === 'production' && !sendRateLimiter.check(ip).success)
+    if (process.env.NODE_ENV === 'production' && ip && !sendRateLimiter.check(`${ip}:${token}`).success)
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-
-    const { token } = await params
     const supabase = getServiceClient()
 
     const { data: reqRaw } = await supabase
