@@ -20,15 +20,15 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const { token } = await params
+
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip')?.trim() ||
-      'unknown'
+      null
 
-    if (!verifyRateLimiter.check(ip).success)
+    if (ip && !verifyRateLimiter.check(`${ip}:${token}`).success)
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-
-    const { token } = await params
     const body = await request.json().catch(() => ({}))
     const { code } = body as { code?: string }
 
