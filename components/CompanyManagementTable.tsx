@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Company } from '@/lib/types'
+import { FormPending } from '@/components/ui/form-pending'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -116,6 +117,7 @@ export default function CompanyManagementTable({ initialCompanies }: CompanyMana
   }
 
   return (
+    <FormPending isPending={isSaving} className="block">
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -194,5 +196,6 @@ export default function CompanyManagementTable({ initialCompanies }: CompanyMana
         </Table>
       </div>
     </div>
+    </FormPending>
   )
 }

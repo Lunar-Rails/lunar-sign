@@ -22,6 +22,7 @@ import { useTemplateEditorSidebar } from '@/lib/template-editor-sidebar-context'
 
 import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
+import { FormPending } from '@/components/ui/form-pending'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { AlertCircle, AlertTriangle, UploadCloud } from 'lucide-react'
@@ -453,6 +454,7 @@ export function TemplateFieldEditor({
   const showPdfViewer = mode === 'edit' ? pdfBytes && pdfBytes.length > 0 : Boolean(file)
 
   return (
+    <FormPending isPending={isSaving} className="block">
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
         <div className="space-y-4 xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0 xl:max-h-[calc(100dvh-88px)] xl:overflow-y-auto">
@@ -556,6 +558,7 @@ export function TemplateFieldEditor({
               setScale={setScale}
               handleDocumentLoadSuccess={handleDocumentLoadSuccess}
               setPageDimension={setPageDimension}
+              firstPageWidthPt={pageDimensions[0]?.widthPt}
               currentPageIndex={currentPageIndex}
               onPageChange={(i) => scrollToPage(i)}
               fields={fields}
@@ -580,5 +583,6 @@ export function TemplateFieldEditor({
         )}
       </div>
     </form>
+    </FormPending>
   )
 }

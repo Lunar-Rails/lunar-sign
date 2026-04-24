@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { FormPending } from '@/components/ui/form-pending'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -93,6 +94,7 @@ export function CompanyMemberManagement({ companyId, initialMembers }: CompanyMe
   }
 
   return (
+    <FormPending isPending={isLoading} className="block">
     <div className="space-y-6">
       <form
         onSubmit={handleAddMember}
@@ -165,5 +167,6 @@ export function CompanyMemberManagement({ companyId, initialMembers }: CompanyMe
         </Table>
       </div>
     </div>
+    </FormPending>
   )
 }

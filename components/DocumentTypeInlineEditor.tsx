@@ -3,6 +3,7 @@
 import { KeyboardEvent, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentTypeNamesSchema } from '@/lib/schemas'
+import { FormPending } from '@/components/ui/form-pending'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
@@ -129,6 +130,7 @@ export default function DocumentTypeInlineEditor({
 
   if (isEditing) {
     return (
+      <FormPending isPending={isSaving} className="block">
       <div className="space-y-1.5">
         <Input
           type="text"
@@ -169,6 +171,7 @@ export default function DocumentTypeInlineEditor({
         )}
         {error && <p className="text-lr-xs text-lr-error">{error}</p>}
       </div>
+      </FormPending>
     )
   }
 

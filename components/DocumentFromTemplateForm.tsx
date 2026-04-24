@@ -102,6 +102,7 @@ export function DocumentFromTemplateForm({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading,
@@ -451,6 +452,7 @@ export function DocumentFromTemplateForm({
             setScale={setScale}
             handleDocumentLoadSuccess={handleDocumentLoadSuccess}
             setPageDimension={setPageDimension}
+            firstPageWidthPt={pageDimensions[0]?.widthPt}
             currentPageIndex={currentPageIndex}
             onPageChange={(i) => scrollToPage(i)}
             fields={fields}

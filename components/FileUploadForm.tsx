@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { AlertCircle, UploadCloud, X } from 'lucide-react'
+import { FormPending } from '@/components/ui/form-pending'
 import { cn } from '@/lib/utils'
 
 interface FileUploadFormProps {
@@ -139,6 +140,7 @@ export default function FileUploadForm({ documentTypes }: FileUploadFormProps) {
   }
 
   return (
+    <FormPending isPending={isLoading} className="block">
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Title */}
       <div>
@@ -261,5 +263,6 @@ export default function FileUploadForm({ documentTypes }: FileUploadFormProps) {
         {isLoading ? 'Uploading…' : 'Upload Document'}
       </Button>
     </form>
+    </FormPending>
   )
 }

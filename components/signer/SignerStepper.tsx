@@ -15,14 +15,23 @@ interface SignerStepperProps {
 export function SignerStepper({ currentStep, done = false }: SignerStepperProps) {
   return (
     <nav aria-label="Signing steps" className="mb-6">
-      <ol className="flex items-center justify-center gap-0">
+      <ol className="relative mx-auto grid w-full max-w-[300px] grid-cols-3 items-start">
         {STEPS.map(({ step, label }, i) => {
           const isActive = currentStep === step && !done
           const isComplete = done || currentStep > step
 
           return (
-            <li key={step} className="flex items-center">
-              <div className="flex flex-col items-center gap-1.5">
+            <li key={step} className="relative flex flex-col items-center gap-1.5">
+              {i < STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    'pointer-events-none absolute left-1/2 top-3.5 h-px w-full -translate-y-1/2',
+                    currentStep > step || done ? 'bg-lr-accent/40' : 'bg-lr-border'
+                  )}
+                />
+              )}
+              
+              <div className="relative z-10 flex flex-col items-center gap-1.5">
                 <span
                   aria-current={isActive ? 'step' : undefined}
                   className={cn(
@@ -45,15 +54,6 @@ export function SignerStepper({ currentStep, done = false }: SignerStepperProps)
                   {label}
                 </span>
               </div>
-
-              {i < STEPS.length - 1 && (
-                <div
-                  className={cn(
-                    'mb-5 mx-2 h-px w-10 transition-all duration-lr-fast',
-                    currentStep > step || done ? 'bg-lr-accent/40' : 'bg-lr-border'
-                  )}
-                />
-              )}
             </li>
           )
         })}

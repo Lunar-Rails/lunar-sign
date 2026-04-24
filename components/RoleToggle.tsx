@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
 import { UserRole } from '@/lib/types'
+import { FormPending } from '@/components/ui/form-pending'
 import { LrSelect } from '@/components/ui/lr-select'
 
 interface RoleToggleProps {
@@ -40,18 +40,19 @@ export default function RoleToggle({ userId, currentRole }: RoleToggleProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <LrSelect
-        options={[
-          { value: 'member', label: 'Member' },
-          { value: 'admin', label: 'Admin' },
-        ]}
-        value={role}
-        onChange={(v) => void handleRoleChange(v as string)}
-        disabled={loading}
-        className="w-[110px] h-8 text-lr-xs"
-      />
-      {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-lr-muted" />}
-    </div>
+    <FormPending isPending={loading} className="inline-block min-w-0">
+      <div className="flex items-center gap-2">
+        <LrSelect
+          options={[
+            { value: 'member', label: 'Member' },
+            { value: 'admin', label: 'Admin' },
+          ]}
+          value={role}
+          onChange={(v) => void handleRoleChange(v as string)}
+          disabled={loading}
+          className="w-[110px] h-8 text-lr-xs"
+        />
+      </div>
+    </FormPending>
   )
 }

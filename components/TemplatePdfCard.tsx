@@ -9,7 +9,7 @@ import {
   usePdfDocument,
   usePdfPageVisibility,
 } from '@drvillo/react-browser-e-signing'
-import { Minus, Plus } from 'lucide-react'
+import { Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
 import type {
   FieldPlacement,
   FieldType,
@@ -19,6 +19,7 @@ import type {
 } from '@drvillo/react-browser-e-signing'
 
 import '@/lib/esigning/configure-client'
+import { useFitToWidth } from '@/hooks/useFitToWidth'
 import { hydrateForSigner } from '@/lib/field-metadata'
 import type { StoredField } from '@/lib/types'
 
@@ -58,6 +59,7 @@ export interface TemplatePdfCardProps {
   isLoading: boolean
   pdfErrorMessage: string | null
   loadError?: string | null
+  firstPageWidthPt?: number
   renderToolbarExtra?: () => ReactNode
   renderAboveViewer?: () => ReactNode
   className?: string
@@ -86,10 +88,15 @@ export function TemplatePdfCard({
   isLoading,
   pdfErrorMessage,
   loadError = null,
+  firstPageWidthPt,
   renderToolbarExtra,
   renderAboveViewer,
   className,
 }: TemplatePdfCardProps) {
+  const [expanded, setExpanded] = useState(false)
+
+  useFitToWidth(viewerContainerRef, firstPageWidthPt, setScale)
+
   const rootClass = className
     ? `rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden ${className}`
     : 'rounded-lr-lg border border-lr-border bg-lr-surface shadow-lr-card overflow-hidden'
@@ -148,8 +155,14 @@ export function TemplatePdfCard({
       )}
 
       {/* Scrollable PDF area — no toolbar inside */}
-      <div className="h-[640px] xl:h-[720px]">
-        <div ref={viewerContainerRef} className="h-full overflow-auto px-4 pt-4">
+      <div
+        data-expanded={expanded ? 'true' : 'false'}
+        className={expanded ? undefined : 'h-[640px] xl:h-[720px]'}
+      >
+        <div
+          ref={viewerContainerRef}
+          className={expanded ? 'overflow-visible px-4 pt-4' : 'h-full overflow-auto px-4 pt-4'}
+        >
           <PdfViewer
             pdfData={pdfDataForViewer}
             numPages={numPages}
@@ -184,6 +197,28 @@ export function TemplatePdfCard({
       {pdfErrorMessage && (
         <p className="px-4 pb-3 text-caption text-lr-error">{pdfErrorMessage}</p>
       )}
+
+      {numPages > 0 && (
+        <div className="flex justify-center border-t border-lr-border px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lr border border-lr-border bg-lr-bg px-3 py-1.5 text-caption font-medium text-lr-muted transition-colors hover:border-lr-accent hover:text-lr-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lr-accent"
+          >
+            {expanded ? (
+              <>
+                <Minimize2 className="h-3.5 w-3.5" />
+                Collapse
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-3.5 w-3.5" />
+                Expand full document
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -215,6 +250,7 @@ export function TemplatePdfPreviewByTemplateId({
     numPages,
     scale,
     setScale,
+    pageDimensions,
     setPageDimension,
     handleDocumentLoadSuccess,
     isLoading,
@@ -280,6 +316,7 @@ export function TemplatePdfPreviewByTemplateId({
       setScale={setScale}
       handleDocumentLoadSuccess={handleDocumentLoadSuccess}
       setPageDimension={setPageDimension}
+      firstPageWidthPt={pageDimensions[0]?.widthPt}
       currentPageIndex={currentPageIndex}
       onPageChange={(i) => scrollToPage(i)}
       fields={fieldPlacements}

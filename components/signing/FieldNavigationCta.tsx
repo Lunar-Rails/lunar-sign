@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, PenLine } from 'lucide-react'
+import { PenLine } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -48,16 +48,17 @@ export function FieldNavigationCta({
             <span className="font-display text-caption font-semibold text-white">Start</span>
           </Button>
         ) : (
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant="secondary"
-            className="h-9 gap-1 rounded-lr rounded-r-none border border-lr-border pr-2.5 pl-2"
             onClick={onNext}
+            className="group relative flex h-9 items-center pl-2.5 pr-4 font-display text-caption font-semibold text-white shadow-lr-glow-accent transition-all duration-lr-fast hover:-translate-y-px active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lr-accent focus-visible:ring-offset-2 focus-visible:ring-offset-lr-bg"
+            style={{
+              background: 'var(--lr-accent)',
+              clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 0 0)',
+            }}
           >
-            <span className="text-caption font-display font-semibold text-lr-text">Next</span>
-            <ChevronRight className="size-4 shrink-0 opacity-80" aria-hidden />
-          </Button>
+            Next
+          </button>
         )}
       </div>
     </div>

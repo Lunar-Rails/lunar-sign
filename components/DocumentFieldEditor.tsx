@@ -19,6 +19,7 @@ import type { DocumentStatus, SignatureRequest, StoredField } from '@/lib/types'
 import { TemplateFieldList } from '@/components/TemplateFieldList'
 import { TemplatePdfCard } from '@/components/TemplatePdfCard'
 import SignersSection from '@/components/SignersSection'
+import { FormPending } from '@/components/ui/form-pending'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -280,6 +281,7 @@ export function DocumentFieldEditor({
   const showPdfViewer = Boolean(pdfBytes)
 
   return (
+    <FormPending isPending={isSaving} className="block">
     <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:gap-6">
       {/* Left sticky panel — mirrors TemplateFieldEditor layout */}
       <div className="space-y-4 xl:sticky xl:top-[72px] xl:w-[380px] xl:shrink-0 xl:max-h-[calc(100dvh-88px)] xl:overflow-y-auto">
@@ -367,6 +369,7 @@ export function DocumentFieldEditor({
             setScale={setScale}
             handleDocumentLoadSuccess={handleDocumentLoadSuccess}
             setPageDimension={setPageDimension}
+            firstPageWidthPt={pageDimensions[0]?.widthPt}
             currentPageIndex={currentPageIndex}
             onPageChange={(i) => scrollToPage(i)}
             fields={fields}
@@ -390,5 +393,6 @@ export function DocumentFieldEditor({
         </div>
       )}
     </div>
+    </FormPending>
   )
 }

@@ -15,6 +15,8 @@ export interface SigningControlsSidebarProps {
   signerInfo: SignerInfo
   onSignerInfoChange: (next: SignerInfo) => void
   displayName: string
+  signerEmail?: string
+  initials?: string
   activeSignatureDataUrl: string | null
   onSignatureDataUrl: (dataUrl: string | null) => void
   errorMessage: string | null
@@ -37,6 +39,8 @@ export function SigningControlsSidebar({
   signerInfo,
   onSignerInfoChange,
   displayName,
+  signerEmail,
+  initials,
   activeSignatureDataUrl: _activeSignatureDataUrl,
   onSignatureDataUrl,
   errorMessage,
@@ -59,6 +63,23 @@ export function SigningControlsSidebar({
       className="space-y-4 lg:sticky lg:top-6 lg:z-10 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:overscroll-y-contain lg:self-start"
       aria-label="Signing controls"
     >
+      {(signerEmail || displayName) && (
+        <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
+          <p className="text-kicker text-lr-muted mb-2">Signer</p>
+          <div className="flex items-center gap-2">
+            {initials && (
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-lr-accent/20 font-display text-xs font-semibold text-lr-accent">
+                {initials}
+              </span>
+            )}
+            <div>
+              <p className="text-body text-lr-text leading-tight">{displayName}</p>
+              {signerEmail && <p className="text-caption text-lr-muted">{signerEmail}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {guided ? (
         <div className="rounded-lr-lg border border-lr-border bg-lr-surface p-4 shadow-lr-card">
           <p className="text-section-label mb-2">Progress</p>

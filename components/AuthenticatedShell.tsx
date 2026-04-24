@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { DocumentSidebarProvider } from '@/lib/document-sidebar-context'
 import { TemplateSidebarProvider } from '@/lib/template-sidebar-context'
 import { TemplateEditorSidebarProvider } from '@/lib/template-editor-sidebar-context'
+import { FormPendingBar, FormPendingProvider } from '@/components/ui/form-pending'
 
 export function AuthenticatedShell({
   profile,
@@ -25,40 +26,44 @@ export function AuthenticatedShell({
     <DocumentSidebarProvider>
     <TemplateSidebarProvider>
     <TemplateEditorSidebarProvider>
+    <FormPendingProvider>
     <div className="flex min-h-screen flex-col bg-lr-bg">
-      {/* Header */}
-      <header className="sticky top-0 z-50 h-14 border-b border-lr-border bg-lr-bg/88 backdrop-blur-lr-header saturate-[1.2]">
-        <div className="flex h-full items-center justify-between px-6 lg:px-10 max-w-lr-app mx-auto w-full">
-          <Link href="/documents" className="flex items-center gap-1 shrink-0">
-            <span className="font-display text-lr-lg font-bold text-lr-accent">Lunar</span>
-            <span className="font-display text-lr-lg font-bold text-lr-gold">Sign</span>
-          </Link>
+      {/* Sticky header + global form-pending bar (full width) */}
+      <div className="sticky top-0 z-50 w-full">
+        <header className="h-14 border-b border-lr-border bg-lr-bg/88 backdrop-blur-lr-header saturate-[1.2]">
+          <div className="flex h-full items-center justify-between px-6 lg:px-10 max-w-lr-app mx-auto w-full">
+            <Link href="/documents" className="flex items-center gap-1 shrink-0">
+              <span className="font-display text-lr-lg font-bold text-lr-accent">Lunar</span>
+              <span className="font-display text-lr-lg font-bold text-lr-gold">Sign</span>
+            </Link>
 
-          <nav className="flex items-end h-14">
-            <NavLink
-              href="/documents"
-              active={pathname === '/documents' || pathname.startsWith('/documents/')}
-            >
-              Documents
-            </NavLink>
-            <NavLink
-              href="/templates"
-              active={pathname === '/templates' || pathname.startsWith('/templates/')}
-            >
-              Templates
-            </NavLink>
-            <NavLink href="/upload" active={pathname === '/upload'}>Upload</NavLink>
-            {profile.role === 'admin' && (
-              <NavLink href="/admin" active={pathname.startsWith('/admin')}>Admin</NavLink>
-            )}
-          </nav>
+            <nav className="flex items-end h-14">
+              <NavLink
+                href="/documents"
+                active={pathname === '/documents' || pathname.startsWith('/documents/')}
+              >
+                Documents
+              </NavLink>
+              <NavLink
+                href="/templates"
+                active={pathname === '/templates' || pathname.startsWith('/templates/')}
+              >
+                Templates
+              </NavLink>
+              <NavLink href="/upload" active={pathname === '/upload'}>Upload</NavLink>
+              {profile.role === 'admin' && (
+                <NavLink href="/admin" active={pathname.startsWith('/admin')}>Admin</NavLink>
+              )}
+            </nav>
 
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <UserDropdown profile={profile} />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserDropdown profile={profile} />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+        <FormPendingBar />
+      </div>
 
       {/* Body */}
       <div className="flex-1">
@@ -70,6 +75,7 @@ export function AuthenticatedShell({
         </div>
       </div>
     </div>
+    </FormPendingProvider>
     </TemplateEditorSidebarProvider>
     </TemplateSidebarProvider>
     </DocumentSidebarProvider>

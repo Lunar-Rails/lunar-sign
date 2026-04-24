@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { FormPending } from '@/components/ui/form-pending'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Send } from 'lucide-react'
 
@@ -34,6 +35,7 @@ export default function SendDocumentButton({ documentId }: SendDocumentButtonPro
   }
 
   return (
+    <FormPending isPending={isLoading} className="block">
     <div className="space-y-2">
       {error && (
         <div className="flex items-center gap-2 rounded-lr border-l-4 border-l-lr-error bg-lr-error-dim px-3 py-2">
@@ -46,5 +48,6 @@ export default function SendDocumentButton({ documentId }: SendDocumentButtonPro
         {isLoading ? 'Sending…' : 'Send for Signing'}
       </Button>
     </div>
+    </FormPending>
   )
 }

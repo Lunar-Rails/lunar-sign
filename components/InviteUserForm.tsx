@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Company, UserRole } from '@/lib/types'
+import { FormPending } from '@/components/ui/form-pending'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -64,6 +65,7 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
   }
 
   return (
+    <FormPending isPending={isSaving} className="block">
     <form onSubmit={handleSubmit} className="rounded-lr-lg border border-lr-border bg-lr-surface p-5 shadow-lr-card">
       <h2 className="text-card-title">Invite user</h2>
       <p className="text-body mt-1">
@@ -133,5 +135,6 @@ export function InviteUserForm({ companies }: InviteUserFormProps) {
         </div>
       )}
     </form>
+    </FormPending>
   )
 }

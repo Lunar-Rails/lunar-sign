@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
 import { Company } from '@/lib/types'
+import { FormPending } from '@/components/ui/form-pending'
 import { LrSelect } from '@/components/ui/lr-select'
 
 interface DocumentCompaniesEditorProps {
@@ -52,6 +53,7 @@ export default function DocumentCompaniesEditor({
   }
 
   return (
+    <FormPending isPending={isSaving} className="block">
     <div>
       <LrSelect
         mode="multi"
@@ -69,5 +71,6 @@ export default function DocumentCompaniesEditor({
         </div>
       )}
     </div>
+    </FormPending>
   )
 }

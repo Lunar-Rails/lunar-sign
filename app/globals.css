@@ -280,6 +280,9 @@ button,
 [data-slot='pdf-viewer-pages'] {
   min-width: 0;
   max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 [data-slot='pdf-viewer-page'] {
@@ -415,4 +418,11 @@ button,
     border-radius: 0 !important;
     backdrop-filter: none !important;
   }
+}
+
+/* Sticky toolbar when PDF card is expanded (page scrolls, toolbar stays visible) */
+[data-expanded='true'] [data-slot='pdf-viewer-toolbar'] {
+  position: sticky !important;
+  top: 3.5rem !important; /* below the app header (h-14 = 3.5rem) */
+  z-index: 20 !important;
 }

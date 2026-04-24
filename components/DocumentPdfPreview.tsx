@@ -11,6 +11,8 @@ import '@drvillo/react-browser-e-signing/styles.css'
 import '@/lib/esigning/configure-client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
+import { useFitToWidth } from '@/hooks/useFitToWidth'
 
 import type { StoredField } from '@/lib/types'
 import { hydrateForSigner } from '@/lib/field-metadata'
@@ -37,6 +39,7 @@ export default function DocumentPdfPreview({
   const [pdfInput, setPdfInput] = useState<ArrayBuffer | null>(null)
   const [isFetching, setIsFetching] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
 
   const {
@@ -105,48 +108,12 @@ export default function DocumentPdfPreview({
     }
   }, [documentId])
 
-  useEffect(() => {
-    const viewerContainer = viewerContainerRef.current
-    const firstPageWidth = pageDimensions[0]?.widthPt
-
-    if (!viewerContainer || !firstPageWidth) return
-
-    function setFitToWidthScale() {
-      const horizontalPaddingPx = 24
-      const container = viewerContainerRef.current
-      if (!container) return
-
-      const availableWidth = container.clientWidth - horizontalPaddingPx
-      if (availableWidth <= 0) return
-
-      const computedScale = Number((availableWidth / firstPageWidth).toFixed(2))
-      if (!Number.isFinite(computedScale) || computedScale <= 0) return
-
-      const clampedScale = Math.min(2, Math.max(0.25, computedScale))
-      setScale((previousScale) =>
-        Math.abs(previousScale - clampedScale) < 0.01 ? previousScale : clampedScale
-      )
-    }
-
-    setFitToWidthScale()
-
-    if (typeof ResizeObserver === 'undefined') return
-
-    const resizeObserver = new ResizeObserver(() => {
-      setFitToWidthScale()
-    })
-
-    resizeObserver.observe(viewerContainer)
-
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [pageDimensions, setScale])
+  useFitToWidth(viewerContainerRef, pageDimensions[0]?.widthPt, setScale, { paddingPx: 24 })
 
   const isLoading = isFetching || isPdfLoading
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       {errorMessage && (
         <div className="rounded-lr border border-lr-error/30 bg-lr-error-dim px-4 py-3 text-caption text-lr-error">
           {errorMessage}
@@ -154,53 +121,77 @@ export default function DocumentPdfPreview({
       )}
 
       {!errorMessage && isLoading && (
-        <div className="flex flex-1 items-center justify-center rounded-lr border border-lr-border bg-lr-surface text-caption text-lr-muted animate-pulse">
+        <div className="flex h-[640px] items-center justify-center rounded-lr border border-lr-border bg-lr-surface text-caption text-lr-muted animate-pulse xl:h-[720px]">
           Loading PDF preview…
         </div>
       )}
 
       {!errorMessage && !isLoading && pdfData && (
-        <div
-          ref={viewerContainerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden rounded-lr border border-lr-border bg-lr-bg"
-        >
-          <PdfViewer
-            pdfData={pdfData}
-            numPages={numPages}
-            scale={scale}
-            onScaleChange={setScale}
-            onDocumentLoadSuccess={handleDocumentLoadSuccess}
-            onPageDimensions={({ pageIndex, widthPt, heightPt }) =>
-              setPageDimension(pageIndex, widthPt, heightPt)
+        <>
+          <div
+            ref={viewerContainerRef}
+            className={
+              expanded
+                ? 'overflow-x-hidden overflow-y-visible rounded-lr border border-lr-border bg-lr-bg'
+                : 'h-[640px] overflow-y-auto overflow-x-hidden rounded-lr border border-lr-border bg-lr-bg xl:h-[720px]'
             }
-            pageMode="scroll"
-            currentPageIndex={currentPageIndex}
-            renderToolbarContent={() => (
-              <PdfPageNavigator
-                currentPageIndex={currentPageIndex}
-                numPages={numPages}
-                onPageChange={scrollToPage}
-              />
-            )}
-            renderOverlay={
-              fieldPlacements.length > 0
-                ? (pageIndex) => (
-                    <FieldOverlay
-                      pageIndex={pageIndex}
-                      fields={fieldPlacements}
-                      selectedFieldType={null}
-                      onAddField={noopAdd}
-                      onUpdateField={() => {}}
-                      onRemoveField={noopRemove}
-                      preview={emptyPreview}
-                      readOnly
-                    />
-                  )
-                : undefined
-            }
-            className="h-full"
-          />
-        </div>
+          >
+            <PdfViewer
+              pdfData={pdfData}
+              numPages={numPages}
+              scale={scale}
+              onScaleChange={setScale}
+              onDocumentLoadSuccess={handleDocumentLoadSuccess}
+              onPageDimensions={({ pageIndex, widthPt, heightPt }) =>
+                setPageDimension(pageIndex, widthPt, heightPt)
+              }
+              pageMode="scroll"
+              currentPageIndex={currentPageIndex}
+              renderToolbarContent={() => (
+                <PdfPageNavigator
+                  currentPageIndex={currentPageIndex}
+                  numPages={numPages}
+                  onPageChange={scrollToPage}
+                />
+              )}
+              renderOverlay={
+                fieldPlacements.length > 0
+                  ? (pageIndex) => (
+                      <FieldOverlay
+                        pageIndex={pageIndex}
+                        fields={fieldPlacements}
+                        selectedFieldType={null}
+                        onAddField={noopAdd}
+                        onUpdateField={() => {}}
+                        onRemoveField={noopRemove}
+                        preview={emptyPreview}
+                        readOnly
+                      />
+                    )
+                  : undefined
+              }
+            />
+          </div>
+          <div className="flex justify-center border-t border-lr-border py-3">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lr border border-lr-border bg-lr-bg px-3 py-1.5 text-caption font-medium text-lr-muted transition-colors hover:border-lr-accent hover:text-lr-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lr-accent"
+            >
+              {expanded ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  Collapse
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  Expand full document
+                </>
+              )}
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

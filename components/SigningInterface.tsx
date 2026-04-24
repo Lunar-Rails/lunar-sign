@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Lock, FileX2, Printer } from 'lucide-react'
+import { Download, FileX2, Printer } from 'lucide-react'
 import {
   modifyPdf,
   sha256,
@@ -72,6 +72,7 @@ export default function SigningInterface({
   const viewerContainerRef = useRef<HTMLDivElement | null>(null)
   const pdfColumnRef = useRef<PdfColumnHandle | null>(null)
   const prevGuideStepKeyRef = useRef<string>('')
+  const pendingSignatureFieldRef = useRef<string | null>(null)
 
   const templateStored = useMemo(() => {
     if (!initialFieldsJson?.trim()) return null
@@ -144,12 +145,12 @@ export default function SigningInterface({
 
   const fieldPreview = useMemo(
     () => ({
-      signatureDataUrl: activeSignatureDataUrl,
+      signatureDataUrl: null,
       fullName: displayName,
       title: signerInfo.title,
       dateText: new Date().toLocaleDateString(),
     }),
-    [activeSignatureDataUrl, displayName, signerInfo.title]
+    [displayName, signerInfo.title]
   )
 
   useEffect(() => {
@@ -172,25 +173,42 @@ export default function SigningInterface({
 
   useEffect(() => {
     if (!guidedSigningEnabled || !guide.started || !guide.currentStep) return
-    const key = `${guide.currentStep.kind}-${guide.currentStep.fieldId}`
+    const key = `${guide.stepIndex}-${guide.currentStep.kind}-${guide.currentStep.fieldId}`
     if (prevGuideStepKeyRef.current === key) return
     prevGuideStepKeyRef.current = key
     scrollToPage(guide.currentStep.pageIndex)
-  }, [guidedSigningEnabled, guide.started, guide.currentStep, scrollToPage])
+    const fieldId = guide.currentStep.fieldId
+    const handle = window.setTimeout(() => {
+      pdfColumnRef.current?.scrollFieldIntoView(fieldId)
+    }, 100)
+    return () => window.clearTimeout(handle)
+  }, [guidedSigningEnabled, guide.started, guide.currentStep, guide.stepIndex, scrollToPage])
 
   const handleGuideNext = useCallback(() => {
-    const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
-    if (pending.length === 0) return
-    const targetId = pending.length > 1 ? pending[1].fieldId : pending[0].fieldId
-    pdfColumnRef.current?.scrollFieldIntoView(targetId)
-  }, [fields, activeSignatureDataUrl])
+    if (guide.pendingSteps.length > 0) {
+      const nextPending = guide.pendingSteps[0]
+      const idx = guide.allSteps.findIndex((s) => s.fieldId === nextPending.fieldId)
+      if (idx >= 0) {
+        guide.goTo(idx)
+        return
+      }
+    }
+    if (guide.allSteps.length > 0) guide.next()
+  }, [guide])
 
-  const handleSignatureFieldClick = useCallback(() => {
-    if (!guidedSigningEnabled || !guide.started) return
-    const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
-    if (pending[0]?.kind !== 'signature') return
-    setSignatureModalOpen(true)
-  }, [guidedSigningEnabled, guide.started, fields, activeSignatureDataUrl])
+  const handleSignatureFieldClick = useCallback(
+    (fieldId: string) => {
+      if (!guidedSigningEnabled || !guide.started) return
+      pendingSignatureFieldRef.current = fieldId
+      if (activeSignatureDataUrl) {
+        guide.acknowledgeSignatureField(fieldId)
+        updateField(fieldId, { value: activeSignatureDataUrl })
+      } else {
+        setSignatureModalOpen(true)
+      }
+    },
+    [guidedSigningEnabled, guide, activeSignatureDataUrl, updateField]
+  )
 
   const isNarrow = useNarrowSigningLayout()
   const [mobileWizardStep, setMobileWizardStep] = useState<MobileWizardStep>(1)
@@ -303,7 +321,11 @@ export default function SigningInterface({
     setErrorMessage(null)
 
     if (guidedSigningEnabled) {
-      const pending = getPendingGuideSteps(fields, Boolean(activeSignatureDataUrl))
+      const pending = getPendingGuideSteps(
+        fields,
+        Boolean(activeSignatureDataUrl),
+        guide.acknowledgedSignatureIds
+      )
       if (pending.length > 0 && !guide.started) {
         setErrorMessage('Press Start on the document to begin.')
         return
@@ -412,6 +434,7 @@ export default function SigningInterface({
       textLinesByPage={textLinesByPage}
       isLoading={isLoading}
       pdfErrorMessage={pdfErrorMessage}
+      firstPageWidthPt={pageDimensions[0]?.widthPt}
       onPageChange={(pageIndex) => {
         if (isScrollMode) scrollToPage(pageIndex)
         else setSinglePageIndex(pageIndex)
@@ -479,54 +502,27 @@ export default function SigningInterface({
           open={signatureModalOpen}
           onOpenChange={setSignatureModalOpen}
           displayName={displayName}
-          onAccept={(url) => setActiveSignatureDataUrl(url)}
+          onAccept={(url) => {
+            setActiveSignatureDataUrl(url)
+            if (pendingSignatureFieldRef.current) {
+              guide.acknowledgeSignatureField(pendingSignatureFieldRef.current)
+              updateField(pendingSignatureFieldRef.current, { value: url })
+              pendingSignatureFieldRef.current = null
+            }
+          }}
         />
       )}
 
       <div className="flex min-h-screen flex-col bg-lr-bg">
-        <SignerAppHeader subtitle="Secure signing session" actions={headerToolbarActions} />
+        <SignerAppHeader
+          documentTitle={documentTitle}
+          actions={headerToolbarActions}
+          onDecline={() => setShowDeclineDialog(true)}
+        />
 
         <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-7xl">
             <SignerStepper currentStep={3} />
-
-            {/* Document header card */}
-            <div className="mb-4 rounded-lr-lg border border-lr-border bg-lr-surface px-5 py-4 shadow-lr-card">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-kicker text-lr-accent mb-1">Signing Session</p>
-                  <h1 className="text-page-title text-lr-text truncate">{documentTitle}</h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-6">
-                    <div>
-                      <p className="text-kicker text-lr-muted mb-1">Signer</p>
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-lr-accent/20 font-display text-xs font-semibold text-lr-accent">
-                          {initials}
-                        </span>
-                        <div>
-                          <p className="text-body text-lr-text leading-tight">{displayName}</p>
-                          <p className="text-caption text-lr-muted">{signerEmail}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 self-start">
-                  <div className="flex items-center gap-1.5 rounded-full border border-lr-border bg-lr-surface-2 px-2.5 py-1">
-                    <Lock size={10} className="text-lr-muted" />
-                    <span className="text-micro text-lr-muted">Secure session</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowDeclineDialog(true)}
-                    aria-label="Decline to sign this document"
-                    className="text-caption text-lr-muted underline-offset-2 hover:text-lr-error hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lr-accent rounded transition-colors duration-lr-fast"
-                  >
-                    Decline to sign
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {isNarrow ? (
               <MobileWizardShell
@@ -564,6 +560,8 @@ export default function SigningInterface({
                   signerInfo={signerInfo}
                   onSignerInfoChange={setSignerInfo}
                   displayName={displayName}
+                  signerEmail={signerEmail}
+                  initials={initials}
                   activeSignatureDataUrl={activeSignatureDataUrl}
                   onSignatureDataUrl={setActiveSignatureDataUrl}
                   errorMessage={errorMessage}

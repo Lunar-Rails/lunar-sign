@@ -276,7 +276,7 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
               <div className="border-b border-lr-border px-4 py-3">
                 <h2 className="text-card-title">Document Preview</h2>
               </div>
-              <div className="h-[640px] xl:h-[720px] p-4">
+              <div className="p-4">
                 <DocumentPdfPreview documentId={doc.id} fieldMetadata={doc.field_metadata} />
               </div>
             </div>
