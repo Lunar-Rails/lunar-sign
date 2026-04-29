@@ -42,10 +42,32 @@ export async function appendCertificateOfCompletion(
 
   let y = height - margin
 
+  function getWrappedLineCount(text: string, size: number, font = regular, maxWidth = contentWidth) {
+    const words = text.split(/\s+/).filter(Boolean)
+    if (words.length === 0) return 1
+
+    let count = 1
+    let currentLine = ''
+
+    for (const word of words) {
+      const nextLine = currentLine ? `${currentLine} ${word}` : word
+      if (font.widthOfTextAtSize(nextLine, size) <= maxWidth) {
+        currentLine = nextLine
+        continue
+      }
+
+      count += 1
+      currentLine = word
+    }
+
+    return count
+  }
+
   function line(text: string, size: number, font = regular, color = rgb(0, 0, 0), indent = 0) {
     if (y < margin + 60) return // guard against overflow
-    page.drawText(text, { x: margin + indent, y, size, font, color, maxWidth: contentWidth - indent })
-    y -= size + 5
+    const maxWidth = contentWidth - indent
+    page.drawText(text, { x: margin + indent, y, size, font, color, maxWidth })
+    y -= getWrappedLineCount(text, size, font, maxWidth) * (size + 5)
   }
 
   function hRule() {
@@ -144,7 +166,7 @@ export async function appendCertificateOfCompletion(
     const drawLine = (text: string, size: number, font = regular, color = rgb(0, 0, 0)) => {
       if (y < margin + 60) return
       page.drawText(text, { x: margin + 10, y, size, font, color, maxWidth: textMaxWidth })
-      y -= size + 5
+      y -= getWrappedLineCount(text, size, font, textMaxWidth) * (size + 5)
     }
 
     drawLine(s.signerName, 9, bold, rgb(0.15, 0.15, 0.15))

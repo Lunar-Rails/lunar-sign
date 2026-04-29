@@ -37,7 +37,7 @@ export function SigningCompletePanel({
   return (
     <div
       className={cn(
-        'w-full max-w-lg rounded-lr-lg border border-lr-border bg-lr-surface p-8 shadow-lr-card',
+        'mx-auto w-full max-w-lg rounded-lr-lg border border-lr-border bg-lr-surface p-8 shadow-lr-card',
         className
       )}
     >
