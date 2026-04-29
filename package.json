@@ -12,9 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
-    "db:migrate": "node --env-file=.env.local --import tsx scripts/migrate.ts",
-    "db:migrate:status": "node --env-file=.env.local --import tsx scripts/migrate.ts status",
-    "ots:check": "node --env-file=.env.local --import tsx scripts/check-ots-status.ts"
+    "db:migrate": "node --import tsx scripts/migrate.ts",
+    "db:migrate:status": "node --import tsx scripts/migrate.ts status",
+    "ots:check": "node --import tsx scripts/check-ots-status.ts"
   },
   "dependencies": {
     "@drvillo/react-browser-e-signing": "^0.6.2",

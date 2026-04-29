@@ -5,6 +5,11 @@
  *
  * Run: pnpm tsx scripts/check-ots-status.ts
  */
+import { config } from 'dotenv'
+import { existsSync } from 'fs'
+
+if (existsSync('.env.local')) config({ path: '.env.local' })
+
 import { createClient } from '@supabase/supabase-js'
 import { createRequire } from 'node:module'
 

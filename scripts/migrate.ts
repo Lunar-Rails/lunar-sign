@@ -5,11 +5,16 @@
  *   pnpm db:migrate          — apply all pending migrations
  *   pnpm db:migrate:status   — show which migrations are applied / pending
  *
- * Requires SUPABASE_DB_URL in .env.local:
+ * Requires SUPABASE_DB_URL (loaded from .env.local when present, otherwise
+ * expected in the process environment):
  *   postgresql://postgres.[project-ref]:[password]@[host]:6543/postgres
  */
 
+import { config } from 'dotenv'
+import { existsSync } from 'fs'
 import { readdir, readFile } from 'fs/promises'
+
+if (existsSync('.env.local')) config({ path: '.env.local' })
 import { join } from 'path'
 import postgres, { type Sql } from 'postgres'
 
