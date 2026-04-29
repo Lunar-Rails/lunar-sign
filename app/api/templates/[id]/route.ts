@@ -228,11 +228,15 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })
 
-    const { error } = await supabase
+    const { data: deleted, error } = await supabase
       .from('templates')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', templateId)
+      .select('id')
+      .maybeSingle()
 
+    // error   → Postgres/network failure (500).
+    // !deleted → RLS blocked the write silently (0 rows); caller is not creator or admin (403).
     if (error) {
       console.error('Template soft delete error:', error)
       return NextResponse.json(
@@ -240,6 +244,8 @@ export async function DELETE(
         { status: 500 }
       )
     }
+    if (!deleted)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     await logAudit(user.id, 'template_deleted', 'template', templateId, {
       title: existing.title,

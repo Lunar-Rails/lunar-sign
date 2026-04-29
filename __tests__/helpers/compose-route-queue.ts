@@ -79,7 +79,8 @@ export function tmplStub(overrides?: Partial<{
 }
 
 // ── DELETE /api/documents/[id] ───────────────────────────────────────────────
-// Route: getUser → documents.maybeSingle → canAccessDocument → documents.update
+// Route: getUser → documents.maybeSingle → canAccessDocument →
+//        documents.update.select('id').maybeSingle
 
 export function queueDocumentDeleteForbiddenNoLinks(docRow = docStub()): QueueChunk {
   return concat(
@@ -92,7 +93,7 @@ export function queueDocumentDeleteOwnerSuccess(docRow = docStub()): QueueChunk 
   return concat(
     [{ data: docRow, error: null }],             // documents.maybeSingle
     queueCanAccessDocumentOwner(docRow.id),
-    [{ data: null, error: null }],               // documents.update (soft delete)
+    [{ data: { id: docRow.id }, error: null }],  // documents.update + select ('id') → row returned
   )
 }
 
@@ -100,7 +101,20 @@ export function queueDocumentDeleteAdminSuccess(docRow = docStub()): QueueChunk 
   return concat(
     [{ data: docRow, error: null }],             // documents.maybeSingle
     queueCanAccessDocumentAdmin(),
-    [{ data: null, error: null }],               // documents.update
+    [{ data: { id: docRow.id }, error: null }],  // documents.update + select ('id') → row returned
+  )
+}
+
+/**
+ * Company member who can read the document (via company link) but whose UPDATE
+ * is blocked by the new RLS policy. canAccessDocument returns true, but the
+ * update returns null (0 rows) → route should return 403.
+ */
+export function queueDocumentDeleteViaCompanyDenied(docRow = docStub()): QueueChunk {
+  return concat(
+    [{ data: docRow, error: null }],             // documents.maybeSingle
+    queueCanAccessDocumentViaCompany(company1),  // canAccessDocument → true (has read access)
+    [{ data: null, error: null }],               // documents.update + select → null (RLS blocks write)
   )
 }
 
@@ -303,6 +317,44 @@ export function queueTemplatePreviewViaCompanySuccess(tmplRow = tmplStub()): Que
   return concat(
     [{ data: tmplRow, error: null }],
     queueCanAccessTemplateViaCompany(company1),
+  )
+}
+
+// ── DELETE /api/templates/[id] ───────────────────────────────────────────────
+// Route: getUser → canAccessTemplate → templates.maybeSingle →
+//        templates.update.select('id').maybeSingle
+
+export function queueTemplateDeleteForbiddenNoLinks(tmplRow = tmplStub()): QueueChunk {
+  return concat(
+    queueCanAccessTemplateDeniedNoLinks(), // canAccessTemplate → false → 403
+  )
+}
+
+export function queueTemplateDeleteCreatorSuccess(tmplRow = tmplStub()): QueueChunk {
+  return concat(
+    queueCanAccessTemplateCreator(tmplRow.id),           // canAccessTemplate → true
+    [{ data: { id: tmplRow.id, title: tmplRow.title }, error: null }], // templates.maybeSingle
+    [{ data: { id: tmplRow.id }, error: null }],          // templates.update + select → row
+  )
+}
+
+export function queueTemplateDeleteAdminSuccess(tmplRow = tmplStub()): QueueChunk {
+  return concat(
+    queueCanAccessTemplateAdmin(),                        // canAccessTemplate → true
+    [{ data: { id: tmplRow.id, title: tmplRow.title }, error: null }], // templates.maybeSingle
+    [{ data: { id: tmplRow.id }, error: null }],          // templates.update + select → row
+  )
+}
+
+/**
+ * Company member who can read the template but whose UPDATE is blocked by
+ * the new RLS policy. Route should return 403 after detecting 0 rows updated.
+ */
+export function queueTemplateDeleteViaCompanyDenied(tmplRow = tmplStub()): QueueChunk {
+  return concat(
+    queueCanAccessTemplateViaCompany(company1),           // canAccessTemplate → true
+    [{ data: { id: tmplRow.id, title: tmplRow.title }, error: null }], // templates.maybeSingle
+    [{ data: null, error: null }],                        // templates.update + select → null (RLS blocks)
   )
 }
 

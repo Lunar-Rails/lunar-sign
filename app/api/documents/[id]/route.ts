@@ -39,11 +39,15 @@ export async function DELETE(
     if (!hasAccess)
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('documents')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', documentId)
+      .select('id')
+      .maybeSingle()
 
+    // error   → Postgres/network failure (500).
+    // !updated → RLS blocked the write silently (0 rows); caller is not owner or admin (403).
     if (error) {
       console.error('Document soft delete error:', error)
       return NextResponse.json(
@@ -51,6 +55,8 @@ export async function DELETE(
         { status: 500 }
       )
     }
+    if (!updated)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     await logAudit(user.id, 'document_deleted', 'document', documentId, {
       title: document.title,

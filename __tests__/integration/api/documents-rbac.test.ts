@@ -24,7 +24,10 @@ import {
   queueDocumentRemindOwnerSuccess,
   docStub,
 } from '../../helpers/compose-route-queue'
-import { queueCanAccessDocumentAdmin } from '../../helpers/rbac-queue-builders'
+import {
+  queueCanAccessDocumentAdmin,
+  queueCanAccessDocumentViaCompany,
+} from '../../helpers/rbac-queue-builders'
 
 vi.mock('@/lib/audit', () => ({ logAudit: vi.fn() }))
 vi.mock('@/lib/email/client', () => ({ sendEmail: vi.fn().mockResolvedValue(true) }))
@@ -176,7 +179,7 @@ describe('PATCH /api/documents/[id]/fields', () => {
         user: { id: userA },
         queue: [
           ...queueDocumentFieldsOwnerSuccess(docStub({ status: 'draft', uploaded_by: userA })),
-          { data: null, error: null }, // documents.update
+          { data: { id: doc1 }, error: null }, // documents.update + select → row returned (RLS allowed)
         ],
       })
     )
@@ -203,6 +206,27 @@ describe('PATCH /api/documents/[id]/fields', () => {
       routeParams({ id: doc1 })
     )
     expect(res.status).toBe(400)
+  })
+
+  it('returns 403 when a company member is blocked by the documents UPDATE policy', async () => {
+    // Company member passes canAccessDocument (read access) but the new RLS policy
+    // only allows owner/admin to UPDATE → DB returns null (0 rows) → route returns 403.
+    createClient.mockResolvedValue(
+      createQueuedSupabaseMock({
+        user: { id: userB },
+        queue: [
+          ...queueCanAccessDocumentViaCompany(),            // canAccessDocument → true
+          { data: { id: doc1, status: 'draft' }, error: null }, // documents.single (post-auth fetch)
+          { data: null, error: null },                      // documents.update → null (RLS blocks)
+        ],
+      })
+    )
+    const { PATCH } = await import('@/app/api/documents/[id]/fields/route')
+    const res = await PATCH(
+      jsonRequest('http://localhost/fields', { field_metadata: [] }, { method: 'PATCH' }),
+      routeParams({ id: doc1 })
+    )
+    expect(res.status).toBe(403)
   })
 })
 

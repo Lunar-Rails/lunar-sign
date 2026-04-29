@@ -52,15 +52,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid field metadata' }, { status: 400 })
     }
 
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from('documents')
       .update({ field_metadata: fieldMetadata })
       .eq('id', documentId)
+      .select('id')
+      .maybeSingle()
 
+    // updateError → Postgres/network failure (500).
+    // !updated   → RLS blocked the write silently (0 rows); caller is not owner or admin (403).
     if (updateError) {
       console.error('Save fields error:', updateError)
       return NextResponse.json({ error: 'Failed to save fields' }, { status: 500 })
     }
+    if (!updated)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     await logAudit(user.id, 'document_fields_updated', 'document', documentId, {
       field_count: fieldMetadata.length,
